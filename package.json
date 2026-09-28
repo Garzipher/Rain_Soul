@@ -1,0 +1,26 @@
+{
+  "name": "soulrain",
+  "version": "1.0.0",
+  "description": "",
+  "main": "playwright.config.js",
+  "scripts": {
+    "test": "playwright test --project=chrome-headless",
+    "test:headed": "playwright test --project=chrome",
+    "test:report": "playwright show-report"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Garzipher/Rain_Soul.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Garzipher/Rain_Soul/issues"
+  },
+  "homepage": "https://github.com/Garzipher/Rain_Soul#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "playwright": "^1.63.0"
+  }
+}

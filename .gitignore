@@ -18,3 +18,8 @@ Thumbs.db
 node_modules/
 __pycache__/
 *.pyc
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
