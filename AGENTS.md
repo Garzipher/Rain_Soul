@@ -125,6 +125,67 @@ feat(user): 添加用户登录功能
 
 ---
 
+## 技能系统（Skills）
+
+本项目已安装以下技能集合，位于 `.trae/skills/` 目录下。AI 智能体应根据任务场景主动使用对应技能。
+
+### 已安装技能
+
+#### Superpowers 技能集（15 个）
+
+| 技能 | 触发场景 | 核心能力 |
+|------|---------|---------|
+| `brainstorming` | 需求模糊、方案不确定时 | 系统化需求分析、多方案对比、边界条件梳理 |
+| `writing-plans` | 需求明确后开工前 | 任务拆解、步骤规划、验收标准定义 |
+| `executing-plans` | 按计划执行开发时 | 按步骤推进、任务追踪、进度管理 |
+| `test-driven-development` | 编写功能代码时 | 测试先行、用例设计、测试覆盖 |
+| `systematic-debugging` | 遇到 bug 需要排查时 | 根因分析、假设验证、系统化排错 |
+| `code-review`（requesting/receiving） | 代码审查场景 | 质量门禁、问题识别、审查清单 |
+| `verification-before-completion` | 任务完成交付前 | 完整性验证、质量检查、交付确认 |
+| `subagent-driven-development` | 复杂大型任务 | 子智能体协作、任务分发、并行开发 |
+| `dispatching-parallel-agents` | 多任务并行场景 | 并行调度、任务分配、结果汇总 |
+| `finishing-a-development-branch` | 分支开发完成时 | 分支收尾、合并准备、交付清单 |
+| `using-git-worktrees` | 多分支并行开发 | Git worktree 管理、多工作区 |
+| `using-superpowers` | 技能使用指导 | 技能总入口、使用方法说明 |
+| `diagnosing-superpowers` | 技能效果不佳时 | 自我诊断、流程分析、优化建议 |
+| `writing-skills` | 自定义技能开发 | 技能编写、最佳实践 |
+
+#### GStack 技能集（20 个核心）
+
+| 技能 | 触发场景 | 核心能力 |
+|------|---------|---------|
+| `office-hours` | 新项目/新功能想法阶段 | 产品思路梳理、价值评估、方向校准 |
+| `plan-ceo-review` | 方案需要战略视角时 | 创始人视角评审、10倍价值挖掘 |
+| `plan-eng-review` | 技术方案评审 | 架构评审、数据流、异常处理、测试计划 |
+| `plan-design-review` | UI/UX 方案评审 | 设计审查、空状态/错误态/加载态 |
+| `design-consultation` | 项目需要设计系统时 | 设计系统搭建、视觉规范、DESIGN.md |
+| `autoplan` | 自动评审流水线 | 自动串行 CEO/Design/Eng 三轮评审 |
+| `review` | 代码审查 | 生产风险审查、bug/回归/缺测检查 |
+| `investigate` | Bug 根因调查 | 系统化追根因、假设验证 |
+| `qa` | 功能测试与修复 | 自动化测试、发现问题并修复 |
+| `design-review` | 视觉打磨 | 视觉 QA、UI 问题修复 |
+| `benchmark` | 性能测试 | 性能基线、Core Web Vitals |
+| `ship` | 发布准备 | 测试/版本/日志/PR 一条龙 |
+| `land-and-deploy` | 合并部署 | 合并、CI 等待、部署验证 |
+| `canary` | 上线后监控 | 生产环境观察、错误/性能异常 |
+| `cso` | 安全审计 | OWASP/STRIDE 审查、secrets/依赖风险 |
+| `careful` | 危险操作 | 危险命令提醒、安全操作模式 |
+| `freeze` | 限制编辑范围 | 目录锁定、边界控制 |
+| `guard` | 高风险操作 | careful + freeze 组合模式 |
+| `document-release` | 发版文档 | README/CHANGELOG/ARCHITECTURE 更新 |
+| `retro` | 周度/阶段回顾 | 工程复盘、趋势分析、产出统计 |
+
+### 技能使用原则
+
+1. **主动使用**：当任务场景与技能描述匹配时，主动调用对应技能的工作流，不要等用户明确要求。
+2. **按需选择**：根据任务复杂度选择合适的技能，简单任务不必走重型流程。
+3. **组合使用**：复杂任务可以组合多个技能，形成完整工作流。
+   - 典型链路：`brainstorming` → `writing-plans` → `test-driven-development` → `review` → `verification-before-completion`
+   - 产品链路：`office-hours` → `plan-eng-review` → 实现 → `review` → `qa` → `ship`
+4. **质量优先**：技能是手段不是目的，始终以交付高质量结果为目标。
+
+---
+
 ## 语言与沟通规范
 
 - 所有代码注释、文档、commit message 使用中文编写。
