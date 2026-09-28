@@ -1,0 +1,65 @@
+{
+  "dispatchLayer": {
+    "active": "gsd-core",
+    "priority": [
+      "gsd-core",
+      "subagent-driven-development",
+      "dispatching-parallel-agents",
+      "executing-plans"
+    ],
+    "preserved": [
+      "test-driven-development",
+      "requesting-code-review",
+      "receiving-code-review"
+    ],
+    "autoDispatchThreshold": {
+      "taskCount": 2,
+      "estimatedComplexity": "medium"
+    },
+    "status": "active"
+  },
+  "memoryLayer": {
+    "active": "claude-mem",
+    "legacy": "gbrain",
+    "legacyStatus": "dormant",
+    "forwardAllRequests": true,
+    "migrationCompleted": true,
+    "migrationResult": {
+      "sourceEntries": 0,
+      "migratedEntries": 0,
+      "failedEntries": 0,
+      "note": "gbrain CLI 未安装，无历史记忆数据需要迁移"
+    },
+    "totalMemoryEntries": 0,
+    "storage": {
+      "type": "sqlite",
+      "path": ".trae/memory/claude-mem.db"
+    },
+    "status": "active"
+  },
+  "knowledgeLayer": {
+    "active": "compound-engineering",
+    "trigger": "after-all-dev-tasks",
+    "priority": 1,
+    "enabled": true,
+    "totalKnowledgeEntries": 63,
+    "categoryBreakdown": {
+      "architecture-patterns": 6,
+      "best-practices": 11,
+      "bug-patterns": 4,
+      "design-patterns": 36,
+      "integration-solutions": 3,
+      "performance-optimizations": 3
+    },
+    "autoCollect": {
+      "superpowersPlans": true,
+      "gstackDeliverables": true,
+      "architectureDecisions": true,
+      "codeReviewFindings": true
+    },
+    "knowledgeBasePath": ".trae/knowledge/",
+    "status": "active"
+  },
+  "integrationDate": "2026-09-28",
+  "overallStatus": "operational"
+}

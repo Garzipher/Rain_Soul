@@ -75,6 +75,19 @@ The one-time privacy stop-gate (artifacts-sync consent) arrives as a
 `GSTACK_INSTRUCTION` block from skill-start when consent is actually pending
 — fire it via AskUserQuestion exactly as the block instructs.
 
+## Memory Layer — Forwarded to Claude Mem
+
+**⚠️ 记忆层已迁移：** gstack 的所有记忆读写请求现已统一转发到 **Claude Mem** 全局记忆层。
+gbrain 已进入休眠状态（dormant），不再写入新数据。
+
+- **活跃记忆层：** `claude-mem` Skill
+- **记忆接口：** read / write / search / update / delete — 全部通过 claude-mem 路由
+- **gbrain 状态：** 只读保留，用于历史数据查询，新数据不再写入 gbrain
+- **配置文件：** `.trae/skill-config/memory-config.json`
+- **迁移状态：** 已完成（无历史数据需要迁移）
+
+如需进行记忆操作，请调用 `claude-mem` Skill 或使用其记忆搜索接口。
+
 ## Model-Specific Behavioral Patch (claude)
 
 The following nudges are tuned for the claude model family. They are
