@@ -1,0 +1,18 @@
+{
+  "defaultDispatcher": "gsd-core",
+  "priorityOrder": [
+    "gsd-core",
+    "subagent-driven-development",
+    "dispatching-parallel-agents",
+    "executing-plans"
+  ],
+  "preservedSkills": [
+    "test-driven-development",
+    "requesting-code-review",
+    "receiving-code-review"
+  ],
+  "autoDispatchThreshold": {
+    "taskCount": 2,
+    "estimatedComplexity": "medium"
+  }
+}
