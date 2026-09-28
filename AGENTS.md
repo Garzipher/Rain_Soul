@@ -100,6 +100,46 @@ feat(user): 添加用户登录功能
 
 ---
 
+## 代码交付校验规则
+
+### 3.1 TDD 规范执行
+
+- **所有代码编写、修改流程严格遵循 superpowers 的 TDD（测试驱动开发）规范执行**
+- 遵循 Red-Green-Refactor 模式：先写失败测试 → 实现功能使测试通过 → 重构优化
+- 测试金字塔原则：80% 单元测试 / 15% 集成测试 / 5% 端到端测试
+- 遵循 Beyonce Rule：如果你喜欢它，就应该给它写个测试
+
+### 3.2 Agent-Skills 二次校验
+
+- **代码提交前自动调用 Agent-Skills by Addy Osmani 的全部校验规则，做二次规范检查**
+- 校验覆盖以下核心维度：
+  - **代码质量审查**（code-review-and-quality）：五轴代码审查，变更规模控制
+  - **安全加固**（security-and-hardening）：OWASP Top 10、认证模式、敏感信息管理
+  - **性能优化**（performance-optimization）：Core Web Vitals、性能剖析
+  - **可访问性**（accessibility）：WCAG 2.1 AA 标准
+  - **可观测性**（observability-and-instrumentation）：结构化日志、RED 指标、链路追踪
+  - **测试质量**（test-driven-development）：测试覆盖、测试模式、反模式检查
+  - **Git 工作流**（git-workflow-and-versioning）：原子提交、变更大小规范
+  - **文档质量**（documentation-and-adrs）：架构决策记录、API 文档
+
+### 3.3 校验门禁
+
+- **校验不通过的代码不允许提交**，必须修复所有不符合工业规范的问题后才能继续
+- 以下情况必须阻断提交：
+  - 测试用例未通过或覆盖率不达标
+  - 存在安全漏洞或敏感信息泄露风险
+  - 代码质量审查存在严重（Severity: High）问题
+  - 不符合性能基线要求
+  - 提交信息格式不规范
+  - 变更规模过大（建议单次不超过 ~200 行）
+- 所有问题必须在提交前修复，不允许带病上线
+
+### 3.4 Agent-Skills 项目位置
+
+Agent-Skills by Addy Osmani 已下载至项目根目录：`agent-skills-main/`，包含 25 个生产级工程技能和 4 个专家角色（代码审查员、测试工程师、安全审计员、Web 性能审计员）。
+
+---
+
 ## 标准工作流程
 
 ### 开发任务执行流程
