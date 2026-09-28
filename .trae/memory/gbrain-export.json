@@ -1,0 +1,18 @@
+{
+  "exportTime": "2026-09-28T00:00:00Z",
+  "source": "gbrain",
+  "sourceVersion": null,
+  "migrationStatus": "no_data",
+  "entries": [],
+  "totalEntries": 0,
+  "meta": {
+    "note": "gbrain CLI 未安装，未检测到可导出的记忆数据。此文件为占位导出文件，用于标记迁移已执行且无历史数据需要迁移。",
+    "detectionResult": {
+      "gbrain_on_path": false,
+      "gbrain_local_status": "no-cli",
+      "gstack_brain_sync_mode": "off"
+    },
+    "exportTool": "claude-mem migration",
+    "schemaVersion": "1.0"
+  }
+}

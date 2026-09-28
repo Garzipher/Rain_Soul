@@ -1,0 +1,11 @@
+{
+  "activeMemoryLayer": "claude-mem",
+  "legacyLayer": "gbrain",
+  "legacyLayerStatus": "dormant",
+  "forwardAllRequests": true,
+  "migrationCompleted": true,
+  "storage": {
+    "type": "sqlite",
+    "path": ".trae/memory/claude-mem.db"
+  }
+}
