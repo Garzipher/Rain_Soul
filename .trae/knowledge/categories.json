@@ -1,0 +1,35 @@
+{
+  "version": "1.0.0",
+  "categories": {
+    "architecture-patterns": {
+      "name": "架构模式",
+      "description": "系统架构设计模式、流程模式、跨平台架构方案",
+      "entryCount": 6
+    },
+    "best-practices": {
+      "name": "最佳实践",
+      "description": "编码规范、约定俗成、开发体验优化、工程最佳实践",
+      "entryCount": 11
+    },
+    "bug-patterns": {
+      "name": "Bug 模式",
+      "description": "已知缺陷模式、集成问题、常见陷阱及其修复方案",
+      "entryCount": 4
+    },
+    "design-patterns": {
+      "name": "设计模式",
+      "description": "Skill 设计模式、Agent 交互模式、状态机、调度策略",
+      "entryCount": 36
+    },
+    "integration-solutions": {
+      "name": "集成方案",
+      "description": "多平台集成、插件系统、跨工具链对接方案",
+      "entryCount": 3
+    },
+    "performance-optimizations": {
+      "name": "性能优化",
+      "description": "性能瓶颈分析、优化策略、资源效率提升方案",
+      "entryCount": 3
+    }
+  }
+}

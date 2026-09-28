@@ -1,0 +1,1468 @@
+{
+  "version": "1.0.0",
+  "name": "Compound Engineering Knowledge Base",
+  "description": "知识复利层 - 结构化沉淀开发经验，避免重复造轮子",
+  "created_at": "2026-09-28",
+  "last_updated": "2026-09-28",
+  "stats": {
+    "total_entries": 63,
+    "categories": {
+      "architecture-patterns": 6,
+      "best-practices": 11,
+      "bug-patterns": 4,
+      "design-patterns": 36,
+      "integration-solutions": 3,
+      "performance-optimizations": 3
+    }
+  },
+  "entries": [
+    {
+      "id": "adding-converter-target-providers",
+      "title": "Converter Target Provider Pitfalls",
+      "path": "compound-engineering-plugin/docs/solutions/adding-converter-target-providers.md",
+      "category": "integration-solutions",
+      "summary": "The step-by-step procedure for adding a target (types, converter, writer, CLI wiring, tests, docs) lives in `docs/solutions/developer-experience/always-on-agents-md.md` under \"Adding a target provi...",
+      "tags": [
+        "converter",
+        "target-provider",
+        "plugin-conversion",
+        "multi-platform",
+        "pattern"
+      ],
+      "date": "2026-02-23",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "agent-friendly-cli-principles",
+      "title": "Agent-Friendly CLIs: An Absent Artifact Is Not an Error",
+      "path": "compound-engineering-plugin/docs/solutions/agent-friendly-cli-principles.md",
+      "category": "best-practices",
+      "summary": "General agent-CLI hygiene (non-interactive by default, `--json` output, examples in `--help`, actionable errors, idempotent retries, bounded output) is covered by public guidance such as Anthropic'...",
+      "tags": [
+        "agent-cli",
+        "cli-design",
+        "error-handling",
+        "exit-codes",
+        "peer-job-runner"
+      ],
+      "date": "2026-03-26",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "posix-process-supervision-on-native-windows",
+      "title": "Porting POSIX process supervision to native Windows: the primitives that fail silently",
+      "path": "compound-engineering-plugin/docs/solutions/architecture-patterns/posix-process-supervision-on-native-windows.md",
+      "category": "architecture-patterns",
+      "summary": "`peer-job-runner.py` supervises detached cross-model peer jobs. It was POSIX-only: `os.fork`/`os.setsid` to detach, `killpg` to reap the worker tree, `fstat().st_uid == geteuid()` plus mode `0700`/...",
+      "tags": [
+        "windows",
+        "cross-platform",
+        "process-supervision",
+        "job-objects",
+        "taskkill",
+        "ctypes",
+        "file-ownership",
+        "o-binary",
+        "detached-jobs",
+        "file-locking",
+        "msvcrt",
+        "pid-reuse",
+        "atomic-rename"
+      ],
+      "date": "2026-07-24",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Porting a POSIX-only supervisor, daemon, or detached-job runner to native Windows Python",
+        "Replacing fork/setsid, killpg, or process groups with Windows equivalents",
+        "Reading or writing bytes through os.open on Windows (result artifacts, logs, caches)",
+        "Reimplementing a uid/mode-based file-ownership or privacy check on Windows",
+        "A worker's child processes survive teardown on Windows but not on macOS/Linux",
+        "Replacing fcntl.flock with a Windows file lock, or relying on a shared/read lock",
+        "Replacing a `ps`-based process-identity or start-time probe used as a PID-reuse guard",
+        "os.replace raises PermissionError on Windows but never on macOS/Linux"
+      ]
+    },
+    {
+      "id": "codex-delegation-best-practices",
+      "title": "Codex Delegation Token Economics",
+      "path": "compound-engineering-plugin/docs/solutions/best-practices/codex-delegation-best-practices.md",
+      "category": "best-practices",
+      "summary": "Measured over six evaluation iterations of an experimental `ce-work` delegation mode (since removed; the live successor is `skills/ce-work/references/cross-model-execution.md`). The setting names i...",
+      "tags": [
+        "codex-delegation",
+        "token-economics",
+        "skill-design",
+        "batching",
+        "orchestration-cost"
+      ],
+      "date": "2026-04-01",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Designing delegation to external models (Codex, future delegates) in orchestrator skills",
+        "Authoring or editing SKILL.md files where token cost matters",
+        "Choosing whether to delegate plan execution or implement directly"
+      ]
+    },
+    {
+      "id": "predictable-tmp-cache-ownership-check",
+      "title": "A predictable-path cache in shared /tmp is a prompt-injection vector — ownership-check reads",
+      "path": "compound-engineering-plugin/docs/solutions/best-practices/predictable-tmp-cache-ownership-check.md",
+      "category": "best-practices",
+      "summary": "A scratch file at a knowable path under world-traversable `/tmp` (keyed by commit SHA, repo name, username, or a digest of committed blobs) can be **pre-created** by a local co-tenant. A planted fi...",
+      "tags": [
+        "security",
+        "prompt-injection",
+        "cache",
+        "tmp",
+        "file-ownership",
+        "shared-host"
+      ],
+      "date": "2026-06-29",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Writing a cache or scratch file to a world-shared location (/tmp) at a predictable path",
+        "The cached content is later fed into an LLM/agent context",
+        "Running on a multi-user host where a local co-tenant could pre-create files"
+      ]
+    },
+    {
+      "id": "prefer-python-over-bash-for-pipeline-scripts",
+      "title": "Prefer Python over bash for multi-step pipeline scripts",
+      "path": "compound-engineering-plugin/docs/solutions/best-practices/prefer-python-over-bash-for-pipeline-scripts.md",
+      "category": "best-practices",
+      "summary": "A bash pipeline script in a since-removed skill hit four distinct bug classes over four review rounds. None was a coding slip; each is inherent to bash's execution model, so the same four recur in ...",
+      "tags": [
+        "bash-vs-python",
+        "pipeline-scripts",
+        "skill-scripting",
+        "set-e-footguns",
+        "error-handling"
+      ],
+      "date": "2026-04-09",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Script orchestrates 2+ external CLI tools (ffmpeg, curl, silicon, vhs)",
+        "Script needs retry logic or graceful degradation on tool failure",
+        "Script will run on macOS where bash 3.2 is the default",
+        "Script needs to be tested from a non-shell test runner (Bun, Jest, pytest)",
+        "Script has conditional failure paths where some errors should be caught and others should abort"
+      ]
+    },
+    {
+      "id": "preserve-user-content-across-all-destructive-paths",
+      "title": "A preserve-user-content guard must cover every destructive path to the target, not just the main one",
+      "path": "compound-engineering-plugin/docs/solutions/best-practices/preserve-user-content-across-all-destructive-paths.md",
+      "category": "best-practices",
+      "summary": "The Pi writer (`src/targets/pi.ts`) clobbered user-managed symlink overrides on every `install ... --to pi` (issue #1048): the main skill/agent loop did `fs.rm(target, { recursive: true, force: tru...",
+      "tags": [
+        "pi-writer",
+        "symlink",
+        "user-content",
+        "install",
+        "choke-point",
+        "adversarial-review",
+        "converters"
+      ],
+      "date": "2026-07-09",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Adding a guard so an installer/writer stops clobbering user-managed files (symlink overrides, hand-authored dirs)",
+        "A target writer removes-then-rewrites content and more than one function can delete or move that same path",
+        "Reviewing a fix that protects a resource against one operation when sibling operations touch it too"
+      ]
+    },
+    {
+      "id": "antigravity-target-empirical-format-verification",
+      "title": "Verify a new target platform's plugin format against the CLI binary, not its docs",
+      "path": "compound-engineering-plugin/docs/solutions/conventions/antigravity-target-empirical-format-verification.md",
+      "category": "best-practices",
+      "summary": "Adding a new converter Target (see [adding-converter-target-providers.md](../adding-converter-target-providers.md) for the structural 6-phase checklist) assumes you know the target's plugin format:...",
+      "tags": [
+        "antigravity",
+        "agy",
+        "new-target",
+        "plugin-format",
+        "empirical-verification",
+        "converter"
+      ],
+      "date": "2026-06-23",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Adding a new converter or install Target for an agent platform",
+        "The platform's official docs render client-side or are otherwise not machine-readable",
+        "Establishing the ground-truth plugin layout before writing converter or writer code",
+        "Migrating an existing Target to a successor platform (e.g. Gemini CLI to Antigravity)"
+      ]
+    },
+    {
+      "id": "resolve-python-interpreter-not-python3",
+      "title": "Resolve the Python interpreter by probing execution — never hardcode `python3` in agent-facing prose",
+      "path": "compound-engineering-plugin/docs/solutions/conventions/resolve-python-interpreter-not-python3.md",
+      "category": "best-practices",
+      "summary": "While adding native Windows support to `peer-job-runner.py` (issue #1243), the runner itself was made to work — verified end to end on Windows 11. The feature still did not work, because every skil...",
+      "tags": [
+        "windows",
+        "python",
+        "interpreter-resolution",
+        "portability",
+        "skill-authoring",
+        "silent-failure",
+        "store-stub"
+      ],
+      "date": "2026-07-24",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Writing a SKILL.md or reference doc that instructs an agent to run a bundled script",
+        "A bundled Python script works when run by hand but the documented invocation fails",
+        "Supporting native Windows contributors (not WSL, not Git Bash with a POSIX Python)",
+        "A feature degrades to a fallback path on one platform and never reports why"
+      ]
+    },
+    {
+      "id": "shell-primitives-must-be-executed-not-shape-checked",
+      "title": "A shape assertion cannot prove a shell primitive exists — execute the documented block",
+      "path": "compound-engineering-plugin/docs/solutions/conventions/shell-primitives-must-be-executed-not-shape-checked.md",
+      "category": "best-practices",
+      "summary": "Twelve skills opened their scratch space with the same guarded preamble: ```bash SCRATCH_ROOT=\"/tmp/compound-engineering-$(id -u)\"; [ ! -L \"$SCRATCH_ROOT\" ] && install -d -m 700 \"$SCRATCH_ROOT\" && ...",
+      "tags": [
+        "windows",
+        "git-bash",
+        "portability",
+        "shell",
+        "coreutils",
+        "testing",
+        "silent-failure",
+        "install",
+        "umask"
+      ],
+      "date": "2026-07-30",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "A guard test asserts that skill prose *contains* a shell command",
+        "Writing or reviewing a scratch-root, lock, or temp-dir preamble an agent will execute",
+        "Supporting native Windows contributors (Git Bash, not WSL)",
+        "A skill works on macOS/Linux and fails on one host before doing any work"
+      ]
+    },
+    {
+      "id": "verify-externally-attributed-constraints-at-the-source",
+      "title": "Verify an externally-attributed constraint against the spec text and the implementing source before encoding it",
+      "path": "compound-engineering-plugin/docs/solutions/conventions/verify-externally-attributed-constraints-at-the-source.md",
+      "category": "best-practices",
+      "summary": "This repo enforces an 8,000-byte ceiling on every `SKILL.md` body. Around that ratchet a belief had settled: that 8,000 bytes is a requirement of the **Agent Plugins standard**. Contributing agents...",
+      "tags": [
+        "provenance",
+        "primary-sources",
+        "agent-plugins",
+        "agent-skills-spec",
+        "codex",
+        "verification",
+        "stale-claims"
+      ],
+      "date": "2026-08-21",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "A test, lint rule, or convention enforces a number attributed to an external standard, spec, or platform",
+        "The attribution carries no file-and-line citation into the spec text or the implementing source",
+        "A review comment or another agent asserts \\\"the spec requires X\\\" and you are about to design around X",
+        "Tightening, loosening, or justifying such a gate",
+        "A repo comment makes a negative claim about upstream (\\\"no such constant exists\\\")"
+      ]
+    },
+    {
+      "id": "always-on-agents-md",
+      "title": "Always-on AGENTS.md vs task-loaded contributor notes",
+      "path": "compound-engineering-plugin/docs/solutions/developer-experience/always-on-agents-md.md",
+      "category": "best-practices",
+      "summary": "Root `AGENTS.md` (also `CLAUDE.md`) loads on every turn. Keep invariants there. Load the sections below only when the task needs them. [OpenAI's Astra note](https://developers.openai.com/blog/rethi...",
+      "tags": [
+        "agents-md",
+        "context-tax",
+        "astra",
+        "ci",
+        "scratch",
+        "portability"
+      ],
+      "date": "2026-09-12",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Editing root AGENTS.md / CLAUDE.md",
+        "Changing CI layout, scratch roots, platform-variable skill prose, or adding a target provider",
+        "Deciding whether an instruction belongs in the always-on file"
+      ]
+    },
+    {
+      "id": "bun-parallel-worker-loses-subprocess-exit",
+      "title": "A bun test worker that loses one subprocess exit turns the rest of its file into exact-timeout failures",
+      "path": "compound-engineering-plugin/docs/solutions/developer-experience/bun-parallel-worker-loses-subprocess-exit.md",
+      "category": "bug-patterns",
+      "summary": "From 2026-09-09 the CI `test` job (`bun run test`, which was `bun test --parallel`) went red on about one in three runs on `main` and on unrelated PRs. Each red run showed the same shape: one subpr...",
+      "tags": [
+        "bun",
+        "bun-test-parallel",
+        "spawnSync",
+        "flaky-tests",
+        "ci"
+      ],
+      "date": "2026-09-11",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "codex-local-skill-development-workflow",
+      "title": "Codex local skill development from any worktree",
+      "path": "compound-engineering-plugin/docs/solutions/developer-experience/codex-local-skill-development-workflow.md",
+      "category": "best-practices",
+      "summary": "The workflow itself (`bun run codex:dev -- local|status|refresh|remote|remove`) is documented in AGENTS.md \"Codex Local Plugin Development\" and implemented in `src/dev/codex-dev.ts`. This doc keeps...",
+      "tags": [
+        "codex",
+        "local-development",
+        "worktrees",
+        "skill-symlink",
+        "plugin-cache",
+        "installation-modes",
+        "config-reconciliation"
+      ],
+      "date": "2026-07-16",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Testing Compound Engineering skill changes from any checkout or linked worktree in Codex",
+        "Switching between unreleased local skill content and the official marketplace-backed plugin",
+        "Verifying which worktree supplies the active Compound Engineering skills"
+      ]
+    },
+    {
+      "id": "global-fsmonitor-makes-the-suite-slow-and-flaky",
+      "title": "A global core.fsmonitor=true makes the subprocess-heavy suite 2.6x slower and flaky",
+      "path": "compound-engineering-plugin/docs/solutions/developer-experience/global-fsmonitor-makes-the-suite-slow-and-flaky.md",
+      "category": "performance-optimizations",
+      "summary": "On a Cursor cloud-agent VM, `bun run test` ran in 220s with two to five 20s timeouts on every run, each time in a different git-heavy file (`cli.test.ts`, `codex-dev.test.ts`, `ce-code-review-mecha...",
+      "tags": [
+        "git",
+        "fsmonitor",
+        "flaky-tests",
+        "cursor-cloud-agent",
+        "test-timeouts"
+      ],
+      "date": "2026-09-08",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "grok-camelcase-structuredoutput-and-nonfinal-peer-position",
+      "title": "Grok's camelCase structuredOutput and schema-valid non-final positions slip past cross-model peer acceptance",
+      "path": "compound-engineering-plugin/docs/solutions/integration-issues/grok-camelcase-structuredoutput-and-nonfinal-peer-position.md",
+      "category": "bug-patterns",
+      "summary": "A `ce-pov` grok-cli peer returned, in ~20s with exit 0, a schema-valid artifact whose `position` was \"blocked: gathering subject evidence\". Every mechanical gate passed it; only orchestrator judgme...",
+      "tags": [
+        "cross-model",
+        "structured-output",
+        "json-schema",
+        "peer-delegation",
+        "ce-pov",
+        "grok"
+      ],
+      "date": "2026-08-15",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "portable-structured-output-schemas-across-model-clis",
+      "title": "Keep structured-output schemas portable across model CLIs",
+      "path": "compound-engineering-plugin/docs/solutions/integration-issues/portable-structured-output-schemas-across-model-clis.md",
+      "category": "bug-patterns",
+      "summary": "A schema passed to an external model CLI is a wire-format contract, not an extensible JSON container: it must stay inside the target validator's supported draft and vocabulary. Human-only metadata ...",
+      "tags": [
+        "cross-model",
+        "structured-output",
+        "json-schema",
+        "schema-portability",
+        "provider-cli",
+        "startup-errors"
+      ],
+      "date": "2026-07-15",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "agent-plugins-schema-is-a-host-routing-switch",
+      "title": "Agent Plugins $schema on root plugin.json is a host routing switch that truncates or drops skills on Codex and oh-my-pi",
+      "path": "compound-engineering-plugin/docs/solutions/integrations/agent-plugins-schema-is-a-host-routing-switch.md",
+      "category": "integration-solutions",
+      "summary": "The decision (root `plugin.json` stays schema-less indefinitely, and why no single root manifest can satisfy Claude Code, Codex, and omp) lives in `docs/specs/agent-plugins.md`; the guard is `tests...",
+      "tags": [
+        "agent-plugins",
+        "plugin-json",
+        "schema",
+        "codex",
+        "oh-my-pi",
+        "skill-truncation",
+        "frontmatter",
+        "host-routing"
+      ],
+      "date": "2026-08-17",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": []
+    },
+    {
+      "id": "cross-platform-model-field-normalization",
+      "title": "Cross-platform model field normalization for target converters",
+      "path": "compound-engineering-plugin/docs/solutions/integrations/cross-platform-model-field-normalization.md",
+      "category": "bug-patterns",
+      "summary": "Claude Code uses bare model aliases (`model: sonnet`) in agent and command frontmatter. A `model` field in a target's frontmatter does not mean the format is the same: each target wants something d...",
+      "tags": [
+        "model-normalization",
+        "converters",
+        "cross-platform",
+        "opencode",
+        "droid",
+        "copilot",
+        "codex"
+      ],
+      "date": "2026-03-29",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "native-plugin-install-strategy",
+      "title": "Native plugin install strategy for supported harnesses",
+      "path": "compound-engineering-plugin/docs/solutions/integrations/native-plugin-install-strategy.md",
+      "category": "integration-solutions",
+      "summary": "Per-harness install commands live in `README.md` (\"Install\" and \"More Install Options\") and are not repeated here. This doc holds the decision and the two rules that fall out of it. Compound Engine...",
+      "tags": [
+        "install-strategy",
+        "native-plugins",
+        "converter-targets",
+        "codex",
+        "kimi",
+        "release-validation"
+      ],
+      "date": "2026-06-19",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "anti-poll-scope-and-async-subagent-dispatch",
+      "title": "Scope anti-poll discipline to detached CLI delegates, and collect subagents by observed return shape",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/anti-poll-scope-and-async-subagent-dispatch.md",
+      "category": "design-patterns",
+      "summary": "This repository authors each skill once and converts it for Claude Code, Codex, Cursor, and Gemini. A skill's dispatch rules therefore run against whatever subagent primitive the host exposes, and ...",
+      "tags": [
+        "cross-model",
+        "subagent-dispatch",
+        "concurrency",
+        "skill-authoring",
+        "codex",
+        "claude-code",
+        "anti-poll",
+        "async"
+      ],
+      "date": "2026-07-21",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Authoring or revising a cross-model skill that dispatches subagents (Claude Code Agent, Codex spawn_agent)",
+        "Writing anti-poll / no-background-task discipline that must not accidentally serialize harness-managed subagent dispatch",
+        "Specifying fan-out concurrency rules that must run identically on Claude Code and Codex",
+        "Reviewing a skill that dispatches multiple reviewers or workers in parallel"
+      ]
+    },
+    {
+      "id": "arguments-token-is-claude-only-in-skill-bodies",
+      "title": "$ARGUMENTS is reliably substituted inside SKILL.md only on Claude Code — reason over the user's prompt instead",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/arguments-token-is-claude-only-in-skill-bodies.md",
+      "category": "design-patterns",
+      "summary": "`$ARGUMENTS` substitution inside a SKILL.md **body** is confirmed only on Claude Code. Per each platform's own documentation: Codex documents `$1`–`$9`, `$ARGUMENTS`, and named placeholders for **p...",
+      "tags": [
+        "skill-authoring",
+        "cross-harness",
+        "arguments",
+        "claude-arguments",
+        "prompt-reasoning",
+        "portability",
+        "flag-parsing"
+      ],
+      "date": "2026-06-26",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Authoring or reviewing a skill that needs the user's invocation arguments inside SKILL.md",
+        "A skill must work on more than one harness (Claude Code, Codex, Cursor, Gemini, Kiro)",
+        "Scanning the prompt for a flag token (output:, mode:, delegate:) rather than only injecting a description",
+        "Deciding whether to depend on the $ARGUMENTS substitution token in skill body prose"
+      ]
+    },
+    {
+      "id": "authored-eval-corpora-contain-the-happy-path",
+      "title": "An authored eval corpus contains the mechanism's happy path",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/authored-eval-corpora-contain-the-happy-path.md",
+      "category": "design-patterns",
+      "summary": "A reasoning-based duplicate matcher for `ce-doc-review` was evaluated against a purpose-built corpus: plans generated by an independent harness, with defect manifests withheld from the session that...",
+      "tags": [
+        "skill-eval",
+        "evaluation-design",
+        "corpus",
+        "blind-scoring",
+        "false-pass"
+      ],
+      "date": "2026-08-13",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": []
+    },
+    {
+      "id": "authoring-auto-invoke-standing-instructions",
+      "title": "Authoring \"Make It Automatic\" auto-invoke guidance for CE skills",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/authoring-auto-invoke-standing-instructions.md",
+      "category": "design-patterns",
+      "summary": "Users add a standing instruction to their agent-instructions file so a skill whose value sits at a completion boundary (`ce-simplify-code`, `ce-compound`) runs on its own. A naive instruction waste...",
+      "tags": [
+        "auto-invoke",
+        "standing-instruction",
+        "ce-simplify-code",
+        "ce-compound",
+        "defense-in-depth",
+        "cross-harness"
+      ],
+      "date": "2026-07-12",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Adding a \"Make It Automatic\" / \"Make Capture Automatic\" section to a skill's docs page",
+        "Writing a standing instruction that tells an agent to auto-invoke a skill from AGENTS.md/CLAUDE.md",
+        "Wiring a mutating skill (ce-simplify-code, ce-compound) to run on its own without user prompting"
+      ]
+    },
+    {
+      "id": "benchmark-review-peer-model-and-reasoning-tier",
+      "title": "Benchmark a cross-model review peer's model and reasoning tier with reversed real bugs and a detection-vs-assertion judge",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/benchmark-review-peer-model-and-reasoning-tier.md",
+      "category": "design-patterns",
+      "summary": "ce-code-review dispatches an adversarial-reviewer persona to a peer model (a different serving family than the host). Two knobs — which model and which reasoning tier — had been set editorially (\"o...",
+      "tags": [
+        "skill-eval",
+        "cross-model",
+        "reasoning-effort",
+        "benchmark",
+        "non-inferiority",
+        "cost-accounting"
+      ],
+      "date": "2026-07-18",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Choosing or changing the model or reasoning tier a skill dispatches a peer/subagent on",
+        "Evaluating a \"cheaper and faster at similar quality\" claim about a candidate model",
+        "Comparing candidate models that sit at different per-token price tiers",
+        "Any peer or subagent whose output is graded for whether it caught something"
+      ]
+    },
+    {
+      "id": "bound-contradiction-checks-to-named-guidance",
+      "title": "Bound instruction-layer contradiction checks to guidance the learning names",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/bound-contradiction-checks-to-named-guidance.md",
+      "category": "design-patterns",
+      "summary": "`ce-compound-refresh` compares a knowledge-track learning against guidance files the learning itself names or links, never searches the guidance layer for an owner, and never edits guidance. The ru...",
+      "tags": [
+        "skill-design",
+        "ce-compound-refresh",
+        "contradiction-detection",
+        "scope-control",
+        "instruction-layer",
+        "subagent-prompt-parity",
+        "mechanical-guard",
+        "eval-fixtures"
+      ],
+      "date": "2026-08-15",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "designing a maintenance skill that checks a stored artifact (learning, doc, spec) against a second layer that could be arbitrarily large — skills, runbooks, root instruction files",
+        "tempted to have the skill search that layer for the file that 'owns' a procedure instead of using files the artifact itself names or links",
+        "a rule must also hold inside a fresh subagent that sees only its own prompt"
+      ]
+    },
+    {
+      "id": "bundled-script-path-resolution-across-harnesses",
+      "title": "Reference bundled skill files by tier: relative for reads, SKILL_DIR anchor for executed scripts",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/bundled-script-path-resolution-across-harnesses.md",
+      "category": "design-patterns",
+      "summary": "The invariant and `SKILL_DIR` shape stay in `AGENTS.md` under \"Platform-Specific Variables in Skills\". The three tiers, flatten-safety, and the permission caveat live in `docs/solutions/developer-e...",
+      "tags": [
+        "bundled-scripts",
+        "path-resolution",
+        "skill-authoring",
+        "cross-harness",
+        "skill-dir",
+        "bash-tool",
+        "claude-skill-dir",
+        "empirical-validation"
+      ],
+      "date": "2026-06-26",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Authoring or reviewing a skill that executes a bundled script via the Bash tool",
+        "A skill must work on more than one harness (Claude Code, Codex, Cursor, Gemini)",
+        "Generalizing an empirical harness finding into a broad authoring rule"
+      ]
+    },
+    {
+      "id": "ce-doc-review-calibration-patterns",
+      "title": "ce-doc-review calibration patterns: tier classification, schema callouts, and run variance",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/ce-doc-review-calibration-patterns.md",
+      "category": "design-patterns",
+      "summary": "Patterns that re-surface whenever personas or synthesis guidance are retuned. Contributors changing calibration should expect them and not \"fix\" them as bugs. The naive read of the tier spec says `...",
+      "tags": [
+        "ce-doc-review",
+        "autofix-classification",
+        "synthesis-pipeline",
+        "persona-calibration",
+        "calibration"
+      ],
+      "date": "2026-04-19",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Changing persona confidence calibration in the doc-review skill-local personas under `skills/ce-doc-review/references/personas/`",
+        "Modifying the synthesis pipeline in `skills/ce-doc-review/references/synthesis-and-presentation.md`",
+        "Adjusting the subagent template's output contract in `references/subagent-template.md`",
+        "Adding or modifying seeded test fixtures under `tests/fixtures/ce-doc-review/`",
+        "Debugging why a finding landed in a different tier than expected"
+      ]
+    },
+    {
+      "id": "cli-output-buffering-for-progress-detection",
+      "title": "Headless output buffering differs across agent CLIs, breaking stdout-growth progress detection",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/cli-output-buffering-for-progress-detection.md",
+      "category": "performance-optimizations",
+      "summary": "Several skills in this repo supervise a long-running peer agent CLI as a child process and decide whether it is still making progress by watching its output file grow. Two layers do this: - **Inner...",
+      "tags": [
+        "cross-harness",
+        "output-buffering",
+        "progress-detection",
+        "headless-agents",
+        "peer-delegation"
+      ],
+      "date": "2026-07-20",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Supervising a delegated agent CLI and deciding whether it is still making progress",
+        "Setting or tuning idle and hard timeout windows for a peer or delegated job",
+        "Choosing an --output-format for a supervised CLI call, especially alongside --json-schema",
+        "Debugging a peer run reaped as idle or timeout that appeared healthy"
+      ]
+    },
+    {
+      "id": "confidence-anchored-scoring",
+      "title": "ce-doc-review confidence scoring: anchored rubric over continuous floats",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/confidence-anchored-scoring.md",
+      "category": "design-patterns",
+      "summary": "Persona review originally used a continuous `confidence` (0.0-1.0) against per-severity gates (0.50 / 0.60 / 0.65 / 0.75) and a 0.40 FYI floor. The scale invited false precision: personas clustered...",
+      "tags": [
+        "ce-doc-review",
+        "ce-code-review",
+        "scoring",
+        "calibration",
+        "personas",
+        "persona-rubric"
+      ],
+      "date": "2026-04-21",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "context-absent-skill-handoff-needs-pinned-invocation",
+      "title": "Context-absent skill handoffs need ownership transfer, a loaded callee, and fail-closed refusal",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/context-absent-skill-handoff-needs-pinned-invocation.md",
+      "category": "design-patterns",
+      "summary": "Two live failures at the `ce-commit-push-pr` -> `ce-babysit-pr` seam (Nugget #1933, #1983): an agent at the end of a long turn satisfied \"auto-invoke `ce-babysit-pr`\" by calling that skill's helper...",
+      "tags": [
+        "skill-handoff",
+        "context-absent-agent",
+        "ownership-transfer",
+        "fail-closed",
+        "ce-babysit-pr",
+        "ce-commit-push-pr",
+        "bootstrap-tokens"
+      ],
+      "date": "2026-07-31",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "skill A auto-invokes a follow-on skill B whose start path is a multi-step bootstrap",
+        "skill B exposes a CLI or command with flags/tokens that must be minted before first use",
+        "authoring a handoff seam between two skills in this plugin",
+        "a harness lacks Claude Code's Skill tool and may invent a narrower substitute on load failure"
+      ]
+    },
+    {
+      "id": "cross-harness-cross-model-tool-invocation",
+      "title": "Cross-harness/cross-model skills drive agent tool calls, not slash commands — describe the capability, verify it by running it",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/cross-harness-cross-model-tool-invocation.md",
+      "category": "design-patterns",
+      "summary": "**1. The unit a skill can drive is an agent tool call, not a user affordance.** An agent cannot press keys or type a slash command, so a user-typed command (Cursor's `/loop`) is not skill-invocable...",
+      "tags": [
+        "cross-harness",
+        "cross-model",
+        "capability-over-tool",
+        "tool-vs-slash-command",
+        "empirical-verification",
+        "ask-vs-execute",
+        "portable-skills",
+        "orchestration"
+      ],
+      "date": "2026-07-11",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Authoring a skill, once, for multiple agent harnesses and models where the skill needs the agent to invoke a capability (schedule/loop, ask the user, invoke a sub-skill, run background work, drive a browser)",
+        "Deciding whether to name a specific tool/command in skill prose or describe the capability",
+        "About to accept an agent's own description of its tool schema as verification",
+        "A skill can invoke a slash-command-like affordance interactively but not from within its own execution"
+      ]
+    },
+    {
+      "id": "detached-job-lifecycle-for-delegated-work",
+      "title": "Detached job lifecycle for delegated work that must outlive a harness tool call",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/detached-job-lifecycle-for-delegated-work.md",
+      "category": "design-patterns",
+      "summary": "Several skills in this plugin delegate real work to external CLIs via bundled scripts — the cross-model peer reviews in ce-doc-review and ce-code-review are the current examples. Their original con...",
+      "tags": [
+        "detached-jobs",
+        "process-lifecycle",
+        "cross-harness",
+        "tool-call-timeout",
+        "setsid-double-fork",
+        "background-work",
+        "polling",
+        "skill-authoring"
+      ],
+      "date": "2026-07-14",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "A skill's bundled script launches delegated work (e.g., a peer-model CLI) whose runtime can exceed a single harness tool-call budget (~2 minutes on some harnesses)",
+        "Designing a launch-and-await flow where one Bash/shell tool call would span the delegate's full runtime",
+        "A long-running delegate silently no-ops on some harnesses while working on others",
+        "Choosing between nohup, setsid double-fork, or new-process-group detachment for cross-harness survival",
+        "Wiring durable job state, sub-second polling, and an atomic terminal record for detached background work"
+      ]
+    },
+    {
+      "id": "detector-that-cannot-decide-should-rank-not-assert",
+      "title": "A detector that cannot decide should rank its output, not assert it",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/detector-that-cannot-decide-should-rank-not-assert.md",
+      "category": "design-patterns",
+      "summary": "`skills/ce-compound/scripts/validate-doc-claims.py` flags a cited commit SHA that does not resolve. Its candidate pattern (`SHA_RE`, hex 7-40 chars with at least one digit and one `a-f`) also match...",
+      "tags": [
+        "detection-heuristics",
+        "false-positive",
+        "confidence-tiers",
+        "validator-precision",
+        "non-convergence"
+      ],
+      "date": "2026-09-01",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Writing a check that classifies a token by what it looks like, when several unrelated kinds of thing share that shape",
+        "A heuristic keeps producing a fresh boundary case every review round while each fix looks like progress",
+        "A script's output is read by an agent or a person before anything acts on it, and the script is worded as though it decides"
+      ]
+    },
+    {
+      "id": "dispatch-script-failure-degrade-outcome-not-boundary",
+      "title": "When a deterministic dispatch script fails, degrade the outcome — never weaken the boundary the script enforced",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/dispatch-script-failure-degrade-outcome-not-boundary.md",
+      "category": "design-patterns",
+      "summary": "The cross-model peer-review skills dispatch through deterministic bundled scripts (`peer-job-runner.py` plus per-provider workers) that also *enforce boundaries*: an egress allowlist, a fixed read ...",
+      "tags": [
+        "graceful-degradation",
+        "deterministic-scripts",
+        "cross-model-review",
+        "fallback-design",
+        "fail-safe-defaults"
+      ],
+      "date": "2026-07-18",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "A skill dispatches work through a deterministic bundled script, and you are deciding what happens when that script fails",
+        "The script enforces a boundary — an egress allowlist, a read scope, an independence rule, a fixed route — not just convenience",
+        "Tempted to add generic try-the-script-then-figure-it-out-yourself fallback prose",
+        "A failure could be either the delegated work failing cleanly or the dispatch infrastructure itself crashing, and the skill treats both the same way"
+      ]
+    },
+    {
+      "id": "git-workflow-skills-need-explicit-state-machines",
+      "title": "Git workflow skills need explicit state machines for branch, push, and PR state",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/git-workflow-skills-need-explicit-state-machines.md",
+      "category": "design-patterns",
+      "summary": "`ce-commit` and `ce-commit-push-pr` accumulated branch-state and PR-state regressions because they described Git flow in prose instead of as explicit state checks. Git workflows look linear but are...",
+      "tags": [
+        "git-workflows",
+        "skill-design",
+        "state-machine",
+        "detached-head",
+        "gh-cli",
+        "pr-detection",
+        "default-branch"
+      ],
+      "date": "2026-03-27",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": []
+    },
+    {
+      "id": "harness-agent-gate-workaround",
+      "title": "Measure a harness workaround against its exit condition",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/harness-agent-gate-workaround.md",
+      "category": "design-patterns",
+      "summary": "The shared `context.mjs` mechanism (since removed; `tests/skill-conventions.test.ts` guards against restoring it) was a measured workaround. [PR #1274](https://github.com/EveryInc/compound-engineer...",
+      "tags": [
+        "subagent-dispatch",
+        "harness-defaults",
+        "workaround-lifecycle",
+        "skill-evaluation",
+        "independence"
+      ],
+      "date": "2026-07-28",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "A harness default suppresses a capability a skill depends on",
+        "Evaluating whether a defensive skill workaround is still needed after a harness upgrade",
+        "Removing shared dispatch machinery without losing workflow-specific correctness rules"
+      ]
+    },
+    {
+      "id": "inline-callee-side-channel-must-name-where-it-may-not-land",
+      "title": "An inline-invoked skill's caller-facing side channel must say where it may not land",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/inline-callee-side-channel-must-name-where-it-may-not-land.md",
+      "category": "design-patterns",
+      "summary": "Skills in this plugin run inline in the caller's context on every host (Claude Code, Codex, Grok, Cursor). Invoking a skill loads its body into the same context. There is no subagent boundary betwe...",
+      "tags": [
+        "skill-authoring",
+        "inline-invocation",
+        "return-contract",
+        "side-channel",
+        "ce-noslop",
+        "cross-harness",
+        "output-leak",
+        "skill-eval"
+      ],
+      "date": "2026-09-13",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Authoring a skill whose contract returns something for the caller besides the main output (a change summary, status note, or receipt)",
+        "The skill runs inline in the caller's context, with no subagent boundary between callee output and the user or an artifact",
+        "Many sibling skills route through the callee and none says what to do with the side channel",
+        "A user-facing message or artifact opens with a callee's process note such as: edit-mode pass applied",
+        "Tempted to teach each consumer to strip the line instead of stating the condition once at the callee"
+      ]
+    },
+    {
+      "id": "invocation-opt-out-flags-block-sibling-skill-invocation",
+      "title": "Skill opt-out flags block sibling invocation on every host, so a callee skill must stay model-invokable",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/invocation-opt-out-flags-block-sibling-skill-invocation.md",
+      "category": "design-patterns",
+      "summary": "While planning `ce-noslop`, a skill that sibling skills invoke at their prose-composition point, the question came up whether it could carry the per-host opt-out flags (`disable-model-invocation: t...",
+      "tags": [
+        "skill-invocation",
+        "disable-model-invocation",
+        "allow-implicit-invocation",
+        "cross-harness",
+        "codex",
+        "grok",
+        "activation",
+        "description-restraint"
+      ],
+      "date": "2026-09-08",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "A skill is authored so that other skills invoke it (a shared writing, commit, review, or simplify step)",
+        "Deciding whether to set disable-model-invocation or a Codex allow_implicit_invocation policy on a skill to stop it over-triggering",
+        "A caller skill's prose tells the agent how to reach a sibling skill on a host without a skill tool"
+      ]
+    },
+    {
+      "id": "liveness-judgment-belongs-to-the-agent",
+      "title": "A liveness marker proves work started; judging whether it finished belongs to the agent",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/liveness-judgment-belongs-to-the-agent.md",
+      "category": "design-patterns",
+      "summary": "`ce-babysit-pr` watches a pull request and calls it merge-ready once it is mergeable, green, and quiet. It treated an eyes reaction on the PR body as proof a review was underway, which skipped the ...",
+      "tags": [],
+      "date": "2026-09-01",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "A watch loop reads a signal a third party sets — a reaction, a label, a status flag — to decide whether that party is still working",
+        "Deciding whether a deterministic detector or the agent should conclude that external work finished",
+        "A stale-signal workaround (a timeout or bound) is being extended or re-tuned instead of re-examined",
+        "Weighing whether to model a domain as engine state or leave it to agent judgment"
+      ]
+    },
+    {
+      "id": "multi-surface-output-needs-a-shared-rendering-floor",
+      "title": "Multi-surface skill output needs a shared, parity-tested rendering floor",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/multi-surface-output-needs-a-shared-rendering-floor.md",
+      "category": "design-patterns",
+      "summary": "`ce-doc-review` renders a finding on four surfaces (walkthrough, batch report, headless envelope, bulk preview). Each surface once carried its **own** copy of a \"self-contained references\" rule. Th...",
+      "tags": [
+        "skill-design",
+        "presentation-contract",
+        "cross-surface-parity",
+        "legibility",
+        "ce-doc-review"
+      ],
+      "date": "2026-07-23",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "A skill renders the same finding/result data on more than one output surface (interactive, batch/report, headless envelope, one-line preview)",
+        "You are strengthening how one surface presents results and the sibling surfaces have their own copy of a weaker rule",
+        "A routing or authority rule is restated in several files, including the always-loaded skill body"
+      ]
+    },
+    {
+      "id": "named-frameworks-with-detection-conditions-for-review-personas",
+      "title": "Attach named canonical frameworks to detection conditions in review personas; never anchor on authors",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/named-frameworks-with-detection-conditions-for-review-personas.md",
+      "category": "design-patterns",
+      "summary": "While evaluating `skills/ce-code-review`'s reviewer personas, we asked whether naming canonical frameworks (Fowler smells, Ousterhout red flags, OWASP/CWE, Beck's test desiderata) in persona prompt...",
+      "tags": [
+        "skill-design",
+        "ce-code-review",
+        "reviewer-personas",
+        "prompt-design",
+        "code-smells",
+        "detection-conditions",
+        "llm-evaluation"
+      ],
+      "date": "2026-08-30",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Designing or tuning reviewer/checker persona prompts that detect quality issues",
+        "Deciding whether to cite a canonical framework (OWASP, Fowler smells, Release It!) in a detection check",
+        "Tempted to anchor a persona on a named author ('review as Martin Fowler')",
+        "Choosing which code smells an LLM reviewer should and should not attempt"
+      ]
+    },
+    {
+      "id": "new-knowledge-source-re-derives-persona-gate-and-route",
+      "title": "Wiring a new knowledge source into a conditional persona re-derives its spawn gate and its synthesis route",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/new-knowledge-source-re-derives-persona-gate-and-route.md",
+      "category": "design-patterns",
+      "summary": "Compound Packs added pack roots to `ce-code-review`'s `learnings-researcher` search-root list, and `docs/guides/packs.md` promised that a diff violating a pack rule is flagged with a citation. The ...",
+      "tags": [
+        "ce-code-review",
+        "compound-packs",
+        "spawn-gate",
+        "synthesis",
+        "cloud-agent-dogfood"
+      ],
+      "date": "2026-09-08",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Adding a knowledge source (packs, standards files, a corpus) to a persona another gate already selects",
+        "A guide promises enforcement at a stage whose only carrier is a conditional persona",
+        "A fresh-agent eval of a gated stage passed, but the run forced or short-circuited the gate"
+      ]
+    },
+    {
+      "id": "paired-old-vs-new-injection-skill-evals",
+      "title": "Prove a skill prose change moved behavior with paired old-vs-new blind injection",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/paired-old-vs-new-injection-skill-evals.md",
+      "category": "design-patterns",
+      "summary": "Editing the prose of an agent skill is cheap; *knowing whether the edit changed agent behavior* is not. Prose changes look self-evidently good in a diff, so they ship on intuition, and two failure ...",
+      "tags": [
+        "skill-evals",
+        "paired-injection",
+        "behavior-verification",
+        "cross-skill-contract",
+        "anti-drift-test",
+        "frontier-model",
+        "named-fields",
+        "fake-cli",
+        "fixture-design",
+        "variance",
+        "cross-host",
+        "eval-methodology"
+      ],
+      "date": "2026-07-01",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Validating a prose/behavior edit to a SKILL.md, agent persona, or prompt",
+        "Needing to tell \"demonstrated improvement\" apart from \"no regression\"",
+        "One skill's output is consumed or gated by another skill or a test",
+        "Adding or renaming a field in a cross-skill output contract",
+        "Changing the judgment of a skill that calls an external CLI (gh, git, a peer model CLI)",
+        "Reading a null result from a harness that freezes an upstream stage",
+        "Skill prose instructs constructing a command from recorded variables",
+        "Fixing a defect that only appears after context compaction or a mid-flow resume"
+      ]
+    },
+    {
+      "id": "pass-paths-not-content-to-subagents",
+      "title": "Pass paths, not content, when dispatching sub-agents",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/pass-paths-not-content-to-subagents.md",
+      "category": "design-patterns",
+      "summary": "When a sub-agent needs repo reference material (config files, standards docs), the orchestrator discovers paths (glob/search, cheap) and passes the path list; the sub-agent reads only the files and...",
+      "tags": [
+        "orchestration",
+        "subagent",
+        "token-efficiency",
+        "skill-design",
+        "multi-agent"
+      ],
+      "date": "2026-03-26",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "portable-agent-skill-authoring",
+      "title": "Portable agent skill authoring across models and harnesses",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/portable-agent-skill-authoring.md",
+      "category": "design-patterns",
+      "summary": "Use this guide when creating or materially revising a skill that must work across models and agent harnesses. The governing idea is simple: > Start with the outcome and intent. Add only the smalles...",
+      "tags": [
+        "skill-design",
+        "cross-model",
+        "cross-harness",
+        "prompting-guidance",
+        "protocol",
+        "judgment",
+        "skill-eval"
+      ],
+      "date": "2026-07-11",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Creating or materially revising a skill that is distributed to multiple agent models or harnesses",
+        "Reviewing skill prose for cross-model behavior, harness portability, authority, or over-prompting",
+        "Choosing deterministic checks and targeted behavior evals for a skill change"
+      ]
+    },
+    {
+      "id": "post-menu-routing-belongs-inline",
+      "title": "Always-on post-menu routing must fire from loaded context — inline, or a required-read pointer that names what only the file carries",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/post-menu-routing-belongs-inline.md",
+      "category": "design-patterns",
+      "summary": "`ce-plan`'s post-generation menu had its per-option routing only in `references/plan-handoff.md`, mentioned from the body in passing. Agents rendered the menu, captured the selection, and stopped —...",
+      "tags": [
+        "skill-design",
+        "menu-routing",
+        "skill-md-vs-references",
+        "ce-plan",
+        "extraction-rule",
+        "load-bearing-rules"
+      ],
+      "date": "2026-04-28",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Authoring a skill that ends in a menu where the user picks the next action",
+        "Deciding whether per-option routing belongs in SKILL.md or in a reference file",
+        "Reviewing a skill where the agent renders a menu and stops at the user's selection without acting"
+      ]
+    },
+    {
+      "id": "prose-cannot-validate-caller-control-data-byte-for-byte",
+      "title": "Skill prose cannot validate caller-supplied control data byte-for-byte; put deterministic guards where the raw argument exists",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/prose-cannot-validate-caller-control-data-byte-for-byte.md",
+      "category": "design-patterns",
+      "summary": "`ce-work` accepts control data from an outer orchestrator through a string envelope: `mode:return-to-caller implementation_engine:<compact-json> [implementation_run:<safe-id>] <plan-path>`. The gra...",
+      "tags": [
+        "skill-design",
+        "skill-authoring",
+        "cross-harness",
+        "skill-eval",
+        "codex",
+        "ce-work",
+        "owning-layer",
+        "input-validation"
+      ],
+      "date": "2026-08-21",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Authoring a skill that accepts structured control data from a caller (a JSON carrier, an envelope, an id, a mode token) and wants malformed input rejected deterministically",
+        "Tempted to add a 'run a real parser' or 'validate byte-for-byte' sentence to skill prose after an eval shows a model accepting malformed input",
+        "A fresh-process eval shows one host (e.g. Codex) repairing or retyping a malformed argument before any mechanism sees it while other hosts reject it",
+        "Deciding whether a guard belongs in SKILL.md prose, in a bundled script that receives the argument verbatim, in the host's invocation layer, or is a known host limitation to document",
+        "The only real producer of the argument is another skill, so a malformed value means a buggy caller rather than hostile input"
+      ]
+    },
+    {
+      "id": "quiet-interval-floors-for-streaming-peer-routes",
+      "title": "Quiet-interval floors for streaming cross-model peer routes (#1270)",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/quiet-interval-floors-for-streaming-peer-routes.md",
+      "category": "design-patterns",
+      "summary": "`run_timeout_cmd` had no `$PEERLOG` idle poll, so wedged claude/grok/cursor peers burned their full hard cap. Adding the poll is only safe when the CLI's shipped flags actually grow `$PEERLOG` mid-...",
+      "tags": [
+        "cross-harness",
+        "progress-detection",
+        "peer-delegation",
+        "idle-timeout"
+      ],
+      "date": "2026-07-30",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Adding output-idle detection to a peer route that previously used run_timeout_cmd",
+        "Choosing or changing CROSS_MODEL_IDLE_SECS for claude / cursor-agent stream-json routes",
+        "Deciding whether a peer CLI flag combination makes PEERLOG byte-growth meaningful"
+      ]
+    },
+    {
+      "id": "requested-vs-verified-model-identity",
+      "title": "Requested-vs-verified model identity receipts for cross-model delegation",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/requested-vs-verified-model-identity.md",
+      "category": "design-patterns",
+      "summary": "\"Which model ran\" is a claim about a remote system's behavior; our own request parameters (`--model`, the `M_CLAUDE` / `M_CODEX` / `M_GROK` pins in the cross-model review scripts) are not evidence ...",
+      "tags": [
+        "cross-model",
+        "delegation",
+        "model-identity",
+        "verification",
+        "receipts",
+        "subagents",
+        "output-integrity"
+      ],
+      "date": "2026-07-14",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "a skill announces or records which external model performed delegated work",
+        "cross-model agreement bonuses or scoring assume a different model family actually ran",
+        "a backend can silently fall back to a default model when the requested one is unavailable"
+      ]
+    },
+    {
+      "id": "review-cost-is-in-entering-the-spine-not-the-findings",
+      "title": "Review cost is in entering the spine, not in the findings: size a review by consequence, never by a total-line floor",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/review-cost-is-in-entering-the-spine-not-the-findings.md",
+      "category": "performance-optimizations",
+      "summary": "PR #1706 gave `ce-code-review` a lite path for small low-consequence diffs, with a total-changed-line floor: over 39 lines the scope helper set `hard_block_full` and the consequence question never ...",
+      "tags": [
+        "ce-code-review",
+        "review-depth",
+        "cost",
+        "sizing-gate",
+        "cross-model-review"
+      ],
+      "date": "2026-09-15",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Adding or tuning a sizing gate, floor, or fast path to a multi-agent skill",
+        "A cheap path exists but real runs almost never take it",
+        "Deciding which lever to pull when a skill run costs far more than its diff warrants"
+      ]
+    },
+    {
+      "id": "size-driven-skill-restructure",
+      "title": "Restructuring a large skill under a byte cap without losing its invariants (ce-babysit-pr 90KB -> 8KB)",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/size-driven-skill-restructure.md",
+      "category": "design-patterns",
+      "summary": "The procedure lives in `.agents/skills/ce-skill-work/references/edit-skill.md` (\"Restructuring for a size or platform constraint\") and the eval grading rules in `references/evaluate.md`. This file ...",
+      "tags": [
+        "skill-design",
+        "8kb-budget",
+        "agent-plugins",
+        "references-extraction",
+        "salience",
+        "cross-model-review",
+        "ce-babysit-pr",
+        "eval-breadth"
+      ],
+      "date": "2026-08-17",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Rewriting a SKILL.md to fit Codex's 8000-byte Agent Plugins prompt budget (tests/codex-skill-prompt-budget.test.ts OVER_BUDGET ratchet)",
+        "Deciding whether a body pointer into a reference will actually be followed, and when",
+        "A skill that cannot reach the cap because shared blocks already exceed it",
+        "Sizing the eval for a restructure of a widely used or delegating skill",
+        "Running a headless host CLI as an eval cell"
+      ]
+    },
+    {
+      "id": "skill-gates-state-conditions-not-prescribed-git-commands",
+      "title": "Skill ship gates state the required condition, not the git commands that prove it",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/skill-gates-state-conditions-not-prescribed-git-commands.md",
+      "category": "design-patterns",
+      "summary": "`ce-debug` Phase 4 has to decide one thing at the end of a fix: does this verified change go out as a PR, or does it stay as a local commit? The skill does not do the git work itself — it invokes `...",
+      "tags": [
+        "skill-design",
+        "skill-authoring",
+        "git-state",
+        "ship-gate",
+        "prescribed-commands",
+        "protocol-vs-judgment",
+        "ce-debug"
+      ],
+      "date": "2026-08-15",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Authoring a skill gate that decides whether work is ready to ship, branch, push, or open a PR",
+        "Tempted to write a specific `git`/`gh` command into skill prose as the way to establish a condition",
+        "A review round proposes swapping one prescribed command for another instead of naming the condition",
+        "The same gate has been rewritten repeatedly and each revision breaks a different repository state"
+      ]
+    },
+    {
+      "id": "state-the-condition-not-a-placement-absolute",
+      "title": "A placement absolute forbids the case its own condition demands",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/state-the-condition-not-a-placement-absolute.md",
+      "category": "design-patterns",
+      "summary": "The rule this case produced is in `docs/solutions/skill-design/portable-agent-skill-authoring.md` (\"Separate protocol from judgment\": a placement or format absolute is judgment wearing protocol's c...",
+      "tags": [
+        "skill-design",
+        "state-conditions-not-cases",
+        "ce-commit-push-pr",
+        "pr-description",
+        "owning-layer",
+        "audit-steps"
+      ],
+      "date": "2026-08-28",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Enforcing a skill-prose condition with a placement, ordering, or format absolute ('never part of the opening', 'always a separate block')",
+        "The same authoring decision appears at more than one step of a skill or reference file",
+        "Writing an audit or pre-apply step that checks whether an artifact contains something, rather than whether it achieves its outcome",
+        "A maintainer rejects output that the skill was followed exactly to produce"
+      ]
+    },
+    {
+      "id": "strong-models-mask-defensive-skill-fixes",
+      "title": "A strong model can mask a defensive skill-prose fix — control confounds and guard both failure directions when evaluating",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/strong-models-mask-defensive-skill-fixes.md",
+      "category": "design-patterns",
+      "summary": "When evaluating a change to an LLM-driven skill's prose, hold four rules: 1. **Expect a strong model to mask a defensive fix.** A capable model already reasons past literal heuristics in the prose....",
+      "tags": [
+        "skill-design",
+        "skill-eval",
+        "eval-methodology",
+        "model-capability",
+        "confound-control",
+        "ce-commit-push-pr"
+      ],
+      "date": "2026-07-09",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Improving an LLM-driven skill's prose (SKILL.md or a reference) and wanting to prove the change helps without regressing",
+        "An adversarial skill eval fails to reproduce the failure mode the change was meant to fix",
+        "A with-skill vs baseline eval ties on pass-rate and you must decide whether the change is worth keeping",
+        "Designing a skill eval that must not trade one failure mode for its opposite"
+      ]
+    },
+    {
+      "id": "subordinate-the-failing-shape-to-the-condition",
+      "title": "Condition over cases can regress a literal host: subordinate the concrete shape, and let nothing compete with the exclusion",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/subordinate-the-failing-shape-to-the-condition.md",
+      "category": "design-patterns",
+      "summary": "This bounds \"state conditions, not cases\" (`AGENTS.md`, \"Working on Skills\"; `.agents/skills/ce-skill-work/references/edit-skill.md` carries the resulting rule under \"Do not overcorrect away determ...",
+      "tags": [
+        "skill-design",
+        "skill-eval",
+        "cross-host",
+        "state-conditions-not-cases",
+        "review-feedback",
+        "salience",
+        "ce-plan"
+      ],
+      "date": "2026-08-24",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Replacing an enumeration of failing cases in skill prose with the condition that decides them",
+        "Acting on a review finding that a case list contradicts a test stated in the same block",
+        "Writing a negative rule (\"X is not Y\") in prose a weaker or more literal model must follow",
+        "Deciding whether a restatement that reads strictly better may ship on a read-through"
+      ]
+    },
+    {
+      "id": "watch-loops-need-a-blocked-external-terminal-state",
+      "title": "Watch-loop skills need a bounded blocked-external handback for fork-PR CI approval gates",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/watch-loops-need-a-blocked-external-terminal-state.md",
+      "category": "design-patterns",
+      "summary": "On a fork -> upstream PR from a non-maintainer (`stablyai/orca#8238`), `gh pr view --json statusCheckRollup` reported the one ungated lightweight job as passed while the substantive workflows sat b...",
+      "tags": [
+        "ce-babysit-pr",
+        "watch-loop",
+        "github-actions",
+        "fork-pr",
+        "ci-gating",
+        "blocked-external",
+        "false-green"
+      ],
+      "date": "2026-07-11",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Building or reviewing a watch-loop skill that polls PR/CI status until merge-ready",
+        "A status signal (e.g., all_checks_ok) is derived only from statusCheckRollup or check-runs",
+        "Classifying a stalled watch-loop into needs-human vs in-progress vs a new blocked-external state"
+      ]
+    },
+    {
+      "id": "workspace-isolation-is-escalation-not-entry-fee",
+      "title": "Workspace isolation for parallel subagent writes is escalation, not an entry fee",
+      "path": "compound-engineering-plugin/docs/solutions/skill-design/workspace-isolation-is-escalation-not-entry-fee.md",
+      "category": "design-patterns",
+      "summary": "`ce-work`'s execution reference once required an isolated workspace for every concurrent worker (\"a shared-workspace worker runs serially regardless of declared file disjointness\"). On harnesses wh...",
+      "tags": [
+        "ce-work",
+        "workspace-isolation",
+        "parallel-execution",
+        "conditions-over-mechanism",
+        "subagent-dispatch",
+        "escalation"
+      ],
+      "date": "2026-08-31",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": [
+        "Deciding whether to isolate parallel subagents in separate worktrees or run them in a shared workspace with coordinated conditions",
+        "Evaluating whether workspace isolation is necessary or whether conditions alone suffice to prevent failures",
+        "A rule serializes work \"to be safe\" on a hazard whose failure cost is bounded and detectable"
+      ]
+    },
+    {
+      "id": "manual-release-please-github-releases",
+      "title": "Manual release-please with GitHub Releases for plugin and marketplace releases",
+      "path": "compound-engineering-plugin/docs/solutions/workflow/manual-release-please-github-releases.md",
+      "category": "architecture-patterns",
+      "summary": "The repo uses release-please manifest mode with one standing release PR: release PR maintenance is automatic on pushes to `main`, the release itself happens only when a maintainer merges that PR, a...",
+      "tags": [
+        "release-please",
+        "github-releases",
+        "marketplace",
+        "plugin-versioning",
+        "ci",
+        "automation",
+        "release-process"
+      ],
+      "date": "2026-03-17",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    },
+    {
+      "id": "measuring-a-packs-effect-needs-non-inferable-rules",
+      "title": "Measuring a Compound Pack's effect: rules must be non-inferable from the repo, and the token effect is model-dependent",
+      "path": "compound-engineering-plugin/docs/solutions/workflow/measuring-a-packs-effect-needs-non-inferable-rules.md",
+      "category": "architecture-patterns",
+      "summary": "Two rounds of paired cloud-agent runs (same fixture, same `lfg` feature request, same model, with vs. without a declared pack; 4 models, 18 pairs and arms) measured whether Compound Packs change wh...",
+      "tags": [
+        "compound-packs",
+        "evaluation",
+        "benchmark",
+        "token-usage",
+        "cloud-agents"
+      ],
+      "date": "2026-09-09",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Benchmarking whether a Compound Pack (or any injected knowledge source) changed what an agent shipped",
+        "Designing pack rules or fixtures for an eval that compares with-pack against no-pack",
+        "Reporting a pack's token cost or saving across models"
+      ]
+    },
+    {
+      "id": "release-please-version-drift-recovery",
+      "title": "Release-please version drift recovery",
+      "path": "compound-engineering-plugin/docs/solutions/workflow/release-please-version-drift-recovery.md",
+      "category": "architecture-patterns",
+      "summary": "Manual edits to a release-managed version field cause drift that: - Breaks `bun run release:validate` on PR CI. - Can cause version regression on the next release-please run if left uncorrected. - ...",
+      "tags": [
+        "release-please",
+        "version-drift",
+        "plugin-versioning",
+        "recovery-playbook",
+        "extra-files"
+      ],
+      "date": "2026-04-24",
+      "source": "compound-engineering-plugin",
+      "severity": "high",
+      "applies_when": []
+    },
+    {
+      "id": "reviewing-byte-duplicated-shared-assets",
+      "title": "Reviewing a byte-duplicated shared asset: scope to the canonical copy or get 6x the findings",
+      "path": "compound-engineering-plugin/docs/solutions/workflow/reviewing-byte-duplicated-shared-assets.md",
+      "category": "architecture-patterns",
+      "summary": "`peer-job-runner.py` is byte-duplicated into six consumer skills (`ce-doc-review` canonical; `ce-code-review`, `ce-pov`, `ce-work`, `ce-plan`, `ce-brainstorm`) because the plugin has no cross-skill...",
+      "tags": [
+        "code-review",
+        "shared-assets",
+        "duplication",
+        "parity",
+        "review-scoping",
+        "subagents"
+      ],
+      "date": "2026-07-24",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": [
+        "Reviewing or simplifying a change to an asset that is byte-duplicated across skills",
+        "Reading changed-line counts or size-based gates on a diff containing duplicated files",
+        "A reviewer recommends extracting a shared module for deliberately duplicated code"
+      ]
+    },
+    {
+      "id": "stale-local-base-contamination",
+      "title": "Stale local base contamination in multi-session branch creation",
+      "path": "compound-engineering-plugin/docs/solutions/workflow/stale-local-base-contamination.md",
+      "category": "architecture-patterns",
+      "summary": "When multiple agent sessions share one local clone, local `<default-branch>` drifts from its remote in two ways: behind (another session pushed and merged), or ahead with unpushed work (another ses...",
+      "tags": [
+        "branching",
+        "multi-agent",
+        "multi-session",
+        "stacked-prs",
+        "contamination"
+      ],
+      "date": "2026-04-27",
+      "source": "compound-engineering-plugin",
+      "severity": "medium",
+      "applies_when": []
+    }
+  ]
+}

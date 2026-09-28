@@ -1,0 +1,27 @@
+{
+  "postProcessSkills": [
+    {
+      "name": "compound-engineering",
+      "trigger": "after-all-dev-tasks",
+      "priority": 1,
+      "enabled": true
+    }
+  ],
+  "knowledgeBase": {
+    "path": ".trae/knowledge/",
+    "autoCollect": {
+      "superpowersPlans": true,
+      "gstackDeliverables": true,
+      "architectureDecisions": true,
+      "codeReviewFindings": true
+    },
+    "categories": [
+      "architecture-patterns",
+      "best-practices",
+      "bug-patterns",
+      "design-patterns",
+      "integration-solutions",
+      "performance-optimizations"
+    ]
+  }
+}
