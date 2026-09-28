@@ -3,6 +3,10 @@
 .trae/skills/gstack-repo/
 .trae/skills/gstack-tmp/
 
+# 外部下载的 Skill/插件仓库（参考用，不纳入版本控制）
+everything-claude-code/
+agent-skills-main/
+
 # 操作系统文件
 .DS_Store
 Thumbs.db
