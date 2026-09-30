@@ -107,7 +107,14 @@
     .empty-state.show { display: block; }
     .empty-state h3 { margin: 0 0 7px; color: var(--ink); font-size: 17px; }
     .empty-state p { margin: 0; line-height: 1.7; }
-    .workspace { width: 100%; min-height: 0; display: grid; grid-template-columns: 252px minmax(0, 1fr); }
+    #editor-view { flex-direction: column; }
+    .work-tabs { min-height: 51px; padding: 0 20px; display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); background: #fff; }
+    .work-tab-group { display: flex; align-items: center; }
+    .work-tab { height: 50px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #6b7782; font-size: 12px; }
+    .work-tab:hover { color: #286d9f; }
+    .work-tab.active { border-bottom-color: var(--accent); color: #286d9f; font-weight: 700; }
+    .work-tabs #back-shelf { margin-left: auto; white-space: nowrap; }
+    .workspace { width: 100%; min-height: 0; flex: 1; display: grid; grid-template-columns: 252px minmax(0, 1fr); }
     .chapter-pane { min-width: 0; display: flex; flex-direction: column; background: #fafbfc; border-right: 1px solid var(--line); }
     .pane-heading { min-height: 66px; padding: 15px 15px 11px 18px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); }
     .pane-heading strong { font-size: 13px; }
@@ -126,6 +133,55 @@
     .tree-item.volume.collapsed .chevron { transform: rotate(-90deg); }
     .pane-footer { margin-top: auto; padding: 14px 15px; display: grid; gap: 8px; border-top: 1px solid var(--line); }
     .pane-footer button { width: 100%; justify-content: center; }
+    .architecture-panel { min-height: 0; flex: 1; display: grid; grid-template-columns: 274px minmax(0, 1fr); background: #fff; }
+    .architecture-nav { min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: #fafbfc; }
+    .architecture-nav-head { padding: 16px; display: grid; gap: 12px; border-bottom: 1px solid var(--line); }
+    .architecture-nav-head strong { font-size: 13px; }
+    .architecture-add { display: flex; gap: 7px; }
+    .architecture-add select, .architecture-add input { min-width: 0; flex: 1; padding: 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: var(--ink); font-size: 12px; }
+    .architecture-add .icon-btn { flex: none; }
+    .architecture-list { min-height: 0; overflow: auto; padding: 10px; }
+    .outline-node, .foreshadow-item { width: 100%; min-width: 0; padding: 10px; display: flex; align-items: center; gap: 8px; border: 0; border-radius: 6px; background: transparent; color: #425365; font-size: 12px; text-align: left; }
+    .outline-node:hover, .foreshadow-item:hover, .outline-node.active, .foreshadow-item.active { background: var(--accent-soft); color: #286d9f; }
+    .outline-node span, .foreshadow-item span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .outline-node[data-type="chapter"] { padding-left: 30px; }
+    .outline-node[data-type="detail"] { padding-left: 49px; }
+    .outline-node .node-toggle { width: 15px; height: 15px; flex: none; border: 0; padding: 0; border-radius: 3px; background: transparent; color: inherit; }
+    .outline-node .node-toggle svg { width: 13px; height: 13px; transition: transform .15s ease; }
+    .outline-node .node-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+    .outline-node .node-spacer { width: 15px; flex: none; }
+    .outline-node .node-select { min-width: 0; flex: 1; display: flex; align-items: center; gap: 8px; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; font: inherit; }
+    .outline-node svg, .foreshadow-item svg { width: 15px; height: 15px; flex: none; }
+    .foreshadow-item small { margin-left: auto; flex: none; color: #6f7b86; font-size: 10px; }
+    .architecture-main { min-width: 0; min-height: 0; overflow: auto; padding: 28px clamp(24px, 5%, 72px) 60px; }
+    .architecture-inner { width: min(100%, 850px); }
+    .architecture-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
+    .architecture-title-row h2 { margin: 0; font-size: 18px; }
+    .architecture-title-row .icon-btn:first-of-type { margin-left: auto; }
+    .architecture-form { display: grid; gap: 19px; }
+    .architecture-field { display: grid; gap: 7px; }
+    .architecture-field label, .architecture-field > strong { color: #566473; font-size: 12px; font-weight: 650; }
+    .architecture-field input, .architecture-field textarea, .architecture-field select { width: 100%; padding: 9px 11px; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: var(--ink); }
+    .architecture-inline { display: flex; align-items: center; gap: 8px; }
+    .architecture-inline select { min-width: 0; flex: 1; }
+    .architecture-inline button { flex: none; white-space: nowrap; }
+    .architecture-field textarea { min-height: 102px; resize: vertical; line-height: 1.6; }
+    .architecture-links, .evidence-list { display: grid; gap: 7px; }
+    .architecture-link, .evidence-row { min-width: 0; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; color: #4d5b69; background: #fff; font-size: 12px; }
+    .architecture-link span, .evidence-row span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+    .architecture-link button, .evidence-row button { flex: none; padding: 5px 7px; border: 0; border-radius: 5px; background: #f2f7fc; color: #3279aa; font-size: 11px; }
+    .architecture-link button:hover, .evidence-row button:hover { background: #e1f0fd; }
+    .architecture-empty { padding: 42px 20px; color: var(--muted); font-size: 12px; text-align: center; }
+    .architecture-empty.compact { padding: 8px 0; text-align: left; }
+    .evidence-row.is-missing { color: #925b48; background: #fff9f5; }
+    .architecture-field .evidence-row button:disabled { color: #999; background: #f3f4f5; cursor: default; }
+    .evidence-add { display: grid; grid-template-columns: 82px minmax(110px, 150px) minmax(120px, 180px) minmax(150px, 1fr) auto; gap: 7px; }
+    .evidence-add select, .evidence-add input { min-width: 0; padding: 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; }
+    .evidence-row { flex-wrap: wrap; }
+    .evidence-relink { width: 100%; display: flex; gap: 7px; }
+    .evidence-relink select { min-width: 0; flex: 1; padding: 5px 7px; border: 1px solid var(--line-strong); border-radius: 5px; background: #fff; }
+    .inline-bookmark { margin-left: 4px; padding: 2px 5px; border-radius: 4px; background: #eaf5ff; color: #277bb0; font-size: 12px; white-space: nowrap; cursor: pointer; }
+    .inline-bookmark:hover { background: #d7edff; }
     .editor-area { min-width: 0; overflow: auto; display: flex; flex-direction: column; background: #f3f5f7; }
     .editor-toolbar { min-height: 53px; padding: 0 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #fff; border-bottom: 1px solid var(--line); }
     .crumbs { overflow: hidden; color: #68737e; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
@@ -315,6 +371,19 @@
       .knowledge-layout.is-collapsed .knowledge-scope { grid-column: 1 / -1; }
       .knowledge-scope { justify-self: start; }
       .workspace { display: flex; flex-direction: column; }
+      .work-tabs { padding: 0 8px; gap: 0; }
+      .work-tab { padding: 0 7px; white-space: nowrap; }
+      .work-tabs #back-shelf { width: 34px; height: 34px; padding: 0; justify-content: center; font-size: 0; }
+      .architecture-panel { grid-template-columns: 1fr; grid-template-rows: clamp(210px, 32dvh, 260px) minmax(0, 1fr); }
+      .architecture-nav { border-right: 0; border-bottom: 1px solid var(--line); }
+      .architecture-main { padding: 20px 16px 45px; }
+      .evidence-add { grid-template-columns: 1fr 1fr; }
+      #foreshadow-evidence-source-paragraph { grid-column: 1 / -1; }
+      .evidence-add input { grid-column: 1 / -1; }
+      .evidence-add button { grid-column: 1 / -1; justify-content: center; }
+      .evidence-relink { display: grid; grid-template-columns: minmax(0, 1fr); }
+      .evidence-relink select { width: 100%; }
+      .evidence-relink button { justify-self: start; }
       .chapter-pane { max-height: 180px; border-right: 0; border-bottom: 1px solid var(--line); }
       .pane-heading { min-height: 48px; }
       .tree { display: flex; padding: 7px 10px; overflow: auto; }
@@ -323,6 +392,7 @@
       .tree-item .count { display: none; }
       .editor-toolbar { min-height: 45px; padding: 0 12px; }
       .tool-chip { display: none; }
+      .tool-chip#editor-foreshadow { display: inline-flex; align-items: center; gap: 4px; }
       .paper { padding: 30px 20px 70px; }
       .writing-foot { padding-inline: 14px; }
       .writing-foot span:last-child { display: none; }
@@ -389,7 +459,8 @@
       </section>
 
       <section class="view" id="editor-view" aria-label="章节写作">
-        <div class="workspace">
+        <div class="work-tabs"><div class="work-tab-group" role="tablist" aria-label="作品工作区"><button type="button" id="work-tab-writing" class="work-tab active" role="tab" data-work-tab="writing" aria-selected="true" aria-controls="writing-panel" tabindex="0">正文</button><button type="button" id="work-tab-plot" class="work-tab" role="tab" data-work-tab="plot" aria-selected="false" aria-controls="plot-panel" tabindex="-1">剧情架构</button><button type="button" id="work-tab-foreshadow" class="work-tab" role="tab" data-work-tab="foreshadow" aria-selected="false" aria-controls="foreshadow-panel" tabindex="-1">伏笔架构</button></div><button type="button" class="secondary" id="back-shelf" title="返回作品集" aria-label="返回作品集"><i data-lucide="arrow-left"></i>返回作品集</button></div>
+        <div class="workspace" id="writing-panel" role="tabpanel" aria-labelledby="work-tab-writing">
           <aside class="chapter-pane">
             <div class="pane-heading"><strong>作品结构</strong><button type="button" class="icon-btn" id="tree-add" title="新建章节" aria-label="新建章节"><i data-lucide="plus"></i></button></div>
             <div class="tree" id="chapter-tree">
@@ -399,14 +470,21 @@
               <button type="button" class="tree-item chapter" data-chapter="第二章 旧信" data-parent="volume-1"><i data-lucide="file-text"></i><span>第二章 旧信</span><span class="count">2,041</span></button>
               <button type="button" class="tree-item chapter" data-chapter="第三章 灯塔" data-parent="volume-1"><i data-lucide="file-text"></i><span>第三章 灯塔</span><span class="count">1,966</span></button>
             </div>
-            <div class="pane-footer"><button type="button" class="secondary" id="back-shelf"><i data-lucide="arrow-left"></i>返回作品集</button></div>
           </aside>
           <div class="editor-area">
-            <div class="editor-toolbar"><span class="crumbs" id="crumbs">雾港来信 / 未分卷 / 第一章 潮汐</span><div class="tools"><button type="button" class="tool-chip" disabled>引用</button><button type="button" class="tool-chip" disabled>伏笔</button><button type="button" class="tool-chip" disabled>AI 辅助</button></div></div>
+            <div class="editor-toolbar"><span class="crumbs" id="crumbs">雾港来信 / 未分卷 / 第一章 潮汐</span><div class="tools"><button type="button" class="tool-chip" disabled>引用</button><button type="button" class="tool-chip" id="editor-foreshadow" title="在当前段落插入伏笔书签"><i data-lucide="bookmark"></i>伏笔</button><button type="button" class="tool-chip" disabled>AI 辅助</button></div></div>
             <div class="error-strip" id="error-strip" role="alert" aria-live="assertive"><span>保存失败。当前内容仍在编辑区，请重试后再离开。</span><button type="button" id="retry-save">重试保存</button></div>
-            <div class="paper"><div class="chapter-kicker" id="chapter-kicker">未分卷 · 第 1 章</div><input class="chapter-title" id="chapter-title" aria-label="章节标题" value="第一章 潮汐"><div class="editor" id="editor" contenteditable="true" role="textbox" aria-label="章节正文" aria-multiline="true"><p>雾港的雨总在傍晚到来。码头上的人习惯了先收起报纸，再看一眼远处的灯塔。</p><p>她在最后一班渡船靠岸前收到那封信。信封没有署名，只在背面画了一道浅浅的潮线，像有人试图记住水位退去的地方。</p><p>街上的钟敲过六下，她还站在原地。风把纸张吹得微微发响，熟悉的笔迹就在指尖下方。</p></div></div>
+            <div class="paper"><div class="chapter-kicker" id="chapter-kicker">未分卷 · 第 1 章</div><input class="chapter-title" id="chapter-title" aria-label="章节标题" value="第一章 潮汐"><div class="editor" id="editor" contenteditable="true" role="textbox" aria-label="章节正文" aria-multiline="true"><p data-paragraph-id="paragraph-lighthouse">雾港的雨总在傍晚到来。码头上的人习惯了先收起报纸，再看一眼远处的灯塔。<span class="inline-bookmark" data-foreshadow-id="foreshadow-lighthouse" contenteditable="false" role="button" tabindex="0">[伏笔：灯塔刻痕]</span></p><p>她在最后一班渡船靠岸前收到那封信。信封没有署名，只在背面画了一道浅浅的潮线，像有人试图记住水位退去的地方。</p><p>街上的钟敲过六下，她还站在原地。风把纸张吹得微微发响，熟悉的笔迹就在指尖下方。</p></div></div>
             <div class="writing-foot"><span id="chapter-count">本章 0 字</span><span>固定正文样式 · 微软雅黑 12 pt · 1.5 倍行距</span></div>
           </div>
+        </div>
+        <div class="architecture-panel" id="plot-panel" role="tabpanel" aria-labelledby="work-tab-plot" hidden>
+          <aside class="architecture-nav"><div class="architecture-nav-head"><strong>剧情节点</strong><div class="architecture-add"><select id="outline-add-kind" aria-label="新增节点类型"><option value="volume">卷</option><option value="chapter">章</option><option value="detail">详细节点</option></select><button type="button" class="icon-btn" id="outline-add" title="添加剧情节点" aria-label="添加剧情节点"><i data-lucide="plus"></i></button></div></div><div class="architecture-list" id="outline-list"></div></aside>
+          <div class="architecture-main"><div class="architecture-inner"><div class="architecture-title-row"><h2 id="outline-selected-type">剧情节点</h2><button type="button" class="icon-btn" id="outline-move-up" title="上移节点" aria-label="上移节点"><i data-lucide="arrow-up"></i></button><button type="button" class="icon-btn" id="outline-move-down" title="下移节点" aria-label="下移节点"><i data-lucide="arrow-down"></i></button><button type="button" class="icon-btn" id="outline-delete" title="删除节点" aria-label="删除节点"><i data-lucide="trash-2"></i></button></div><div class="architecture-empty" id="outline-empty">暂无剧情节点</div><div class="architecture-form" id="outline-fields" hidden><div class="architecture-field"><label for="outline-title">节点名称</label><input id="outline-title" maxlength="100"></div><div class="architecture-field"><label for="outline-summary">剧情内容</label><textarea id="outline-summary" maxlength="3000"></textarea></div><div class="architecture-field"><label for="outline-chapter">关联正文章节</label><div class="architecture-inline"><select id="outline-chapter"></select><button type="button" class="secondary" id="outline-open-chapter">定位章节</button></div></div><div class="architecture-field"><label for="outline-knowledge-link">关联知识</label><select id="outline-knowledge-link"></select><div class="architecture-links" id="outline-knowledge-links"></div></div><div class="architecture-field"><label for="outline-foreshadow-link">关联伏笔</label><select id="outline-foreshadow-link"></select><div class="architecture-links" id="outline-foreshadow-links"></div></div></div></div></div>
+        </div>
+        <div class="architecture-panel" id="foreshadow-panel" role="tabpanel" aria-labelledby="work-tab-foreshadow" hidden>
+          <aside class="architecture-nav"><div class="architecture-nav-head"><strong>伏笔</strong><div class="architecture-add"><input id="foreshadow-add-name" maxlength="100" placeholder="伏笔名称" aria-label="伏笔名称"><button type="button" class="icon-btn" id="foreshadow-add" title="添加伏笔" aria-label="添加伏笔"><i data-lucide="plus"></i></button></div></div><div class="architecture-list" id="foreshadow-list"></div></aside>
+          <div class="architecture-main"><div class="architecture-inner"><div class="architecture-title-row"><h2>伏笔详情</h2><button type="button" class="icon-btn" id="foreshadow-delete" title="删除伏笔" aria-label="删除伏笔"><i data-lucide="trash-2"></i></button></div><div class="architecture-empty" id="foreshadow-empty">暂无伏笔</div><div class="architecture-form" id="foreshadow-fields" hidden><div class="architecture-field"><label for="foreshadow-name">名称</label><input id="foreshadow-name" maxlength="100"></div><div class="architecture-field"><label for="foreshadow-status">状态</label><select id="foreshadow-status"><option>未埋设</option><option>已埋设</option><option>已触发</option><option>已回收</option><option>废弃</option></select></div><div class="architecture-field"><label for="foreshadow-outline">剧情节点</label><div class="architecture-inline"><select id="foreshadow-outline"></select><button type="button" class="secondary" id="foreshadow-open-outline">定位节点</button></div></div><div class="architecture-field"><label for="foreshadow-description">说明</label><textarea id="foreshadow-description" maxlength="3000"></textarea></div><div class="architecture-field"><strong>埋设、触发与回收证据</strong><div class="evidence-list" id="foreshadow-evidence-list"></div><div class="evidence-add"><select id="foreshadow-evidence-kind" aria-label="证据阶段"><option>埋设</option><option>触发</option><option>回收</option></select><select id="foreshadow-evidence-chapter" aria-label="证据章节"></select><select id="foreshadow-evidence-source-paragraph" aria-label="证据段落"><option value="">仅关联章节</option></select><input id="foreshadow-evidence-paragraph" maxlength="300" placeholder="段落摘录或位置" aria-label="段落摘录或位置"><button type="button" class="secondary" id="foreshadow-evidence-add"><i data-lucide="plus"></i>添加证据</button></div></div><button type="button" class="secondary" id="bookmark-remove" hidden>移除此处书签</button></div></div></div>
         </div>
       </section>
 
@@ -466,6 +544,7 @@
   <div class="context-menu" id="context-menu" role="menu"><button type="button" id="context-delete" role="menuitem"><i data-lucide="trash-2"></i><span>删除</span></button></div>
   <div class="dialog-backdrop" id="create-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="create-title"><h2 id="create-title">新建作品</h2><p>作品会出现在作品集里。</p><label for="work-name">作品名称</label><input id="work-name" maxlength="80" placeholder="输入作品名称"><div class="dialog-actions"><button type="button" class="secondary" id="dialog-cancel">取消</button><button type="button" class="primary" id="dialog-confirm">创建作品</button></div></div></div>
   <div class="dialog-backdrop" id="knowledge-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="knowledge-title"><h2 id="knowledge-title">新增知识</h2><p id="knowledge-owner-hint">添加到当前作品：雾港来信</p><form id="knowledge-form"><div class="field"><label for="knowledge-body-input">内容</label><textarea id="knowledge-body-input" maxlength="2000" placeholder="输入知识内容"></textarea></div><div class="field"><label for="knowledge-category-input">分类</label><select id="knowledge-category-input"><option value="character">人物描写</option><option value="scene">景物描写</option><option value="mind">内心描写</option><option value="quote">经典引用</option><option value="plot">剧情与伏笔</option></select></div><div class="field"><label for="knowledge-tags-input">标签</label><input id="knowledge-tags-input" placeholder="输入设置中已有标签，逗号分隔"></div><div class="field"><label for="knowledge-source-input">出处</label><input id="knowledge-source-input" placeholder="作品、章节或来源"></div><div class="dialog-actions"><button type="button" class="secondary" id="knowledge-cancel">取消</button><button type="button" class="primary" id="knowledge-create">添加知识</button></div></form></div></div>
+  <div class="dialog-backdrop" id="bookmark-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="bookmark-title"><h2 id="bookmark-title">插入伏笔书签</h2><label for="bookmark-target">伏笔</label><select id="bookmark-target"></select><div class="dialog-actions"><button type="button" class="secondary" id="bookmark-cancel">取消</button><button type="button" class="primary" id="bookmark-confirm">插入书签</button></div></div></div>
   <div class="dialog-backdrop" id="confirm-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><h2 id="confirm-title">确认删除</h2><p id="confirm-message">删除后无法在当前 Demo 中恢复。</p><div class="dialog-actions"><button type="button" class="secondary" id="confirm-cancel">取消</button><button type="button" class="primary danger" id="confirm-delete">确认删除</button></div></div></div>
   <div class="dialog-backdrop" id="migration-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="migration-title"><h2 id="migration-title">迁移分类</h2><p id="migration-message">选择目标分类，迁移后将删除原分类。</p><label for="migration-target">目标分类</label><select id="migration-target"></select><div class="dialog-actions"><button type="button" class="secondary" id="migration-cancel">取消</button><button type="button" class="primary" id="migration-confirm">迁移并删除</button></div></div></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -473,15 +552,28 @@
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
-    const state = { view: 'shelf', work: '雾港来信', chapter: '第一章 潮汐', failed: false, dirty: false, timer: null, forceTimer: null, retryTimer: null, retrySnapshot: null, context: null, pendingDelete: null, pendingSession: null, pendingCategory: null, modalReturn: null, category: 'all', tags: new Set(), knowledgeScope: 'current', session: 'structure', conversationWork: '雾港来信', sessionSerial: 0, categorySerial: 0, chapterDrafts: new Map(), workTrees: new Map() };
+    const state = { view: 'shelf', work: '雾港来信', chapter: '第一章 潮汐', workTab: 'writing', outlineId: '', foreshadowId: '', architectureSerial: 0, paragraphSerial: 0, bookmarkParagraph: null, openedBookmark: null, pendingArchitecture: null, failed: false, dirty: false, timer: null, forceTimer: null, retryTimer: null, retrySnapshot: null, context: null, pendingDelete: null, pendingSession: null, pendingCategory: null, modalReturn: null, category: 'all', tags: new Set(), knowledgeScope: 'current', session: 'structure', conversationWork: '雾港来信', sessionSerial: 0, categorySerial: 0, chapterDrafts: new Map(), workTrees: new Map() };
     const sampleText = $('editor').innerHTML;
     const initialTreeHtml = $('chapter-tree').innerHTML;
     const newWorkTreeHtml = '<button type="button" class="tree-item volume" data-volume="unassigned"><i class="chevron" data-lucide="chevron-down"></i><i data-lucide="folder"></i><span>未分卷</span><span class="count">1 章</span></button><button type="button" class="tree-item chapter active" data-chapter="第一章 新章节" data-parent="unassigned"><i data-lucide="file-text"></i><span>第一章 新章节</span><span class="count">0</span></button>';
     state.workTrees.set(state.work, initialTreeHtml);
+    state.workTrees.set('长夜列车', '<button type="button" class="tree-item volume" data-volume="volume-1"><i class="chevron" data-lucide="chevron-down"></i><i data-lucide="folder"></i><span>第一卷 · 夜行</span><span class="count">1 章</span></button><button type="button" class="tree-item chapter active" data-chapter="第二章 站台" data-parent="volume-1"><i data-lucide="file-text"></i><span>第二章 站台</span><span class="count">0</span></button>');
+    state.workTrees.set('学习路径', '<button type="button" class="tree-item volume" data-volume="unassigned"><i class="chevron" data-lucide="chevron-down"></i><i data-lucide="folder"></i><span>未分卷</span><span class="count">1 章</span></button><button type="button" class="tree-item chapter active" data-chapter="第一章 接口与数据流" data-parent="unassigned"><i data-lucide="file-text"></i><span>第一章 接口与数据流</span><span class="count">0</span></button>');
+    const chapterSerialByWork = new Map([['雾港来信', 3], ['长夜列车', 2], ['学习路径', 1]]);
+    const architectureByWork = new Map([
+      ['雾港来信', { outlines: [
+        { id: 'outline-harbor-volume', type: 'volume', parentId: null, title: '第一卷 · 归港', summary: '旧信把林晚带回雾港。', chapterId: '', knowledgeIds: [] },
+        { id: 'outline-harbor-chapter', type: 'chapter', parentId: 'outline-harbor-volume', title: '第一章 潮汐', summary: '林晚收到没有署名的信。', chapterId: '第一章 潮汐', knowledgeIds: [] },
+        { id: 'outline-lighthouse', type: 'detail', parentId: 'outline-harbor-chapter', title: '灯塔刻痕', summary: '第七级石阶上的刻痕暗示旧日约定。', chapterId: '第一章 潮汐', knowledgeIds: ['entry-lighthouse'] }
+      ], foreshadows: [{ id: 'foreshadow-lighthouse', name: '灯塔刻痕', status: '已埋设', outlineId: 'outline-lighthouse', description: '刻痕指向第三章的潮汐记录。', evidence: [{ kind: '埋设', chapterId: '第一章 潮汐', paragraphId: 'paragraph-lighthouse', paragraph: '码头上的人习惯先看一眼灯塔。' }] }] }],
+      ['长夜列车', { outlines: [{ id: 'outline-train-chapter', type: 'chapter', parentId: null, title: '第二章 站台', summary: '站台广播与车票信息不一致。', chapterId: '第二章 站台', knowledgeIds: [] }], foreshadows: [{ id: 'foreshadow-ticket', name: '缺角车票', status: '已触发', outlineId: 'outline-train-chapter', description: '车票日期与广播矛盾。', evidence: [{ kind: '触发', chapterId: '第二章 站台', paragraphId: '', paragraph: '车票上的日期仍清晰可辨。' }] }] }],
+      ['学习路径', { outlines: [{ id: 'outline-learning-chapter', type: 'chapter', parentId: null, title: '接口与数据流', summary: '整理预加载层和 SQLite 的调用关系。', chapterId: '第一章 接口与数据流', knowledgeIds: [] }], foreshadows: [{ id: 'foreshadow-dataflow', name: '前后端对接', status: '未埋设', outlineId: 'outline-learning-chapter', description: '跟踪接口、路由与数据流的关联。', evidence: [] }] }]
+    ]);
+    const collapsedOutlinesByWork = new Map();
     document.querySelectorAll('.knowledge-entry').forEach((entry) => { entry.dataset.tags = JSON.stringify(Array.from(entry.querySelectorAll('.entry-tag'), (chip) => chip.textContent.trim())); });
     const entryTags = (entry) => JSON.parse(entry.dataset.tags || '[]');
     const iconRefresh = () => { if (window.lucide) window.lucide.createIcons(); };
-    const countWords = () => Array.from($('editor').innerText).filter((char) => /[\p{Script=Han}A-Za-z0-9]/u.test(char)).length;
+    const countWords = () => { const copy = $('editor').cloneNode(true); copy.querySelectorAll('[data-foreshadow-id]').forEach((marker) => marker.remove()); return Array.from(copy.textContent).filter((char) => /[\p{Script=Han}A-Za-z0-9]/u.test(char)).length; };
     const renderCount = () => { $('chapter-count').textContent = `本章 ${countWords().toLocaleString('zh-CN')} 字`; };
     const setStatus = (label, error = false) => { $('save-status').textContent = label; $('save-status').classList.toggle('error', error); };
     function sanitizeEditorHtml(html) {
@@ -489,7 +581,11 @@
       const allowed = new Set(['P', 'BR', 'STRONG', 'EM', 'B', 'I', 'SPAN']);
       template.content.querySelectorAll('*').forEach((element) => {
         if (!allowed.has(element.tagName)) { element.replaceWith(...Array.from(element.childNodes)); return; }
+        const paragraphId = element.tagName === 'P' ? element.dataset.paragraphId : '';
+        const foreshadow = element.tagName === 'SPAN' ? findForeshadow(element.dataset.foreshadowId) : null;
         Array.from(element.attributes).forEach((attribute) => element.removeAttribute(attribute.name));
+        if (paragraphId && /^[a-zA-Z0-9-]+$/.test(paragraphId)) element.dataset.paragraphId = paragraphId;
+        if (foreshadow) { element.dataset.foreshadowId = foreshadow.id; element.className = 'inline-bookmark'; element.contentEditable = 'false'; element.setAttribute('role', 'button'); element.tabIndex = 0; element.textContent = `[伏笔：${foreshadow.name || '未命名伏笔'}]`; }
       });
       return template.innerHTML;
     }
@@ -503,7 +599,7 @@
       document.querySelectorAll('[data-nav]').forEach((element) => element.classList.toggle('active', element.dataset.nav === view));
       const meta = viewMeta[view] || viewMeta.shelf;
       $('top-eyebrow').textContent = meta[0]; $('top-title').textContent = typeof meta[1] === 'function' ? meta[1]() : meta[1];
-      $('new-work').hidden = view !== 'shelf'; $('save-status').hidden = view !== 'editor';
+      $('new-work').hidden = view !== 'shelf'; $('save-status').hidden = view !== 'editor' || state.workTab !== 'writing';
       if (view === 'knowledge') { syncKnowledgeWorkOptions(); updateKnowledgeCounts(); filterKnowledge(); }
       if (view === 'splitter') $('splitter-owner').textContent = state.work;
       if (view === 'conversation') {
@@ -514,16 +610,259 @@
         if (firstSession) renderSession(firstSession.dataset.session);
         else renderEmptyConversation(group?.dataset.work || state.work);
       }
-      if (view === 'editor') { $('crumbs').textContent = `${state.work} / ${state.chapter}`; renderCount(); }
+      if (view === 'editor') { if (state.failed) switchWorkTab('writing'); $('crumbs').textContent = `${state.work} / ${state.chapter}`; renderCount(); }
     }
     function showToast(message) { const toast = $('toast'); toast.textContent = message; toast.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => toast.classList.remove('show'), 2300); }
-    function draftKey(work = state.work, chapter = state.chapter) { return `${work}::${chapter}`; }
-    function captureChapterDraft() { if (!state.chapter) return; state.chapterDrafts.set(draftKey(), { title: $('chapter-title').value, html: sanitizeEditorHtml($('editor').innerHTML) }); }
+    function draftKey(work = state.work, chapter = state.chapter) { return JSON.stringify([work, chapter]); }
+    function ensureParagraphIds() { const seen = new Set(); $('editor').querySelectorAll('p').forEach((paragraph) => { if (!paragraph.dataset.paragraphId || seen.has(paragraph.dataset.paragraphId)) paragraph.dataset.paragraphId = `paragraph-${++state.paragraphSerial}`; seen.add(paragraph.dataset.paragraphId); }); }
+    function captureChapterDraft() { if (!state.chapter) return; ensureParagraphIds(); state.chapterDrafts.set(draftKey(), { title: $('chapter-title').value, html: sanitizeEditorHtml($('editor').innerHTML) }); }
     function saveWorkTree() { if (state.work) state.workTrees.set(state.work, $('chapter-tree').innerHTML); }
-    function loadWorkTree(name) { $('chapter-tree').innerHTML = state.workTrees.get(name) ?? initialTreeHtml; iconRefresh(); }
-    function renderChapter(button) { if (!button) return; state.chapter = button.dataset.chapter; document.querySelectorAll('[data-chapter]').forEach((item) => item.classList.toggle('active', item === button)); const draft = state.chapterDrafts.get(draftKey()); $('chapter-title').value = draft?.title || state.chapter; $('crumbs').textContent = `${state.work} / ${state.chapter}`; $('chapter-kicker').textContent = state.chapter.includes('第一') ? '未分卷 · 第 1 章' : '第一卷 · 归港'; $('editor').innerHTML = draft?.html ?? (state.chapter === '第一章 潮汐' && state.work === '雾港来信' ? sampleText : ''); renderCount(); }
+    function loadWorkTree(name) { $('chapter-tree').innerHTML = state.workTrees.get(name) ?? newWorkTreeHtml; iconRefresh(); }
+    function renderChapter(button) { if (!button) return; state.chapter = button.dataset.chapter; state.openedBookmark = null; document.querySelectorAll('[data-chapter]').forEach((item) => item.classList.toggle('active', item === button)); const draft = state.chapterDrafts.get(draftKey()); $('chapter-title').value = draft?.title || state.chapter; $('crumbs').textContent = `${state.work} / ${state.chapter}`; const parent = Array.from($('chapter-tree').querySelectorAll('[data-volume]')).find((item) => item.dataset.volume === button.dataset.parent); $('chapter-kicker').textContent = `${parent?.querySelector('span')?.textContent || '未分卷'} · ${state.chapter.match(/^第.+?章/)?.[0] || '章节'}`; $('editor').innerHTML = draft?.html ?? (state.chapter === '第一章 潮汐' && state.work === '雾港来信' ? sampleText : ''); refreshInlineBookmarks(); renderCount(); }
     function flushPendingSave() { captureChapterDraft(); clearTimeout(state.timer); clearTimeout(state.forceTimer); state.timer = null; state.forceTimer = null; state.dirty = false; if (!state.failed) setStatus('已保存'); }
-    function openWork(name) { flushPendingSave(); saveWorkTree(); state.work = name; state.conversationWork = name; state.session = ''; state.knowledgeScope = 'current'; loadWorkTree(name); const firstChapter = $('chapter-tree').querySelector('[data-chapter]'); state.chapter = firstChapter?.dataset.chapter || ''; renderChapter(firstChapter); $('error-strip').classList.remove('show'); state.failed = false; state.dirty = false; setStatus('已保存'); show('editor'); }
+    function openWork(name) { flushPendingSave(); saveWorkTree(); state.work = name; state.conversationWork = name; state.session = ''; state.outlineId = ''; state.foreshadowId = ''; state.openedBookmark = null; state.knowledgeScope = 'current'; loadWorkTree(name); const firstChapter = $('chapter-tree').querySelector('[data-chapter]'); state.chapter = firstChapter?.dataset.chapter || ''; renderChapter(firstChapter); $('error-strip').classList.remove('show'); state.failed = false; state.dirty = false; setStatus('已保存'); switchWorkTab('writing'); show('editor'); }
+    function workArchitecture() { if (!architectureByWork.has(state.work)) architectureByWork.set(state.work, { outlines: [], foreshadows: [] }); return architectureByWork.get(state.work); }
+    function findOutline(id) { return workArchitecture().outlines.find((node) => node.id === id); }
+    function findForeshadow(id) { return workArchitecture().foreshadows.find((item) => item.id === id); }
+    function chapterNames() { return Array.from($('chapter-tree').querySelectorAll('[data-chapter]'), (item) => item.dataset.chapter); }
+    function fillSelect(select, options, selected = '') { select.replaceChildren(...options.map(([label, value]) => new Option(label, value))); select.value = options.some(([, value]) => value === selected) ? selected : options[0]?.[1] ?? ''; }
+    function refreshInlineBookmarks() { $('editor').querySelectorAll('[data-foreshadow-id]').forEach((marker) => { const item = findForeshadow(marker.dataset.foreshadowId); marker.textContent = item ? `[伏笔：${item.name || '未命名伏笔'}]` : '[伏笔：已删除]'; }); }
+    function switchWorkTab(tab) {
+      if (state.failed && tab !== 'writing') { showToast('保存失败，请重试保存后再切换。'); return; }
+      if (state.view === 'editor' && state.workTab === 'writing' && tab !== 'writing') flushPendingSave();
+      state.workTab = tab;
+      document.querySelectorAll('[data-work-tab]').forEach((button) => { const active = button.dataset.workTab === tab; button.classList.toggle('active', active); button.setAttribute('aria-selected', String(active)); button.tabIndex = active ? 0 : -1; });
+      $('writing-panel').hidden = tab !== 'writing'; $('plot-panel').hidden = tab !== 'plot'; $('foreshadow-panel').hidden = tab !== 'foreshadow';
+      $('save-status').hidden = state.view !== 'editor' || tab !== 'writing';
+      if (tab === 'plot') renderOutline();
+      if (tab === 'foreshadow') renderForeshadow();
+    }
+    function architectureLinkRow(label, openKey, openId, removeKey) {
+      const row = document.createElement('div'); row.className = 'architecture-link';
+      const name = document.createElement('span'); name.textContent = label;
+      const open = document.createElement('button'); open.type = 'button'; open.dataset[openKey] = openId; open.textContent = '定位';
+      const remove = document.createElement('button'); remove.type = 'button'; remove.dataset[removeKey] = openId; remove.setAttribute('aria-label', `取消关联${label}`); remove.textContent = '移除';
+      row.append(name, open, remove); return row;
+    }
+    function renderOutline() {
+      const data = workArchitecture(); const nodes = data.outlines;
+      const selected = findOutline(state.outlineId) || nodes[0]; state.outlineId = selected?.id || '';
+      const list = $('outline-list'); list.replaceChildren();
+      const collapsed = collapsedOutlinesByWork.get(state.work) || new Set();
+      const appendChildren = (parentId) => nodes.filter((node) => node.parentId === parentId).forEach((node) => {
+        const row = document.createElement('div'); row.className = 'outline-node'; row.dataset.nodeId = node.id; row.dataset.type = node.type; row.classList.toggle('active', node.id === state.outlineId);
+        const hasChildren = nodes.some((child) => child.parentId === node.id);
+        const toggle = document.createElement(hasChildren ? 'button' : 'span'); toggle.className = hasChildren ? 'node-toggle' : 'node-spacer';
+        if (hasChildren) { toggle.type = 'button'; toggle.dataset.toggleNode = node.id; toggle.setAttribute('aria-label', `${collapsed.has(node.id) ? '展开' : '收起'}${node.title}`); toggle.setAttribute('aria-expanded', String(!collapsed.has(node.id))); toggle.innerHTML = '<i data-lucide="chevron-down"></i>'; }
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'node-select'; button.dataset.selectNode = node.id;
+        const icon = document.createElement('i'); icon.dataset.lucide = node.type === 'volume' ? 'folder' : node.type === 'chapter' ? 'file-text' : 'list-tree';
+        const name = document.createElement('span'); name.textContent = node.title || '未命名节点'; button.append(icon, name); row.append(toggle, button); list.append(row); if (!collapsed.has(node.id)) appendChildren(node.id);
+      });
+      appendChildren(null); iconRefresh();
+      $('outline-empty').hidden = !!selected; $('outline-fields').hidden = !selected;
+      for (const id of ['outline-move-up', 'outline-move-down', 'outline-delete']) $(id).disabled = !selected;
+      $('outline-selected-type').textContent = selected ? ({ volume: '卷', chapter: '章', detail: '详细节点' })[selected.type] : '剧情节点';
+      if (!selected) return;
+      $('outline-title').value = selected.title; $('outline-summary').value = selected.summary;
+      fillSelect($('outline-chapter'), [['不关联章节', ''], ...chapterNames().map((name) => [name, name])], selected.chapterId);
+      $('outline-open-chapter').disabled = !selected.chapterId;
+      const knowledge = Array.from(document.querySelectorAll('.knowledge-entry')).filter((entry) => entry.dataset.ownerWork === state.work);
+      fillSelect($('outline-knowledge-link'), [['关联知识条目', ''], ...knowledge.filter((entry) => !selected.knowledgeIds.includes(entry.dataset.entry)).map((entry) => [entry.querySelector('.entry-summary').textContent.slice(0, 28), entry.dataset.entry])]);
+      $('outline-knowledge-links').replaceChildren(...selected.knowledgeIds.map((id) => { const entry = knowledge.find((item) => item.dataset.entry === id); return entry ? architectureLinkRow(entry.querySelector('.entry-summary').textContent.slice(0, 45), 'openKnowledge', id, 'removeKnowledge') : null; }).filter(Boolean));
+      fillSelect($('outline-foreshadow-link'), [['关联伏笔', ''], ...data.foreshadows.filter((item) => item.outlineId !== selected.id).map((item) => [item.name, item.id])]);
+      $('outline-foreshadow-links').replaceChildren(...data.foreshadows.filter((item) => item.outlineId === selected.id).map((item) => architectureLinkRow(item.name, 'openForeshadow', item.id, 'removeForeshadow')));
+    }
+    function addOutline() {
+      const data = workArchitecture(); const type = $('outline-add-kind').value; const selected = findOutline(state.outlineId);
+      let parentId = null;
+      if (type === 'chapter' && selected) parentId = selected.type === 'volume' ? selected.id : selected.type === 'chapter' ? selected.parentId : findOutline(selected.parentId)?.parentId || null;
+      if (type === 'detail') { parentId = selected?.type === 'chapter' ? selected.id : selected?.type === 'detail' ? selected.parentId : null; if (!parentId) { showToast('请先选择章级剧情节点。'); return; } }
+      const title = type === 'volume' ? '新分卷' : type === 'chapter' ? '新章节大纲' : '新详细节点';
+      const node = { id: `outline-${++state.architectureSerial}`, type, parentId, title, summary: '', chapterId: '', knowledgeIds: [] };
+      data.outlines.push(node); revealOutline(node.id); renderOutline(); $('outline-title').focus(); saveVisual();
+    }
+    function moveOutline(direction) {
+      const nodes = workArchitecture().outlines; const selected = findOutline(state.outlineId); if (!selected) return;
+      const siblings = nodes.filter((node) => node.parentId === selected.parentId); const next = siblings[siblings.indexOf(selected) + direction]; if (!next) return;
+      const index = nodes.indexOf(selected); const nextIndex = nodes.indexOf(next); [nodes[index], nodes[nextIndex]] = [nodes[nextIndex], nodes[index]]; renderOutline(); $('outline-list').querySelector('.outline-node.active .node-select')?.focus(); saveVisual();
+    }
+    function toggleOutline(id) {
+      const collapsed = collapsedOutlinesByWork.get(state.work) || new Set();
+      if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+      if (collapsed.has(id)) {
+        let selected = findOutline(state.outlineId);
+        while (selected?.parentId) { if (selected.parentId === id) { state.outlineId = id; break; } selected = findOutline(selected.parentId); }
+      }
+      collapsedOutlinesByWork.set(state.work, collapsed); renderOutline();
+      $('outline-list').querySelector(`[data-toggle-node="${id}"]`)?.focus();
+    }
+    function revealOutline(id) {
+      const collapsed = collapsedOutlinesByWork.get(state.work) || new Set();
+      let ancestor = findOutline(id)?.parentId;
+      while (ancestor) { collapsed.delete(ancestor); ancestor = findOutline(ancestor)?.parentId; }
+      collapsedOutlinesByWork.set(state.work, collapsed); state.outlineId = id;
+    }
+    function deleteArchitectureTarget() {
+      const { kind, id } = state.pendingArchitecture || {};
+      const data = workArchitecture();
+      if (kind === 'outline') {
+        const removed = new Set([id]);
+        let size;
+        do { size = removed.size; data.outlines.filter((node) => removed.has(node.parentId)).forEach((node) => removed.add(node.id)); } while (removed.size !== size);
+        data.outlines = data.outlines.filter((node) => !removed.has(node.id));
+        data.foreshadows.forEach((item) => { if (removed.has(item.outlineId)) item.outlineId = ''; });
+        removed.forEach((nodeId) => collapsedOutlinesByWork.get(state.work)?.delete(nodeId));
+        state.outlineId = ''; renderOutline();
+      } else if (kind === 'foreshadow') {
+        flushPendingSave(); data.foreshadows = data.foreshadows.filter((item) => item.id !== id);
+        $('editor').querySelectorAll('[data-foreshadow-id]').forEach((marker) => { if (marker.dataset.foreshadowId === id) marker.remove(); });
+        state.chapterDrafts.forEach((draft, key) => {
+          if (JSON.parse(key)[0] !== state.work) return;
+          const template = document.createElement('template'); template.innerHTML = draft.html;
+          template.content.querySelectorAll('[data-foreshadow-id]').forEach((marker) => { if (marker.dataset.foreshadowId === id) marker.remove(); });
+          draft.html = template.innerHTML;
+        });
+        state.openedBookmark = null; state.foreshadowId = ''; captureChapterDraft(); renderCount(); renderForeshadow();
+      }
+      state.pendingArchitecture = null; saveVisual(); closeConfirm(false);
+      const next = kind === 'outline' ? $('outline-list').querySelector('.outline-node.active .node-select') || $('outline-add') : $('foreshadow-list').querySelector('.foreshadow-item.active') || $('foreshadow-add');
+      next.focus();
+    }
+    function requestArchitectureDelete(kind) {
+      const selected = kind === 'outline' ? findOutline(state.outlineId) : findForeshadow(state.foreshadowId);
+      if (!selected) return;
+      state.pendingArchitecture = { kind, id: selected.id }; state.pendingDelete = null; state.pendingSession = null;
+      $('confirm-title').textContent = kind === 'outline' ? '删除剧情节点' : '删除伏笔';
+      $('confirm-message').textContent = kind === 'outline' ? `确定删除“${selected.title}”及其下级节点吗？关联的伏笔会保留。` : `确定删除“${selected.name}”吗？正文中的对应书签也会移除。`;
+      openModal('confirm-dialog', 'confirm-cancel');
+    }
+    function renderForeshadow() {
+      const items = workArchitecture().foreshadows;
+      const selected = findForeshadow(state.foreshadowId) || items[0]; state.foreshadowId = selected?.id || '';
+      $('foreshadow-list').replaceChildren(...items.map((item) => {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'foreshadow-item'; button.dataset.foreshadowId = item.id; button.classList.toggle('active', item.id === state.foreshadowId);
+        const icon = document.createElement('i'); icon.dataset.lucide = 'bookmark'; const name = document.createElement('span'); name.textContent = item.name || '未命名伏笔';
+        const status = document.createElement('small'); status.textContent = item.status; button.append(icon, name, status); return button;
+      }));
+      $('foreshadow-empty').hidden = !!selected; $('foreshadow-fields').hidden = !selected; $('foreshadow-delete').disabled = !selected;
+      if (!selected) { iconRefresh(); return; }
+      $('foreshadow-name').value = selected.name; $('foreshadow-status').value = selected.status; $('foreshadow-description').value = selected.description;
+      fillSelect($('foreshadow-outline'), [['不关联剧情节点', ''], ...workArchitecture().outlines.map((node) => [node.title, node.id])], selected.outlineId);
+      $('foreshadow-open-outline').disabled = !selected.outlineId;
+      fillSelect($('foreshadow-evidence-chapter'), [['选择章节', ''], ...chapterNames().map((name) => [name, name])]);
+      fillSelect($('foreshadow-evidence-source-paragraph'), [['仅关联章节', '']]);
+      const list = $('foreshadow-evidence-list'); list.replaceChildren();
+      if (!selected.evidence.length) { const empty = document.createElement('div'); empty.className = 'architecture-empty compact'; empty.textContent = '尚无证据'; list.append(empty); }
+      selected.evidence.forEach((evidence, index) => {
+        const row = document.createElement('div'); row.className = 'evidence-row';
+        const chapterExists = chapterNames().includes(evidence.chapterId);
+        const paragraphExists = !evidence.paragraphId || paragraphInChapter(evidence.chapterId, evidence.paragraphId);
+        const missing = !chapterExists || !paragraphExists; row.classList.toggle('is-missing', missing);
+        const source = chapterExists ? evidence.chapterId : '来源章节已失效';
+        const history = evidence.previousChapters?.length ? `（原：${evidence.previousChapters.join(' → ')}）` : '';
+        const textNode = document.createElement('span'); textNode.textContent = `${evidence.kind} · ${source}${history} · ${evidence.paragraph}${paragraphExists ? '' : '（段落已失效）'}`;
+        const locate = document.createElement('button'); locate.type = 'button'; locate.dataset.evidenceIndex = index; locate.textContent = evidence.paragraphId ? '定位段落' : '定位章节'; locate.disabled = missing;
+        const remove = document.createElement('button'); remove.type = 'button'; remove.dataset.removeEvidence = index; remove.textContent = '移除'; remove.setAttribute('aria-label', `移除${evidence.kind}证据`);
+        row.append(textNode, locate, remove); list.append(row);
+        if (missing) {
+          const controls = document.createElement('div'); controls.className = 'evidence-relink';
+          const select = document.createElement('select'); select.dataset.evidenceRelinkSelect = index; select.setAttribute('aria-label', `重新关联${evidence.kind}证据章节`);
+          fillSelect(select, [['选择新章节', ''], ...chapterNames().map((name) => [name, name])], chapterExists ? evidence.chapterId : '');
+          const paragraphSelect = document.createElement('select'); paragraphSelect.dataset.evidenceRelinkParagraph = index; paragraphSelect.setAttribute('aria-label', `重新关联${evidence.kind}证据段落`);
+          fillSelect(paragraphSelect, [['仅关联章节', ''], ...paragraphOptions(select.value)]);
+          const relink = document.createElement('button'); relink.type = 'button'; relink.dataset.relinkEvidence = index; relink.textContent = '重新关联';
+          controls.append(select, paragraphSelect, relink); row.append(controls);
+        }
+      });
+      $('bookmark-remove').hidden = !(state.openedBookmark?.element?.isConnected && state.openedBookmark.foreshadowId === selected.id && state.openedBookmark.work === state.work);
+      iconRefresh();
+    }
+    function paragraphInChapter(chapterId, paragraphId) {
+      if (chapterId === state.chapter) return !!Array.from($('editor').querySelectorAll('p')).find((paragraph) => paragraph.dataset.paragraphId === paragraphId);
+      const draft = state.chapterDrafts.get(draftKey(state.work, chapterId)); if (!draft) return false;
+      const template = document.createElement('template'); template.innerHTML = draft.html;
+      return !!Array.from(template.content.querySelectorAll('p')).find((paragraph) => paragraph.dataset.paragraphId === paragraphId);
+    }
+    function paragraphOptions(chapterId) {
+      if (!chapterId) return [];
+      let paragraphs;
+      if (chapterId === state.chapter) { ensureParagraphIds(); paragraphs = Array.from($('editor').querySelectorAll('p')); }
+      else {
+        const draft = state.chapterDrafts.get(draftKey(state.work, chapterId));
+        const template = document.createElement('template'); template.innerHTML = draft?.html || '';
+        paragraphs = Array.from(template.content.querySelectorAll('p'));
+      }
+      return paragraphs.filter((paragraph) => paragraph.dataset.paragraphId).map((paragraph) => [paragraph.textContent.replace(/\[伏笔：[^\]]+\]/g, '').trim().slice(0, 38) || '空段落', paragraph.dataset.paragraphId]);
+    }
+    function updateEvidenceParagraphOptions() {
+      fillSelect($('foreshadow-evidence-source-paragraph'), [['仅关联章节', ''], ...paragraphOptions($('foreshadow-evidence-chapter').value)]);
+    }
+    function locateChapter(chapterId, paragraphId = '') {
+      const button = Array.from($('chapter-tree').querySelectorAll('[data-chapter]')).find((item) => item.dataset.chapter === chapterId);
+      if (!button) { showToast('来源章节已失效。'); return; }
+      switchWorkTab('writing'); if (state.chapter !== chapterId) activateChapter(button);
+      if (paragraphId) {
+        const paragraph = Array.from($('editor').querySelectorAll('p')).find((item) => item.dataset.paragraphId === paragraphId);
+        if (!paragraph) { showToast('来源段落已失效。'); return; }
+        paragraph.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+      $('editor').focus();
+    }
+    function addForeshadow() {
+      const name = $('foreshadow-add-name').value.trim(); if (!name) { $('foreshadow-add-name').focus(); return; }
+      const item = { id: `foreshadow-${++state.architectureSerial}`, name, status: '未埋设', outlineId: '', description: '', evidence: [] };
+      workArchitecture().foreshadows.push(item); state.foreshadowId = item.id; $('foreshadow-add-name').value = ''; renderForeshadow(); $('foreshadow-name').focus(); saveVisual();
+    }
+    function addForeshadowEvidence() {
+      const item = findForeshadow(state.foreshadowId); const chapterId = $('foreshadow-evidence-chapter').value;
+      const paragraphId = $('foreshadow-evidence-source-paragraph').value;
+      const excerpt = paragraphOptions(chapterId).find(([, id]) => id === paragraphId)?.[0] || '';
+      const paragraph = $('foreshadow-evidence-paragraph').value.trim() || excerpt;
+      if (!item || !chapterId || !paragraph) { showToast('请选择章节并填写段落证据。'); return; }
+      item.evidence.push({ kind: $('foreshadow-evidence-kind').value, chapterId, paragraphId, paragraph });
+      renderForeshadow(); $('foreshadow-evidence-paragraph').value = ''; saveVisual();
+    }
+    function openBookmarkDialog() {
+      const items = workArchitecture().foreshadows;
+      if (!items.length) { showToast('请先在伏笔架构中创建伏笔。'); switchWorkTab('foreshadow'); return; }
+      const selection = window.getSelection(); const start = selection?.rangeCount ? selection.getRangeAt(0).startContainer : null;
+      const startElement = start?.nodeType === Node.ELEMENT_NODE ? start : start?.parentElement;
+      let paragraph = startElement?.closest('p');
+      if (!paragraph || !$('editor').contains(paragraph)) paragraph = $('editor').querySelector('p');
+      if (!paragraph) {
+        paragraph = document.createElement('p'); paragraph.append(...Array.from($('editor').childNodes)); $('editor').append(paragraph);
+      }
+      ensureParagraphIds(); state.bookmarkParagraph = paragraph.dataset.paragraphId;
+      fillSelect($('bookmark-target'), items.map((item) => [item.name, item.id])); openModal('bookmark-dialog', 'bookmark-target');
+    }
+    function insertBookmark() {
+      const item = findForeshadow($('bookmark-target').value);
+      const paragraph = Array.from($('editor').querySelectorAll('p')).find((node) => node.dataset.paragraphId === state.bookmarkParagraph);
+      if (!item) { showToast('请先选择伏笔。'); return; }
+      if (!paragraph) { closeModal('bookmark-dialog'); showToast('目标段落已变化，请重新选择。'); return; }
+      const marker = document.createElement('span'); marker.className = 'inline-bookmark'; marker.dataset.foreshadowId = item.id;
+      marker.contentEditable = 'false'; marker.setAttribute('role', 'button'); marker.tabIndex = 0; marker.textContent = `[伏笔：${item.name || '未命名伏笔'}]`;
+      paragraph.append(marker);
+      if (!item.evidence.some((entry) => entry.kind === '埋设' && entry.chapterId === state.chapter && entry.paragraphId === paragraph.dataset.paragraphId)) {
+        item.evidence.push({ kind: '埋设', chapterId: state.chapter, paragraphId: paragraph.dataset.paragraphId, paragraph: paragraph.textContent.replace(marker.textContent, '').trim().slice(0, 100) || '正文书签', fromBookmark: true });
+      }
+      state.bookmarkParagraph = null; saveVisual(); renderCount(); closeModal('bookmark-dialog'); showToast('伏笔书签已插入。');
+    }
+    function openInlineBookmark(marker) {
+      const item = findForeshadow(marker.dataset.foreshadowId);
+      if (!item) { showToast('该伏笔已失效。'); return; }
+      state.openedBookmark = { element: marker, foreshadowId: item.id, work: state.work, chapter: state.chapter };
+      state.foreshadowId = item.id; switchWorkTab('foreshadow'); $('foreshadow-name').focus();
+    }
+    function removeOpenedBookmark() {
+      const opened = state.openedBookmark;
+      if (!opened?.element?.isConnected || opened.work !== state.work || opened.chapter !== state.chapter) return;
+      const paragraphNode = opened.element.closest('p'); const paragraphId = paragraphNode?.dataset.paragraphId;
+      opened.element.remove();
+      const item = findForeshadow(opened.foreshadowId);
+      if (item && !Array.from(paragraphNode?.querySelectorAll('[data-foreshadow-id]') || []).some((marker) => marker.dataset.foreshadowId === item.id)) item.evidence = item.evidence.filter((entry) => !(entry.fromBookmark && entry.chapterId === state.chapter && entry.paragraphId === paragraphId));
+      state.openedBookmark = null; saveVisual(); renderCount(); renderForeshadow(); $('foreshadow-name').focus(); showToast('已移除此处书签。');
+    }
     function openModal(id, focusTarget) {
       state.modalReturn = document.activeElement;
       $(id).classList.add('show');
@@ -574,19 +913,20 @@
       $('confirm-message').textContent = kind === 'volume' ? `确定删除“${label}”以及其中的全部章节吗？` : `确定删除“${label}”吗？此操作只影响当前 Demo。`;
       openModal('confirm-dialog', 'confirm-cancel');
     }
-    function closeConfirm(restoreFocus = true) { closeModal('confirm-dialog', restoreFocus); state.pendingDelete = null; state.pendingSession = null; }
+    function closeConfirm(restoreFocus = true) { closeModal('confirm-dialog', restoreFocus); state.pendingDelete = null; state.pendingSession = null; state.pendingArchitecture = null; }
     function activateChapter(button) { if (!button) return; flushPendingSave(); captureChapterDraft(); state.chapter = button.dataset.chapter; renderChapter(button); }
     function deleteContextTarget() {
       const context = state.pendingDelete; if (!context) return;
       if (context.kind === 'work') {
         context.element.remove();
-        state.workTrees.delete(context.label);
-        Array.from(state.chapterDrafts.keys()).filter((key) => key.startsWith(`${context.label}::`)).forEach((key) => state.chapterDrafts.delete(key));
+        state.workTrees.delete(context.label); chapterSerialByWork.delete(context.label);
+        architectureByWork.delete(context.label); collapsedOutlinesByWork.delete(context.label);
+        Array.from(state.chapterDrafts.keys()).filter((key) => JSON.parse(key)[0] === context.label).forEach((key) => state.chapterDrafts.delete(key));
         document.querySelectorAll('.knowledge-entry').forEach((entry) => { if (entry.dataset.ownerWork === context.label) entry.remove(); });
         Object.entries(sessionWork).forEach(([id, work]) => { if (work === context.label) { delete sessionWork[id]; delete sessionMessages[id]; } });
         if (state.work === context.label) {
           state.work = document.querySelector('.book[data-work]')?.dataset.work || '';
-          state.chapter = '';
+          state.chapter = ''; state.outlineId = ''; state.foreshadowId = ''; state.openedBookmark = null;
           if (state.work) { loadWorkTree(state.work); renderChapter($('chapter-tree').querySelector('[data-chapter]')); }
           else { $('chapter-tree').replaceChildren(); $('chapter-title').value = ''; $('editor').replaceChildren(); renderCount(); }
         }
@@ -595,13 +935,16 @@
       }
       flushPendingSave();
       let currentRemoved = false;
+      const removedChapters = [];
       if (context.kind === 'volume') {
         const id = context.element.dataset.volume;
-        document.querySelectorAll(`[data-parent="${id}"]`).forEach((item) => { if (item.dataset.chapter === state.chapter) currentRemoved = true; state.chapterDrafts.delete(draftKey(state.work, item.dataset.chapter)); item.remove(); });
+        document.querySelectorAll(`[data-parent="${id}"]`).forEach((item) => { if (item.dataset.chapter === state.chapter) currentRemoved = true; removedChapters.push(item.dataset.chapter); state.chapterDrafts.delete(draftKey(state.work, item.dataset.chapter)); item.remove(); });
         context.element.remove();
       }
       let parentNodeToUpdate = null;
-      if (context.kind === 'chapter') { currentRemoved = context.element.dataset.chapter === state.chapter; state.chapterDrafts.delete(draftKey(state.work, context.element.dataset.chapter)); parentNodeToUpdate = document.querySelector(`[data-volume="${context.element.dataset.parent}"]`); context.element.remove(); }
+      if (context.kind === 'chapter') { currentRemoved = context.element.dataset.chapter === state.chapter; removedChapters.push(context.element.dataset.chapter); state.chapterDrafts.delete(draftKey(state.work, context.element.dataset.chapter)); parentNodeToUpdate = document.querySelector(`[data-volume="${context.element.dataset.parent}"]`); context.element.remove(); }
+      workArchitecture().outlines.forEach((node) => { if (removedChapters.includes(node.chapterId)) node.chapterId = ''; });
+      workArchitecture().foreshadows.forEach((item) => item.evidence.forEach((entry) => { if (removedChapters.includes(entry.chapterId)) { entry.previousChapters = [...(entry.previousChapters || []), entry.chapterId]; entry.chapterId = ''; entry.paragraphId = ''; } }));
       if (parentNodeToUpdate) { const count = parentNodeToUpdate.querySelector('.count'); const remaining = document.querySelectorAll(`[data-parent="${parentNodeToUpdate.dataset.volume}"]`).length; if (count) count.textContent = `${remaining} 章`; }
       saveWorkTree();
       if (currentRemoved) {
@@ -817,6 +1160,7 @@
       $('session-empty').hidden = !!$('session-list').querySelector('.session'); showToast('会话已删除。');
     }
     function confirmPendingAction() {
+      if (state.pendingArchitecture) { deleteArchitectureTarget(); return; }
       if (state.pendingSession) { const item = state.pendingSession; deleteSession(item); closeConfirm(); return; }
       if (state.pendingDelete?.kind === 'tag') { const value = state.pendingDelete.label; removeTag(value); closeConfirm(); return; }
       deleteContextTarget();
@@ -859,6 +1203,7 @@
           if (modal.id === 'confirm-dialog') closeConfirm();
           else if (modal.id === 'create-dialog') closeDialog();
           else if (modal.id === 'knowledge-dialog') closeKnowledgeDialog();
+          else if (modal.id === 'bookmark-dialog') closeModal('bookmark-dialog');
           else if (modal.id === 'migration-dialog') closeMigrationDialog();
           return;
         }
@@ -879,13 +1224,86 @@
     $('context-delete').addEventListener('click', openConfirm);
     $('confirm-cancel').addEventListener('click', closeConfirm); $('confirm-delete').addEventListener('click', confirmPendingAction);
     $('editor').addEventListener('input', () => { renderCount(); saveVisual(); }); $('chapter-title').addEventListener('input', saveVisual);
+    document.querySelectorAll('[data-work-tab]').forEach((button) => button.addEventListener('click', () => switchWorkTab(button.dataset.workTab)));
+    $('editor-view').querySelector('.work-tabs').addEventListener('keydown', (event) => {
+      const current = event.target.closest('[data-work-tab]'); if (!current) return;
+      const tabs = Array.from(document.querySelectorAll('[data-work-tab]')); const index = tabs.indexOf(current);
+      const next = event.key === 'ArrowRight' ? tabs[(index + 1) % tabs.length] : event.key === 'ArrowLeft' ? tabs[(index + tabs.length - 1) % tabs.length] : event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[tabs.length - 1] : null;
+      if (!next) return;
+      event.preventDefault(); switchWorkTab(next.dataset.workTab); (state.workTab === next.dataset.workTab ? next : current).focus();
+    });
+    $('outline-add').addEventListener('click', addOutline);
+    $('outline-list').addEventListener('click', (event) => {
+      const toggle = event.target.closest('[data-toggle-node]'); if (toggle) { toggleOutline(toggle.dataset.toggleNode); return; }
+      const select = event.target.closest('[data-select-node]'); if (select) { state.outlineId = select.dataset.selectNode; renderOutline(); $('outline-list').querySelector('.outline-node.active .node-select')?.focus(); }
+    });
+    $('outline-move-up').addEventListener('click', () => moveOutline(-1)); $('outline-move-down').addEventListener('click', () => moveOutline(1));
+    $('outline-delete').addEventListener('click', () => requestArchitectureDelete('outline'));
+    $('outline-title').addEventListener('input', () => { const node = findOutline(state.outlineId); if (!node) return; node.title = $('outline-title').value; const label = $('outline-list').querySelector('.outline-node.active .node-select span'); if (label) label.textContent = node.title || '未命名节点'; saveVisual(); });
+    $('outline-title').addEventListener('blur', () => { const node = findOutline(state.outlineId); if (!node) return; node.title = node.title.trim() || '未命名节点'; $('outline-title').value = node.title; const label = $('outline-list').querySelector('.outline-node.active .node-select span'); if (label) label.textContent = node.title; saveVisual(); });
+    $('outline-summary').addEventListener('input', () => { const node = findOutline(state.outlineId); if (node) { node.summary = $('outline-summary').value; saveVisual(); } });
+    $('outline-chapter').addEventListener('change', () => { const node = findOutline(state.outlineId); if (node) { node.chapterId = $('outline-chapter').value; $('outline-open-chapter').disabled = !node.chapterId; saveVisual(); } });
+    $('outline-open-chapter').addEventListener('click', () => { const node = findOutline(state.outlineId); if (node?.chapterId) locateChapter(node.chapterId); });
+    $('outline-knowledge-link').addEventListener('change', () => { const node = findOutline(state.outlineId); const id = $('outline-knowledge-link').value; if (node && id && !node.knowledgeIds.includes(id)) { node.knowledgeIds.push(id); renderOutline(); saveVisual(); } });
+    $('outline-foreshadow-link').addEventListener('change', () => { const item = findForeshadow($('outline-foreshadow-link').value); if (item) { item.outlineId = state.outlineId; renderOutline(); saveVisual(); } });
+    $('outline-fields').addEventListener('click', (event) => {
+      const target = event.target.closest('[data-open-knowledge], [data-remove-knowledge], [data-open-foreshadow], [data-remove-foreshadow]'); if (!target) return;
+      const node = findOutline(state.outlineId); if (!node) return;
+      if (target.dataset.removeKnowledge) { node.knowledgeIds = node.knowledgeIds.filter((id) => id !== target.dataset.removeKnowledge); renderOutline(); saveVisual(); }
+      if (target.dataset.removeForeshadow) { const item = findForeshadow(target.dataset.removeForeshadow); if (item) item.outlineId = ''; renderOutline(); saveVisual(); }
+      if (target.dataset.openForeshadow) { state.foreshadowId = target.dataset.openForeshadow; switchWorkTab('foreshadow'); $('foreshadow-name').focus(); }
+      if (target.dataset.openKnowledge) {
+        const entry = Array.from(document.querySelectorAll('.knowledge-entry')).find((item) => item.dataset.entry === target.dataset.openKnowledge);
+        if (!entry) { showToast('关联知识已失效。'); return; }
+        state.knowledgeScope = 'current'; state.category = 'all'; state.tags.clear(); $('knowledge-search').value = ''; show('knowledge');
+        document.querySelectorAll('#knowledge-view .category-list [data-category]').forEach((item) => item.classList.toggle('active', item.dataset.category === 'all'));
+        document.querySelectorAll('#knowledge-view .tag-row [data-tag]').forEach((item) => item.classList.toggle('active', item.dataset.tag === 'all'));
+        filterKnowledge(); selectEntry(entry); entry.scrollIntoView({ block: 'center' }); entry.focus();
+      }
+    });
+    $('foreshadow-add').addEventListener('click', addForeshadow); $('foreshadow-add-name').addEventListener('keydown', (event) => { if (event.key === 'Enter') addForeshadow(); });
+    $('foreshadow-list').addEventListener('click', (event) => { const button = event.target.closest('[data-foreshadow-id]'); if (button) { state.foreshadowId = button.dataset.foreshadowId; renderForeshadow(); button.focus(); } });
+    $('foreshadow-delete').addEventListener('click', () => requestArchitectureDelete('foreshadow'));
+    $('foreshadow-name').addEventListener('input', () => { const item = findForeshadow(state.foreshadowId); if (!item) return; item.name = $('foreshadow-name').value; const label = $('foreshadow-list').querySelector('.foreshadow-item.active span'); if (label) label.textContent = item.name || '未命名伏笔'; refreshInlineBookmarks(); saveVisual(); });
+    $('foreshadow-name').addEventListener('blur', () => { const item = findForeshadow(state.foreshadowId); if (!item) return; item.name = item.name.trim() || '未命名伏笔'; $('foreshadow-name').value = item.name; const label = $('foreshadow-list').querySelector('.foreshadow-item.active span'); if (label) label.textContent = item.name; refreshInlineBookmarks(); saveVisual(); });
+    $('foreshadow-status').addEventListener('change', () => { const item = findForeshadow(state.foreshadowId); if (item) { item.status = $('foreshadow-status').value; renderForeshadow(); saveVisual(); } });
+    $('foreshadow-outline').addEventListener('change', () => { const item = findForeshadow(state.foreshadowId); if (item) { item.outlineId = $('foreshadow-outline').value; $('foreshadow-open-outline').disabled = !item.outlineId; saveVisual(); } });
+    $('foreshadow-open-outline').addEventListener('click', () => { const item = findForeshadow(state.foreshadowId); if (!item?.outlineId) return; revealOutline(item.outlineId); switchWorkTab('plot'); $('outline-list').querySelector('.outline-node.active .node-select')?.focus(); });
+    $('foreshadow-description').addEventListener('input', () => { const item = findForeshadow(state.foreshadowId); if (item) { item.description = $('foreshadow-description').value; saveVisual(); } });
+    $('foreshadow-evidence-chapter').addEventListener('change', updateEvidenceParagraphOptions);
+    $('foreshadow-evidence-add').addEventListener('click', addForeshadowEvidence);
+    $('foreshadow-evidence-list').addEventListener('change', (event) => {
+      const select = event.target.closest('[data-evidence-relink-select]'); if (!select) return;
+      const paragraphSelect = Array.from($('foreshadow-evidence-list').querySelectorAll('[data-evidence-relink-paragraph]')).find((node) => node.dataset.evidenceRelinkParagraph === select.dataset.evidenceRelinkSelect);
+      if (paragraphSelect) fillSelect(paragraphSelect, [['仅关联章节', ''], ...paragraphOptions(select.value)]);
+    });
+    $('foreshadow-evidence-list').addEventListener('click', (event) => {
+      const target = event.target.closest('[data-evidence-index], [data-remove-evidence], [data-relink-evidence]'); const item = findForeshadow(state.foreshadowId); if (!target || !item) return;
+      if (target.dataset.removeEvidence !== undefined) { item.evidence.splice(Number(target.dataset.removeEvidence), 1); renderForeshadow(); saveVisual(); return; }
+      if (target.dataset.relinkEvidence !== undefined) {
+        const select = Array.from($('foreshadow-evidence-list').querySelectorAll('[data-evidence-relink-select]')).find((node) => node.dataset.evidenceRelinkSelect === target.dataset.relinkEvidence);
+        if (!select?.value) { showToast('请选择新的证据章节。'); return; }
+        const paragraphSelect = Array.from($('foreshadow-evidence-list').querySelectorAll('[data-evidence-relink-paragraph]')).find((node) => node.dataset.evidenceRelinkParagraph === target.dataset.relinkEvidence);
+        const entry = item.evidence[Number(target.dataset.relinkEvidence)]; entry.chapterId = select.value; entry.paragraphId = paragraphSelect?.value || '';
+        renderForeshadow(); saveVisual(); return;
+      }
+      const evidence = item.evidence[Number(target.dataset.evidenceIndex)]; if (evidence) locateChapter(evidence.chapterId, evidence.paragraphId);
+    });
+    $('editor-foreshadow').addEventListener('mousedown', (event) => event.preventDefault());
+    $('editor-foreshadow').addEventListener('click', openBookmarkDialog);
+    $('bookmark-cancel').addEventListener('click', () => closeModal('bookmark-dialog'));
+    $('bookmark-confirm').addEventListener('click', insertBookmark);
+    $('bookmark-dialog').addEventListener('click', (event) => { if (event.target === $('bookmark-dialog')) closeModal('bookmark-dialog'); });
+    $('bookmark-remove').addEventListener('click', removeOpenedBookmark);
+    $('editor').addEventListener('click', (event) => { const marker = event.target.closest('[data-foreshadow-id]'); if (marker) openInlineBookmark(marker); });
+    $('editor').addEventListener('keydown', (event) => { const marker = event.target.closest('[data-foreshadow-id]'); if (marker && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openInlineBookmark(marker); } });
     $('back-shelf').addEventListener('click', () => { if (!state.failed) { flushPendingSave(); saveWorkTree(); } show('shelf'); });
     $('retry-save').addEventListener('click', () => {
       captureChapterDraft(); clearTimeout(state.timer); clearTimeout(state.forceTimer); clearTimeout(state.retryTimer); state.timer = null; state.forceTimer = null; state.retrySnapshot = JSON.stringify(state.chapterDrafts.get(draftKey()) || null); $('retry-save').disabled = true; setStatus('保存中');
       state.retryTimer = setTimeout(() => { const changedDuringRetry = JSON.stringify(state.chapterDrafts.get(draftKey()) || null) !== state.retrySnapshot; state.failed = false; state.retrySnapshot = null; state.retryTimer = null; $('error-strip').classList.remove('show'); $('retry-save').disabled = false; if (changedDuringRetry) saveVisual(); else { state.dirty = false; setStatus('已保存'); } }, 650);
     });
     $('new-work').addEventListener('click', openDialog); $('dialog-cancel').addEventListener('click', closeDialog); $('create-dialog').addEventListener('click', (event) => { if (event.target === $('create-dialog')) closeDialog(); });
-    $('dialog-confirm').addEventListener('click', () => { const entered = $('work-name').value.trim(); if (!entered) { $('work-name').focus(); return; } const name = uniqueWorkName(entered); state.workTrees.set(name, newWorkTreeHtml); $('books').prepend(createWorkCard(name, '新作品', '新建作品，准备开始第一章。', '1 章 · 0 字')); updateWorkTotal(); closeDialog(false); openWork(name); if (name !== entered) showToast(`作品已命名为“${name}”，以区分同名作品。`); });
+    $('dialog-confirm').addEventListener('click', () => { const entered = $('work-name').value.trim(); if (!entered) { $('work-name').focus(); return; } const name = uniqueWorkName(entered); state.workTrees.set(name, newWorkTreeHtml); chapterSerialByWork.set(name, 1); $('books').prepend(createWorkCard(name, '新作品', '新建作品，准备开始第一章。', '1 章 · 0 字')); updateWorkTotal(); closeDialog(false); openWork(name); if (name !== entered) showToast(`作品已命名为“${name}”，以区分同名作品。`); });
     $('work-name').addEventListener('keydown', (event) => { if (event.key === 'Enter') $('dialog-confirm').click(); });
     $('tree-add').addEventListener('click', () => {
       if (state.failed) return;
@@ -899,7 +1317,7 @@
         tree.prepend(parentNode);
       }
       const parent = parentNode?.dataset.volume || 'unassigned';
-      const number = tree.querySelectorAll('[data-chapter]').length + 1; const title = `第${number}章 新章节`;
+      const number = (chapterSerialByWork.get(state.work) || tree.querySelectorAll('[data-chapter]').length) + 1; chapterSerialByWork.set(state.work, number); const title = `第${number}章 新章节`;
       const button = document.createElement('button'); button.type = 'button'; button.className = 'tree-item chapter'; button.dataset.chapter = title; button.dataset.parent = parent;
       button.innerHTML = '<i data-lucide="file-text"></i><span></span><span class="count">0</span>'; button.querySelector('span').textContent = title;
       const siblings = Array.from(tree.querySelectorAll('[data-parent]')).filter((item) => item.dataset.parent === parent);
