@@ -34,6 +34,7 @@
     button, input, select, textarea { font: inherit; }
     button { cursor: pointer; }
     button:focus-visible, input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .editor:focus-visible { outline: 0; }
     .demo-bar { min-height: 48px; padding: 8px 22px; display: flex; gap: 18px; align-items: center; justify-content: space-between; background: #edf0f3; border-bottom: 1px solid #d8dde3; color: #4d5661; }
     .demo-bar strong { font-size: 13px; }
     .demo-bar span { font-size: 12px; color: #7c8590; }
@@ -41,6 +42,7 @@
     .demo-actions button { border: 1px solid #cdd4dc; border-radius: 6px; background: #fff; color: #4a5663; padding: 6px 10px; font-size: 12px; }
     .demo-actions button.active { background: var(--accent-soft); border-color: #a9c7fa; color: #2f63bc; }
     .app { position: relative; display: grid; grid-template-columns: 60px minmax(0, 1fr); width: min(100%, 1600px); height: 100%; min-height: 0; margin: 0 auto; background: var(--canvas); box-shadow: var(--shadow); transition: grid-template-columns .18s ease; }
+    .sidebar-scrim { display: none; }
     .app:not(.is-collapsed) { grid-template-columns: 236px minmax(0, 1fr); }
     .rail { min-width: 0; background: var(--rail); color: #263443; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #dbe6f0; }
     .rail-header { min-height: 64px; padding: 13px 12px; display: flex; align-items: center; gap: 11px; border-bottom: 1px solid #e3edf5; }
@@ -80,6 +82,7 @@
     .primary, .secondary { display: inline-flex; align-items: center; gap: 8px; border-radius: 7px; font-weight: 600; }
     .primary { padding: 9px 13px; border: 1px solid var(--accent-dark); background: var(--accent); color: #fff; }
     .primary:hover { background: var(--accent-dark); }
+    .primary:disabled, .secondary:disabled { opacity: .5; cursor: not-allowed; }
     .secondary { padding: 8px 12px; border: 1px solid var(--line-strong); background: #fff; color: #394552; }
     .secondary:hover { border-color: #aeb7c1; background: #f7f8fa; }
     .primary svg, .secondary svg { width: 16px; height: 16px; }
@@ -142,7 +145,9 @@
     .error-strip.show { display: flex; }
     .error-strip button { margin-left: auto; padding: 5px 9px; border: 1px solid #cf8b7d; border-radius: 5px; background: #fff; color: #8e4639; }
     .content-page { min-height: 0; }
-    .knowledge-layout { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 16px; margin-top: 22px; }
+    .knowledge-layout { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 16px; margin-top: 22px; transition: grid-template-columns .18s ease; }
+    .knowledge-layout.is-collapsed { grid-template-columns: 0 minmax(0, 1fr); }
+    .knowledge-layout.is-collapsed > .panel { visibility: hidden; overflow: hidden; }
     .panel, .setting-panel { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
     .panel-heading { min-height: 52px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); }
     .panel-heading strong { font-size: 13px; }
@@ -156,12 +161,13 @@
     .knowledge-content { min-width: 0; }
     .knowledge-actions { display: flex; gap: 8px; align-items: center; }
     .knowledge-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .knowledge-layout.is-collapsed .knowledge-toolbar { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .category-expand-toggle { display: none; }
+    .knowledge-layout.is-collapsed .category-expand-toggle { display: grid; }
     .knowledge-search { position: relative; min-width: 0; }
     .knowledge-search svg { position: absolute; left: 13px; top: 12px; width: 16px; height: 16px; color: #8a949e; }
     .knowledge-search input { width: 100%; padding: 10px 12px 10px 37px; border: 1px solid var(--line-strong); border-radius: 7px; background: #fff; color: var(--ink); }
-    .knowledge-scope { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: #f5f7fa; }
-    .knowledge-scope button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #68727d; font-size: 11px; white-space: nowrap; }
-    .knowledge-scope button.active { background: #fff; color: #315fa8; box-shadow: 0 1px 3px rgb(28 44 67 / 12%); }
+    .knowledge-scope { min-height: 34px; min-width: 178px; padding: 0 28px 0 10px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: #315fa8; font-size: 11px; }
     .tag-row { min-height: 52px; padding: 9px 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
     .tag { display: inline-flex; justify-content: center; padding: 6px 9px; border: 1px solid var(--line); background: #fff; }
     .tag.active { border-color: #a9c7fa; background: var(--accent-soft); color: #315fa8; }
@@ -170,22 +176,26 @@
     .knowledge-entry { min-height: 100px; padding: 14px 15px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
     .knowledge-entry:hover, .knowledge-entry.active { border-color: #a9c7fa; box-shadow: 0 5px 14px rgb(37 84 154 / 7%); }
     .knowledge-entry[hidden] { display: none; }
-    .entry-head { display: flex; align-items: center; justify-content: flex-end; gap: 10px; order: 2; margin-top: auto; }
+    .entry-head { min-width: 0; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; order: 2; margin-top: auto; }
     .entry-meta, .entry-summary { color: var(--muted); font-size: 12px; line-height: 1.65; }
     .entry-summary { display: -webkit-box; overflow: hidden; margin: 0 0 11px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .knowledge-entry.expanded .entry-summary { display: block; -webkit-line-clamp: unset; }
-    .entry-full { display: none; margin: -3px 0 11px; color: #4f5f6e; font-size: 12px; line-height: 1.8; }
-    .knowledge-entry.expanded .entry-full { display: block; }
-    .entry-source { white-space: nowrap; }
-    .entry-owner { display: none; color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .entry-source { max-width: 100%; overflow-wrap: anywhere; text-align: right; }
+    .entry-owner { display: none; max-width: 100%; overflow-wrap: anywhere; color: var(--muted); font-size: 11px; text-align: right; }
     #knowledge-view[data-scope="all"] .entry-owner { display: inline; }
-    .entry-tags { display: none; }
-    .knowledge-entry.expanded .entry-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+    .entry-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
     .entry-tag { padding: 3px 7px; border-radius: 4px; background: #f1f6fb; color: #607789; font-size: 10px; }
     .conversation-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; margin-top: 22px; min-height: 510px; }
     .session-list { min-width: 0; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
     .session-list-head { margin: 3px 4px 9px; display: flex; align-items: center; justify-content: space-between; }
     .session-list-head h3 { margin: 0 0 0 5px; font-size: 13px; }
+    .session-group { margin: 0 0 11px; }
+    .session-group-head { display: flex; align-items: center; gap: 4px; padding: 2px 3px; }
+    .session-work-open { min-width: 0; flex: 1; padding: 7px 8px; overflow: hidden; border: 0; border-radius: 5px; background: transparent; color: #354a5d; font-size: 12px; font-weight: 700; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+    .session-work-open:hover, .session-work-open.active { background: var(--accent-soft); color: #286d9f; }
+    .session-work-add { width: 27px; height: 27px; flex: none; border-color: transparent; background: transparent; }
+    .session-work-add:hover { border-color: var(--line); background: #f6fbff; }
+    .session-group-list { padding-left: 9px; }
     .session { width: 100%; position: relative; margin-bottom: 2px; padding: 3px 32px 3px 3px; border-radius: 7px; }
     .session:hover, .session.active { background: var(--accent-soft); }
     .session-open { width: 100%; min-height: 43px; padding: 7px 8px; display: grid; gap: 4px; border: 0; border-radius: 5px; background: transparent; color: var(--ink); text-align: left; }
@@ -253,6 +263,12 @@
     .splitter-preview-list > div { padding: 12px; display: grid; gap: 4px; border: 1px solid #e6ebf0; border-radius: 6px; background: #fff; }
     .splitter-preview-list strong { font-size: 12px; }
     .splitter-preview-list span { color: var(--muted); font-size: 11px; }
+    .splitter-excerpt { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 9px; align-items: start; padding: 12px; border: 1px solid #e6ebf0; border-radius: 6px; background: #fff; cursor: pointer; }
+    .splitter-excerpt:has(input:checked) { border-color: #9ecbfa; background: #f4faff; }
+    .splitter-excerpt input { margin-top: 3px; accent-color: var(--accent); }
+    .splitter-excerpt span { display: grid; gap: 4px; }
+    .splitter-excerpt strong { font-size: 12px; }
+    .splitter-excerpt em { color: var(--muted); font-size: 11px; font-style: normal; line-height: 1.65; }
     .switch { position: relative; width: 36px; height: 20px; appearance: none; border: 0; border-radius: 20px; background: #cbd2da; cursor: pointer; }
     .switch::after { content: ""; width: 16px; height: 16px; position: absolute; top: 2px; left: 2px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 18%); transition: left .15s ease; }
     .switch:checked { background: var(--accent); }
@@ -281,7 +297,7 @@
       .demo-bar { align-items: flex-start; flex-direction: column; gap: 7px; }
       .app { height: 100%; min-height: 0; grid-template-columns: 56px minmax(0, 1fr); }
       .app:not(.is-collapsed) { grid-template-columns: 56px minmax(0, 1fr); }
-      .app:not(.is-collapsed)::after { content: ""; position: absolute; inset: 0; z-index: 10; background: rgb(22 35 48 / 14%); }
+      .app:not(.is-collapsed) .sidebar-scrim { display: block; position: absolute; inset: 0; z-index: 10; border: 0; background: rgb(22 35 48 / 14%); }
       .app:not(.is-collapsed) .rail { position: absolute; inset: 0 auto 0 0; z-index: 12; width: min(236px, calc(100vw - 56px)); box-shadow: 12px 0 28px rgb(22 29 37 / 14%); }
       .app:not(.is-collapsed) .main { grid-column: 2; }
       .topbar { min-height: 64px; padding: 10px 16px; }
@@ -295,6 +311,8 @@
       .page-heading .secondary { flex: none; white-space: nowrap; }
       .knowledge-actions { flex-wrap: wrap; }
       .knowledge-toolbar { grid-template-columns: 1fr; }
+      .knowledge-layout.is-collapsed .knowledge-toolbar { grid-template-columns: auto minmax(0, 1fr); }
+      .knowledge-layout.is-collapsed .knowledge-scope { grid-column: 1 / -1; }
       .knowledge-scope { justify-self: start; }
       .workspace { display: flex; flex-direction: column; }
       .chapter-pane { max-height: 180px; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -311,11 +329,17 @@
       .knowledge-layout, .conversation-layout, .settings-grid { grid-template-columns: 1fr; }
       .splitter-layout { grid-template-columns: 1fr; }
       .splitter-import, .splitter-preview { min-height: 0; }
-      .session-list { min-height: 0; overflow-x: auto; white-space: nowrap; }
-      .session-list h3 { display: none; }
-      .session-list .session { display: inline-grid; width: auto; margin-right: 4px; }
+      .conversation-heading { padding-bottom: 12px; }
+      .conversation-layout { height: min(460px, calc(100dvh - 295px)); min-height: 240px; margin-top: 12px; grid-template-rows: 112px minmax(0, 1fr); }
+      .session-list { min-height: 0; overflow: auto; }
+      .session-list .session { width: 100%; }
+      .conversation-main { min-height: 0; }
       .settings-grid { margin-top: 16px; }
       #data-path { padding-inline: 6px; font-size: 10px; }
+    }
+    @media (max-width: 760px) and (max-height: 600px) {
+      .demo-bar { display: none; }
+      .conversation-layout { height: min(460px, calc(100dvh - 160px)); }
     }
   </style>
 </head>
@@ -332,6 +356,7 @@
     </div>
   </div>
   <div class="app is-collapsed" id="app">
+    <button type="button" class="sidebar-scrim" id="sidebar-scrim" aria-label="关闭侧栏" title="关闭侧栏"></button>
     <aside class="rail">
       <div class="rail-header">
         <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="展开侧栏" aria-expanded="false" title="展开侧栏"><span class="hamburger" aria-hidden="true"><span></span><span></span><span></span></span></button>
@@ -353,7 +378,6 @@
 
       <section class="view active" id="shelf-view" aria-label="作品集">
         <div class="shelf">
-          <div class="shelf-head"><div><h2>作品集</h2></div></div>
           <div class="filter-row"><strong>作品 <span id="work-total">3</span></strong></div>
           <div class="books" id="books">
             <button type="button" class="book" data-work="雾港来信"><span class="book-top"><span class="book-type">长篇小说</span></span><span class="book-title">雾港来信</span><span class="book-excerpt">潮声落下之后，她终于在旧信封里认出了那个名字。</span><span class="book-bottom"><span>12 章 · 38,420 字</span><span>今天 10:24</span></span></button>
@@ -387,19 +411,19 @@
       </section>
 
       <section class="view" id="knowledge-view" aria-label="知识库">
-        <div class="content-page"><div class="page-heading"><div><h2>知识库</h2><p>按分类、标签和来源整理作品素材。</p></div><div class="knowledge-actions"><button type="button" class="secondary" id="open-splitter"><i data-lucide="scissors"></i>拆书工具</button><button type="button" class="primary" id="new-entry"><i data-lucide="plus"></i>新增知识</button></div></div>
-          <div class="knowledge-layout">
-            <aside class="panel"><div class="panel-heading"><strong>分类</strong><button type="button" class="icon-btn" id="manage-categories" title="在设置中维护分类" aria-label="在设置中维护分类"><i data-lucide="settings-2"></i></button></div><div class="category-list"><button type="button" class="active" data-category="all">全部知识 <span>8</span></button><button type="button" data-category="character">人物描写 <span>2</span></button><button type="button" data-category="scene">景物描写 <span>2</span></button><button type="button" data-category="mind">内心描写 <span>1</span></button><button type="button" data-category="quote">经典引用 <span>1</span></button><button type="button" data-category="plot">剧情与伏笔 <span>2</span></button></div></aside>
-            <div class="knowledge-content"><div class="knowledge-toolbar"><div class="knowledge-search"><i data-lucide="search"></i><input id="knowledge-search" type="search" placeholder="模糊搜索知识内容、出处和标签"></div><div class="knowledge-scope" role="group" aria-label="知识范围"><button type="button" class="active" id="knowledge-scope-current" aria-pressed="true">当前作品 · <span id="knowledge-current-work">雾港来信</span></button><button type="button" id="knowledge-scope-all" aria-pressed="false">全部作品</button></div></div><div class="tag-row"><span class="entry-meta">标签</span><button type="button" class="tag active" data-tag="all">全部</button><button type="button" class="tag" data-tag="人物">人物</button><button type="button" class="tag" data-tag="景物">景物</button><button type="button" class="tag" data-tag="内心">内心</button><button type="button" class="tag" data-tag="引用">引用</button><button type="button" class="tag" data-tag="伏笔">伏笔</button><button type="button" class="tag" data-tag="叙述">叙述</button><button type="button" class="tag" data-tag="氛围">氛围</button><button type="button" class="tag" data-tag="道具">道具</button><button type="button" class="tag tag-add" id="add-tag"><i data-lucide="plus"></i>添加标签</button></div>
+        <div class="content-page"><div class="page-heading"><div><p>按分类、标签和来源整理作品素材。</p></div><div class="knowledge-actions"><button type="button" class="secondary" id="open-splitter"><i data-lucide="scissors"></i>拆书工具</button><button type="button" class="primary" id="new-entry"><i data-lucide="plus"></i>新增知识</button></div></div>
+          <div class="knowledge-layout" id="knowledge-layout">
+            <aside class="panel"><div class="panel-heading"><strong>分类</strong><button type="button" class="icon-btn" id="category-collapse-toggle" title="收起分类侧栏" aria-label="收起分类侧栏" aria-expanded="true"><i data-lucide="panel-left-close"></i></button></div><div class="category-list"><button type="button" class="active" data-category="all">全部知识 <span>6</span></button><button type="button" data-category="character">人物描写 <span>2</span></button><button type="button" data-category="scene">景物描写 <span>2</span></button><button type="button" data-category="mind">内心描写 <span>1</span></button><button type="button" data-category="quote">经典引用 <span>1</span></button><button type="button" data-category="plot">剧情与伏笔 <span>1</span></button></div></aside>
+            <div class="knowledge-content"><div class="knowledge-toolbar"><button type="button" class="icon-btn category-expand-toggle" id="category-expand-toggle" title="展开分类侧栏" aria-label="展开分类侧栏" aria-expanded="false"><i data-lucide="panel-left-open"></i></button><div class="knowledge-search"><i data-lucide="search"></i><input id="knowledge-search" type="search" placeholder="模糊搜索知识内容、出处和标签"></div><select class="knowledge-scope" id="knowledge-scope" aria-label="知识范围"><option value="current">当前作品 · 雾港来信</option><option value="长夜列车">长夜列车</option><option value="学习路径">学习路径</option><option value="all">全部作品</option></select></div><div class="tag-row"><span class="entry-meta">标签</span><button type="button" class="tag active" data-tag="all">全部</button><button type="button" class="tag" data-tag="人物">人物</button><button type="button" class="tag" data-tag="景物">景物</button><button type="button" class="tag" data-tag="内心">内心</button><button type="button" class="tag" data-tag="引用">引用</button><button type="button" class="tag" data-tag="伏笔">伏笔</button><button type="button" class="tag" data-tag="叙述">叙述</button><button type="button" class="tag" data-tag="氛围">氛围</button><button type="button" class="tag" data-tag="道具">道具</button></div>
               <div class="knowledge-list" id="knowledge-list">
-                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="潮汐信标" data-category="plot" data-tags="景物 伏笔" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">旧港北侧的灯塔，每逢退潮会露出一段刻痕，是第三章回收的重要线索。</div><div class="entry-full">旧港北侧的灯塔，每逢退潮会露出一段刻痕。刻痕记录着历次潮位，也对应林晚收到的信件日期。</div><div class="entry-tags"><span class="entry-tag">景物</span><span class="entry-tag">伏笔</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第一章</span><span class="entry-owner">雾港来信</span></div></article>
-                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="林晚" data-category="character" data-tags="人物 内心" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">负责整理旧信的主角，习惯先观察再做决定，面对熟悉笔迹时会短暂失神。</div><div class="entry-full">林晚负责整理旧信，行动前会先观察环境和他人的反应。她不轻易解释自己的选择，但会把重要线索记录在潮汐表上。</div><div class="entry-tags"><span class="entry-tag">人物</span><span class="entry-tag">内心</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 人物卡</span><span class="entry-owner">雾港来信</span></div></article>
-                <article class="knowledge-entry" data-owner-work="长夜列车" data-entry="雨幕里的站台" data-category="scene" data-tags="景物" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">雨水把站台边缘的灯影拉成长线，远处的广播像从水底传来。</div><div class="entry-full">雨水把站台边缘的灯影拉成长线，远处的广播像从水底传来。人物进入站台后，环境声逐渐覆盖对话。</div><div class="entry-tags"><span class="entry-tag">景物</span></div><div class="entry-head"><span class="entry-source">长夜列车 · 第二章</span><span class="entry-owner">长夜列车</span></div></article>
-                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="迟到的回信" data-category="mind" data-tags="内心" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">她明知道信里不会有答案，却仍然把折痕一一抚平。</div><div class="entry-full">她明知道信里不会有答案，却仍然把折痕一一抚平。这个动作不是为了修复纸张，而是为了让自己相信事情仍可被整理。</div><div class="entry-tags"><span class="entry-tag">内心</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第四章</span><span class="entry-owner">雾港来信</span></div></article>
-                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="潮声落下之后" data-category="quote" data-tags="引用" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">“潮声落下之后，留下来的才是岸。” 用于表现人物在选择后的安静时刻。</div><div class="entry-full">“潮声落下之后，留下来的才是岸。” 用于表现人物在选择后的安静时刻，引用来源保留在作品资料中。</div><div class="entry-tags"><span class="entry-tag">引用</span></div><div class="entry-head"><span class="entry-source">经典引用 · 手工录入</span><span class="entry-owner">雾港来信</span></div></article>
-                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="陈砚" data-category="character" data-tags="人物 叙述" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">修船师傅说话直接，习惯把重要物件放在离门最近的抽屉里。</div><div class="entry-full">陈砚修船时不喜欢闲谈，回答问题常先看对方的手。他把旧船票留在工作台抽屉，只有遇到潮汐变化才会取出来。</div><div class="entry-tags"><span class="entry-tag">人物</span><span class="entry-tag">叙述</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 人物卡</span><span class="entry-owner">雾港来信</span></div></article>
-                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="冬晨的旧城区" data-category="scene" data-tags="景物 氛围" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜，脚步声显得格外清楚。</div><div class="entry-full">冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜。店铺尚未开门，巷口风铃声把远处的船笛衬得更慢。</div><div class="entry-tags"><span class="entry-tag">景物</span><span class="entry-tag">氛围</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第六章</span><span class="entry-owner">雾港来信</span></div></article>
-                <article class="knowledge-entry" data-owner-work="长夜列车" data-entry="空白车票" data-category="plot" data-tags="伏笔 道具" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">车票的目的地一栏被裁去，只留下日期和一枚褪色的检票印。</div><div class="entry-full">车票的目的地一栏被裁去，只留下日期和一枚褪色的检票印。日期早于车站封闭时间，是后续核对人物行程的线索。</div><div class="entry-tags"><span class="entry-tag">伏笔</span><span class="entry-tag">道具</span></div><div class="entry-head"><span class="entry-source">长夜列车 · 第三章</span><span class="entry-owner">长夜列车</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="entry-lighthouse" data-category="plot" data-tags="景物 伏笔" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">旧港北侧的灯塔从雨幕里浮出来，石阶上还留着退潮后的盐霜。林晚数到第七级时，看见扶手内侧有一道细刻痕，像是谁匆忙划下的日期。她伸手摸了摸，指尖沾了一层冰凉的白灰。</div><div class="entry-tags"><span class="entry-tag">景物</span><span class="entry-tag">伏笔</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第一章</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="entry-linwan" data-category="character" data-tags="人物 内心" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">林晚没有立刻拆开那封信。她先把潮汐表移到桌角，又将散开的纸页一张张压平，直到窗外的风不再掀动页边。等屋里安静下来，她才用指甲挑开封口，目光却仍停在落款的位置。</div><div class="entry-tags"><span class="entry-tag">人物</span><span class="entry-tag">内心</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 人物卡</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="长夜列车" data-entry="entry-platform" data-category="scene" data-tags="景物" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">雨水把站台边缘的灯影拉成长线，铁轨尽头只剩一小片模糊的红光。广播响起时，声音被顶棚接住，又从空车厢里折回来。候车的人同时抬头，谁也没有听清列车究竟晚点了多久。</div><div class="entry-tags"><span class="entry-tag">景物</span></div><div class="entry-head"><span class="entry-source">长夜列车 · 第二章</span><span class="entry-owner">长夜列车</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="entry-letter" data-category="mind" data-tags="内心" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">她明知道信里不会有答案，却仍然把折痕一一抚平。每压平一道，心里那个迟迟不肯说出口的问题就清楚一些。纸张平整了，她反而不敢再看，只把手掌留在信上，像按住一扇将要打开的门。</div><div class="entry-tags"><span class="entry-tag">内心</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第四章</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="entry-quote" data-category="quote" data-tags="引用" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">“潮声落下之后，留下来的才是岸。”她把这句话写在信的背面，等墨迹干透，才发现窗外的海面已经露出一条浅浅的沙线。原来有些答案，并不需要从那封信里寻找。</div><div class="entry-tags"><span class="entry-tag">引用</span></div><div class="entry-head"><span class="entry-source">经典引用 · 手工录入</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="entry-chenyan" data-category="character" data-tags="人物 叙述" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">陈砚说话前总先看对方的手。林晚递来旧船票时，他没有接，只用沾着机油的指节敲了敲工作台。等她把票放下，他才拉开离门最近的抽屉，取出另一张边角磨白的纸片。</div><div class="entry-tags"><span class="entry-tag">人物</span><span class="entry-tag">叙述</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 人物卡</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="entry-oldtown" data-category="scene" data-tags="景物 氛围" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜。店铺尚未开门，卷帘门上的锁轻轻晃动，巷口风铃声把远处的船笛衬得更慢。她走过时，脚步声像落进一只空碗里。</div><div class="entry-tags"><span class="entry-tag">景物</span><span class="entry-tag">氛围</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第六章</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="长夜列车" data-entry="entry-ticket" data-category="plot" data-tags="伏笔 道具" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">那张车票被人沿着虚线撕去了一截，目的地的位置只剩参差的纸纤维。检票印褪成淡紫色，日期却清楚得刺眼。她把票翻到背面，对着站台时刻表看了许久，直到广播再次报出一班根本不存在的列车。</div><div class="entry-tags"><span class="entry-tag">伏笔</span><span class="entry-tag">道具</span></div><div class="entry-head"><span class="entry-source">长夜列车 · 第三章</span><span class="entry-owner">长夜列车</span></div></article>
               </div>
               <div class="knowledge-empty" id="knowledge-empty" role="status" hidden>没有匹配的知识内容</div>
             </div>
@@ -409,24 +433,24 @@
 
       <section class="view" id="conversation-view" aria-label="需求会话">
         <div class="content-page"><div class="page-heading conversation-heading"><div><h2 id="conversation-project">雾港来信</h2></div></div>
-          <div class="conversation-layout"><aside class="session-list" id="session-list"><div class="session-list-head"><h3>会话</h3><button type="button" class="icon-btn" id="new-session" title="新建会话" aria-label="新建会话"><i data-lucide="plus"></i></button></div><div class="session active" data-session="structure"><button type="button" class="session-open"><strong>结构讨论</strong><small>刚刚 · 3 条消息</small></button><button type="button" class="session-delete" aria-label="删除结构讨论" title="删除会话"><i data-lucide="trash-2"></i></button></div><div class="session" data-session="learning"><button type="button" class="session-open"><strong>接口笔记</strong><small>昨天 · 8 条消息</small></button><button type="button" class="session-delete" aria-label="删除接口笔记" title="删除会话"><i data-lucide="trash-2"></i></button></div><div class="session" data-session="plot"><button type="button" class="session-open"><strong>伏笔整理</strong><small>9 月 28 日 · 5 条消息</small></button><button type="button" class="session-delete" aria-label="删除伏笔整理" title="删除会话"><i data-lucide="trash-2"></i></button></div><div class="session-empty" id="session-empty" hidden>暂无会话<br>新建一个会话开始讨论。</div></aside>
+          <div class="conversation-layout"><aside class="session-list" id="session-list"><div class="session-list-head"><h3>作品</h3><button type="button" class="icon-btn" id="new-session" title="在当前作品新建会话" aria-label="在当前作品新建会话"><i data-lucide="plus"></i></button></div><div class="session-group" data-session-group="true" data-work="雾港来信"><div class="session-group-head"><button type="button" class="session-work-open" data-work="雾港来信">雾港来信</button><button type="button" class="icon-btn session-work-add" data-work="雾港来信" title="为雾港来信新建会话" aria-label="为雾港来信新建会话"><i data-lucide="plus"></i></button></div><div class="session-group-list"><div class="session active" data-session="structure" data-owner-work="雾港来信"><button type="button" class="session-open"><strong>结构讨论</strong><small>刚刚 · 3 条消息</small></button><button type="button" class="session-delete" aria-label="删除结构讨论" title="删除会话"><i data-lucide="trash-2"></i></button></div><div class="session" data-session="learning" data-owner-work="雾港来信"><button type="button" class="session-open"><strong>接口笔记</strong><small>昨天 · 8 条消息</small></button><button type="button" class="session-delete" aria-label="删除接口笔记" title="删除会话"><i data-lucide="trash-2"></i></button></div><div class="session" data-session="plot" data-owner-work="雾港来信"><button type="button" class="session-open"><strong>伏笔整理</strong><small>9 月 28 日 · 5 条消息</small></button><button type="button" class="session-delete" aria-label="删除伏笔整理" title="删除会话"><i data-lucide="trash-2"></i></button></div></div></div><div class="session-group" data-session-group="true" data-work="长夜列车"><div class="session-group-head"><button type="button" class="session-work-open" data-work="长夜列车">长夜列车</button><button type="button" class="icon-btn session-work-add" data-work="长夜列车" title="为长夜列车新建会话" aria-label="为长夜列车新建会话"><i data-lucide="plus"></i></button></div><div class="session-group-list"><div class="session" data-session="train" data-owner-work="长夜列车"><button type="button" class="session-open"><strong>场景分析</strong><small>昨天 · 4 条消息</small></button><button type="button" class="session-delete" aria-label="删除场景分析" title="删除会话"><i data-lucide="trash-2"></i></button></div></div></div><div class="session-group" data-session-group="true" data-work="学习路径"><div class="session-group-head"><button type="button" class="session-work-open" data-work="学习路径">学习路径</button><button type="button" class="icon-btn session-work-add" data-work="学习路径" title="为学习路径新建会话" aria-label="为学习路径新建会话"><i data-lucide="plus"></i></button></div><div class="session-group-list"><div class="session" data-session="path-notes" data-owner-work="学习路径"><button type="button" class="session-open"><strong>学习笔记</strong><small>9 月 28 日 · 6 条消息</small></button><button type="button" class="session-delete" aria-label="删除学习笔记" title="删除会话"><i data-lucide="trash-2"></i></button></div></div></div><div class="session-empty" id="session-empty" hidden>暂无会话<br>新建一个会话开始讨论。</div></aside>
             <section class="conversation-main"><div class="conversation-head"><strong id="conversation-title">结构讨论</strong></div><div class="message-list" id="message-list"><div class="message">我想确认第一章里的灯塔线索应该在哪一卷回收。</div><div class="message user">先把它标记为伏笔，关联第一章和第三章，暂时不要自动改稿。</div><div class="message">已记录为待回收伏笔。后续分析会显示证据段落和不确定性。</div></div><div class="session-empty" id="conversation-empty" hidden>选择左侧会话，或新建会话开始讨论。</div><form class="composer" id="conversation-form"><input id="message-input" placeholder="输入消息" aria-label="输入消息"><button type="submit" class="primary" aria-label="发送消息"><i data-lucide="send"></i></button></form></section>
           </div>
         </div>
       </section>
 
       <section class="view" id="splitter-view" aria-label="拆书工具">
-        <div class="content-page"><div class="page-heading"><div><h2>拆书工具</h2><p>导入手稿并整理章节，确认后添加为一部新作品。</p></div><button type="button" class="secondary" id="back-knowledge"><i data-lucide="arrow-left"></i>返回知识库</button></div>
-          <p class="splitter-disclaimer">当前为流程 Demo，不会解析所选文件正文；正式导入保留正文段落和可识别标题，图片、表格等复杂内容不导入。下方章节列表使用固定示例。</p>
+        <div class="content-page"><div class="page-heading"><div><p>从优秀作品中挑选段落，拆解为当前作品的知识储备。</p></div><button type="button" class="secondary" id="back-knowledge"><i data-lucide="arrow-left"></i>返回知识库</button></div>
+          <p class="splitter-disclaimer">当前为流程 Demo，不会解析所选文件正文；正式导入保留正文段落和可识别标题，图片、表格等复杂内容不导入。下方使用固定示例，确认后会加入当前作品“<span id="splitter-owner">雾港来信</span>”的知识库，供学习、仿写和 AI 参考。</p>
           <div class="splitter-layout">
-            <section class="setting-panel splitter-import"><div class="splitter-step"><span>01</span><div><strong>选择手稿</strong><p>支持 TXT 和 DOCX，演示仅在当前页面预览。</p></div></div><label class="file-drop" for="splitter-file"><i data-lucide="upload"></i><span id="splitter-file-name">选择 TXT / DOCX 文件</span><input id="splitter-file" type="file" accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label><div class="field"><label for="splitter-rule">章节识别规则</label><select id="splitter-rule"><option>识别常见章节标题，识别不到则作为一章</option><option>按空行分段，手动调整章节</option></select></div><div class="setting-actions"><button type="button" class="secondary" id="splitter-reset">清空选择</button><button type="button" class="primary" id="splitter-preview"><i data-lucide="scan-search"></i>生成预览</button></div></section>
-            <section class="setting-panel splitter-preview"><div class="splitter-step"><span>02</span><div><strong>预览章节</strong><p>可在确认前检查章节名称和正文范围。</p></div></div><div class="splitter-chapters" id="splitter-chapters"><div class="splitter-empty" id="splitter-empty"><i data-lucide="file-search"></i><span>选择文件后生成章节预览</span></div><div class="splitter-preview-list" id="splitter-preview-list" hidden><div><strong>第一章 潮汐</strong><span>1,284 字 · 正文段落</span></div><div><strong>第二章 旧信</strong><span>2,041 字 · 正文段落</span></div><div><strong>第三章 灯塔</strong><span>1,966 字 · 正文段落</span></div></div></div><div class="setting-actions"><button type="button" class="primary" id="splitter-confirm" disabled>确认导入为新作品</button></div></section>
+            <section class="setting-panel splitter-import"><div class="splitter-step"><span>01</span><div><strong>选择参考作品</strong><p>支持 TXT 和 DOCX，演示仅在当前页面预览。</p></div></div><label class="file-drop" for="splitter-file"><i data-lucide="upload"></i><span id="splitter-file-name">选择 TXT / DOCX 文件</span><input id="splitter-file" type="file" accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label><div class="field"><label for="splitter-rule">内容识别规则</label><select id="splitter-rule"><option>识别章节标题和正文段落</option><option>按空行分段，手动挑选内容</option></select></div><div class="setting-actions"><button type="button" class="secondary" id="splitter-reset">清空选择</button><button type="button" class="primary" id="splitter-preview"><i data-lucide="scan-search"></i>生成预览</button></div></section>
+            <section class="setting-panel splitter-preview"><div class="splitter-step"><span>02</span><div><strong>选择可复用段落</strong><p>勾选值得学习的描写，确认后归档到当前作品知识库。</p></div></div><div class="splitter-chapters" id="splitter-chapters"><div class="splitter-empty" id="splitter-empty"><i data-lucide="file-search"></i><span>选择文件后生成段落预览</span></div><div class="splitter-preview-list" id="splitter-preview-list" hidden><label class="splitter-excerpt"><input type="checkbox" checked data-split-category="scene" data-split-tags="景物 氛围"><span><strong>景物描写 · 雨幕里的站台</strong><em>雨水把站台边缘的灯影拉成长线，远处的广播像从水底传来。候车的人站在屋檐下，看见雨滴沿着车次牌一颗颗滑落，直到最后一盏灯也被夜色吞没。</em></span></label><label class="splitter-excerpt"><input type="checkbox" checked data-split-category="character" data-split-tags="人物 叙述"><span><strong>人物描写 · 进站前的停顿</strong><em>她在门口停了半步，先看清每个人的手，再把伞收拢靠在墙边。有人朝她点头，她没有回应，只把湿透的袖口往上卷了一点，露出腕间那道浅色旧伤。</em></span></label><label class="splitter-excerpt"><input type="checkbox" data-split-category="quote" data-split-tags="引用"><span><strong>经典引用 · 潮声落下之后</strong><em>潮声落下之后，留下来的才是岸。</em></span></label></div></div><div class="setting-actions"><button type="button" class="primary" id="splitter-confirm" disabled>加入当前作品知识库</button></div></section>
           </div>
         </div>
       </section>
 
       <section class="view" id="settings-view" aria-label="设置">
-        <div class="content-page"><div class="page-heading"><div><h2>设置</h2><p>管理个人资料、编辑器样式和本机数据。</p></div></div>
+        <div class="content-page"><div class="page-heading"><div><p>管理个人资料、编辑器样式、本机数据和知识库维护。</p></div></div>
           <div class="settings-grid">
             <section class="setting-panel"><h3>个人资料</h3><p>头像和显示名称会出现在侧栏。</p><div class="setting-profile"><div class="avatar" id="settings-avatar">雨</div><div><strong id="settings-name-preview">山间雨</strong><div class="entry-meta">本机资料</div></div></div><div class="field"><label for="display-name">显示名称</label><input id="display-name" value="山间雨" maxlength="40"></div><div class="field"><label for="avatar-upload">本地头像</label><input id="avatar-upload" type="file" accept="image/png,image/jpeg,image/webp"></div><div class="setting-actions"><button type="button" class="primary" id="save-profile">保存资料</button></div></section>
             <section class="setting-panel"><h3>编辑器</h3><p>首版统一正文样式，后续再开放自定义。</p><div class="field"><label for="editor-font">正文样式</label><input id="editor-font" value="微软雅黑 · 16 px · 1.5 倍行距" readonly></div><div class="style-preview"><strong>第一章 潮汐</strong><p>固定样式预览：段落、标题和字数统计在导出时保持一致。</p></div></section>
@@ -441,7 +465,7 @@
 
   <div class="context-menu" id="context-menu" role="menu"><button type="button" id="context-delete" role="menuitem"><i data-lucide="trash-2"></i><span>删除</span></button></div>
   <div class="dialog-backdrop" id="create-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="create-title"><h2 id="create-title">新建作品</h2><p>作品会出现在作品集里。</p><label for="work-name">作品名称</label><input id="work-name" maxlength="80" placeholder="输入作品名称"><div class="dialog-actions"><button type="button" class="secondary" id="dialog-cancel">取消</button><button type="button" class="primary" id="dialog-confirm">创建作品</button></div></div></div>
-  <div class="dialog-backdrop" id="knowledge-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="knowledge-title"><h2 id="knowledge-title">新增知识</h2><p id="knowledge-owner-hint">添加到当前作品：雾港来信</p><form id="knowledge-form"><div class="field"><label for="knowledge-body-input">内容</label><textarea id="knowledge-body-input" maxlength="2000" placeholder="输入知识内容"></textarea></div><div class="field"><label for="knowledge-category-input">分类</label><select id="knowledge-category-input"><option value="character">人物描写</option><option value="scene">景物描写</option><option value="mind">内心描写</option><option value="quote">经典引用</option><option value="plot">剧情与伏笔</option></select></div><div class="field"><label for="knowledge-tags-input">标签</label><input id="knowledge-tags-input" placeholder="用逗号分隔多个标签"></div><div class="field"><label for="knowledge-source-input">出处</label><input id="knowledge-source-input" placeholder="作品、章节或来源"></div><div class="dialog-actions"><button type="button" class="secondary" id="knowledge-cancel">取消</button><button type="button" class="primary" id="knowledge-create">添加知识</button></div></form></div></div>
+  <div class="dialog-backdrop" id="knowledge-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="knowledge-title"><h2 id="knowledge-title">新增知识</h2><p id="knowledge-owner-hint">添加到当前作品：雾港来信</p><form id="knowledge-form"><div class="field"><label for="knowledge-body-input">内容</label><textarea id="knowledge-body-input" maxlength="2000" placeholder="输入知识内容"></textarea></div><div class="field"><label for="knowledge-category-input">分类</label><select id="knowledge-category-input"><option value="character">人物描写</option><option value="scene">景物描写</option><option value="mind">内心描写</option><option value="quote">经典引用</option><option value="plot">剧情与伏笔</option></select></div><div class="field"><label for="knowledge-tags-input">标签</label><input id="knowledge-tags-input" placeholder="输入设置中已有标签，逗号分隔"></div><div class="field"><label for="knowledge-source-input">出处</label><input id="knowledge-source-input" placeholder="作品、章节或来源"></div><div class="dialog-actions"><button type="button" class="secondary" id="knowledge-cancel">取消</button><button type="button" class="primary" id="knowledge-create">添加知识</button></div></form></div></div>
   <div class="dialog-backdrop" id="confirm-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><h2 id="confirm-title">确认删除</h2><p id="confirm-message">删除后无法在当前 Demo 中恢复。</p><div class="dialog-actions"><button type="button" class="secondary" id="confirm-cancel">取消</button><button type="button" class="primary danger" id="confirm-delete">确认删除</button></div></div></div>
   <div class="dialog-backdrop" id="migration-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="migration-title"><h2 id="migration-title">迁移分类</h2><p id="migration-message">选择目标分类，迁移后将删除原分类。</p><label for="migration-target">目标分类</label><select id="migration-target"></select><div class="dialog-actions"><button type="button" class="secondary" id="migration-cancel">取消</button><button type="button" class="primary" id="migration-confirm">迁移并删除</button></div></div></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -449,10 +473,13 @@
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
-    const state = { view: 'shelf', work: '雾港来信', chapter: '第一章 潮汐', failed: false, dirty: false, timer: null, forceTimer: null, retryTimer: null, retrySnapshot: null, context: null, pendingDelete: null, pendingSession: null, pendingCategory: null, modalReturn: null, category: 'all', tags: new Set(), knowledgeScope: 'current', session: 'structure', sessionSerial: 0, categorySerial: 0, chapterDrafts: new Map(), workTrees: new Map() };
+    const state = { view: 'shelf', work: '雾港来信', chapter: '第一章 潮汐', failed: false, dirty: false, timer: null, forceTimer: null, retryTimer: null, retrySnapshot: null, context: null, pendingDelete: null, pendingSession: null, pendingCategory: null, modalReturn: null, category: 'all', tags: new Set(), knowledgeScope: 'current', session: 'structure', conversationWork: '雾港来信', sessionSerial: 0, categorySerial: 0, chapterDrafts: new Map(), workTrees: new Map() };
     const sampleText = $('editor').innerHTML;
     const initialTreeHtml = $('chapter-tree').innerHTML;
+    const newWorkTreeHtml = '<button type="button" class="tree-item volume" data-volume="unassigned"><i class="chevron" data-lucide="chevron-down"></i><i data-lucide="folder"></i><span>未分卷</span><span class="count">1 章</span></button><button type="button" class="tree-item chapter active" data-chapter="第一章 新章节" data-parent="unassigned"><i data-lucide="file-text"></i><span>第一章 新章节</span><span class="count">0</span></button>';
     state.workTrees.set(state.work, initialTreeHtml);
+    document.querySelectorAll('.knowledge-entry').forEach((entry) => { entry.dataset.tags = JSON.stringify(Array.from(entry.querySelectorAll('.entry-tag'), (chip) => chip.textContent.trim())); });
+    const entryTags = (entry) => JSON.parse(entry.dataset.tags || '[]');
     const iconRefresh = () => { if (window.lucide) window.lucide.createIcons(); };
     const countWords = () => Array.from($('editor').innerText).filter((char) => /[\p{Script=Han}A-Za-z0-9]/u.test(char)).length;
     const renderCount = () => { $('chapter-count').textContent = `本章 ${countWords().toLocaleString('zh-CN')} 字`; };
@@ -477,17 +504,26 @@
       const meta = viewMeta[view] || viewMeta.shelf;
       $('top-eyebrow').textContent = meta[0]; $('top-title').textContent = typeof meta[1] === 'function' ? meta[1]() : meta[1];
       $('new-work').hidden = view !== 'shelf'; $('save-status').hidden = view !== 'editor';
-      if (view === 'knowledge') { $('knowledge-current-work').textContent = state.work; updateKnowledgeCounts(); filterKnowledge(); }
+      if (view === 'knowledge') { syncKnowledgeWorkOptions(); updateKnowledgeCounts(); filterKnowledge(); }
+      if (view === 'splitter') $('splitter-owner').textContent = state.work;
+      if (view === 'conversation') {
+        syncConversationWorks();
+        const group = Array.from($('session-list').querySelectorAll('.session-group')).find((item) => item.dataset.work === state.conversationWork) || Array.from($('session-list').querySelectorAll('.session-group')).find((item) => item.dataset.work === state.work);
+        const selected = Array.from(group?.querySelectorAll('.session') || []).find((item) => item.dataset.session === state.session);
+        const firstSession = selected || group?.querySelector('.session');
+        if (firstSession) renderSession(firstSession.dataset.session);
+        else renderEmptyConversation(group?.dataset.work || state.work);
+      }
       if (view === 'editor') { $('crumbs').textContent = `${state.work} / ${state.chapter}`; renderCount(); }
     }
     function showToast(message) { const toast = $('toast'); toast.textContent = message; toast.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => toast.classList.remove('show'), 2300); }
     function draftKey(work = state.work, chapter = state.chapter) { return `${work}::${chapter}`; }
     function captureChapterDraft() { if (!state.chapter) return; state.chapterDrafts.set(draftKey(), { title: $('chapter-title').value, html: sanitizeEditorHtml($('editor').innerHTML) }); }
     function saveWorkTree() { if (state.work) state.workTrees.set(state.work, $('chapter-tree').innerHTML); }
-    function loadWorkTree(name) { $('chapter-tree').innerHTML = state.workTrees.get(name) || initialTreeHtml; iconRefresh(); }
-    function renderChapter(button) { if (!button) return; state.chapter = button.dataset.chapter; document.querySelectorAll('[data-chapter]').forEach((item) => item.classList.toggle('active', item === button)); const draft = state.chapterDrafts.get(draftKey()); $('chapter-title').value = draft?.title || state.chapter; $('crumbs').textContent = `${state.work} / ${state.chapter}`; $('chapter-kicker').textContent = state.chapter.includes('第一') ? '未分卷 · 第 1 章' : '第一卷 · 归港'; $('editor').innerHTML = draft?.html || (state.chapter === '第一章 潮汐' && state.work === '雾港来信' ? sampleText : '<p>在这里开始写作。</p>'); renderCount(); }
+    function loadWorkTree(name) { $('chapter-tree').innerHTML = state.workTrees.get(name) ?? initialTreeHtml; iconRefresh(); }
+    function renderChapter(button) { if (!button) return; state.chapter = button.dataset.chapter; document.querySelectorAll('[data-chapter]').forEach((item) => item.classList.toggle('active', item === button)); const draft = state.chapterDrafts.get(draftKey()); $('chapter-title').value = draft?.title || state.chapter; $('crumbs').textContent = `${state.work} / ${state.chapter}`; $('chapter-kicker').textContent = state.chapter.includes('第一') ? '未分卷 · 第 1 章' : '第一卷 · 归港'; $('editor').innerHTML = draft?.html ?? (state.chapter === '第一章 潮汐' && state.work === '雾港来信' ? sampleText : ''); renderCount(); }
     function flushPendingSave() { captureChapterDraft(); clearTimeout(state.timer); clearTimeout(state.forceTimer); state.timer = null; state.forceTimer = null; state.dirty = false; if (!state.failed) setStatus('已保存'); }
-    function openWork(name) { flushPendingSave(); saveWorkTree(); state.work = name; state.knowledgeScope = 'current'; loadWorkTree(name); const firstChapter = $('chapter-tree').querySelector('[data-chapter]'); state.chapter = firstChapter?.dataset.chapter || ''; renderChapter(firstChapter); $('error-strip').classList.remove('show'); state.failed = false; state.dirty = false; $('conversation-project').textContent = name; setStatus('已保存'); show('editor'); }
+    function openWork(name) { flushPendingSave(); saveWorkTree(); state.work = name; state.conversationWork = name; state.session = ''; state.knowledgeScope = 'current'; loadWorkTree(name); const firstChapter = $('chapter-tree').querySelector('[data-chapter]'); state.chapter = firstChapter?.dataset.chapter || ''; renderChapter(firstChapter); $('error-strip').classList.remove('show'); state.failed = false; state.dirty = false; setStatus('已保存'); show('editor'); }
     function openModal(id, focusTarget) {
       state.modalReturn = document.activeElement;
       $(id).classList.add('show');
@@ -512,7 +548,7 @@
       card.append(top, title, description, bottom); return card;
     }
     function uniqueWorkName(name) {
-      const existing = new Set(Array.from(document.querySelectorAll('[data-work]')).map((item) => item.dataset.work));
+      const existing = new Set(Array.from(document.querySelectorAll('.book[data-work]')).map((item) => item.dataset.work));
       if (!existing.has(name)) return name;
       let suffix = 2;
       while (existing.has(`${name} (${suffix})`)) suffix += 1;
@@ -520,9 +556,9 @@
     }
     function completeSave() { state.timer = null; state.forceTimer = null; state.dirty = false; if (!state.failed) setStatus('已保存'); }
     function saveVisual() { captureChapterDraft(); state.dirty = true; if (state.failed) return; setStatus('未保存'); clearTimeout(state.timer); if (!state.forceTimer) state.forceTimer = setTimeout(() => { clearTimeout(state.timer); completeSave(); }, 5000); state.timer = setTimeout(completeSave, 500); }
-    function updateWorkTotal() { const total = document.querySelectorAll('[data-work]').length; $('work-total').textContent = total; $('books-empty').classList.toggle('show', total === 0); }
+    function updateWorkTotal() { const total = document.querySelectorAll('.book[data-work]').length; $('work-total').textContent = total; $('books-empty').classList.toggle('show', total === 0); $('new-entry').disabled = total === 0; $('open-splitter').disabled = total === 0; $('new-session').disabled = total === 0; syncKnowledgeWorkOptions(); syncConversationWorks(); }
     function openContextMenu(target, event) {
-      const kind = target.dataset.work ? 'work' : target.dataset.volume ? 'volume' : 'chapter';
+      const kind = target.matches('.book[data-work]') ? 'work' : target.dataset.volume ? 'volume' : 'chapter';
       const label = target.dataset.work || target.querySelector('span')?.textContent.trim() || '当前条目';
       state.context = { kind, label, element: target };
       const menu = $('context-menu'); const item = $('context-delete'); item.querySelector('span').textContent = kind === 'volume' ? '删除卷及章节' : kind === 'work' ? '删除作品' : '删除章节';
@@ -542,7 +578,21 @@
     function activateChapter(button) { if (!button) return; flushPendingSave(); captureChapterDraft(); state.chapter = button.dataset.chapter; renderChapter(button); }
     function deleteContextTarget() {
       const context = state.pendingDelete; if (!context) return;
-      if (context.kind === 'work') { context.element.remove(); updateWorkTotal(); closeConfirm(); showToast(`已从作品集移除“${context.label}”`); if (state.work === context.label) show('shelf'); return; }
+      if (context.kind === 'work') {
+        context.element.remove();
+        state.workTrees.delete(context.label);
+        Array.from(state.chapterDrafts.keys()).filter((key) => key.startsWith(`${context.label}::`)).forEach((key) => state.chapterDrafts.delete(key));
+        document.querySelectorAll('.knowledge-entry').forEach((entry) => { if (entry.dataset.ownerWork === context.label) entry.remove(); });
+        Object.entries(sessionWork).forEach(([id, work]) => { if (work === context.label) { delete sessionWork[id]; delete sessionMessages[id]; } });
+        if (state.work === context.label) {
+          state.work = document.querySelector('.book[data-work]')?.dataset.work || '';
+          state.chapter = '';
+          if (state.work) { loadWorkTree(state.work); renderChapter($('chapter-tree').querySelector('[data-chapter]')); }
+          else { $('chapter-tree').replaceChildren(); $('chapter-title').value = ''; $('editor').replaceChildren(); renderCount(); }
+        }
+        if (state.conversationWork === context.label) state.conversationWork = state.work;
+        state.knowledgeScope = 'current'; updateWorkTotal(); updateKnowledgeCounts(); filterKnowledge(); closeConfirm(); show('shelf'); showToast(`已从作品集移除“${context.label}”`); return;
+      }
       flushPendingSave();
       let currentRemoved = false;
       if (context.kind === 'volume') {
@@ -561,29 +611,56 @@
       }
       closeConfirm(); showToast(`已从作品结构移除“${context.label}”`);
     }
+    function knowledgeScopeMatches(owner) {
+      return state.knowledgeScope === 'all' || owner === (state.knowledgeScope === 'current' ? state.work : state.knowledgeScope.slice(5));
+    }
+    function syncKnowledgeWorkOptions() {
+      const select = $('knowledge-scope');
+      const selected = state.knowledgeScope;
+      const works = Array.from(document.querySelectorAll('.book[data-work]')).map((book) => book.dataset.work);
+      select.replaceChildren();
+      const current = document.createElement('option'); current.value = 'current'; current.textContent = `当前作品 · ${state.work}`; select.append(current);
+      works.filter((work) => work !== state.work).forEach((work) => { const option = document.createElement('option'); option.value = `work:${work}`; option.textContent = work; select.append(option); });
+      const all = document.createElement('option'); all.value = 'all'; all.textContent = '全部作品'; select.append(all);
+      select.value = Array.from(select.options).some((option) => option.value === selected) ? selected : 'current';
+      state.knowledgeScope = select.value;
+    }
+    function syncConversationWorks() {
+      const groups = Array.from($('session-list').querySelectorAll('.session-group'));
+      const existing = new Set(groups.map((group) => group.dataset.work));
+      Array.from(document.querySelectorAll('.book[data-work]')).forEach((book) => {
+        const name = book.dataset.work;
+        if (existing.has(name)) return;
+        const group = document.createElement('section'); group.className = 'session-group'; group.dataset.sessionGroup = 'true'; group.dataset.work = name;
+        const head = document.createElement('div'); head.className = 'session-group-head';
+        const open = document.createElement('button'); open.type = 'button'; open.className = 'session-work-open'; open.dataset.work = name; open.textContent = name;
+        const add = document.createElement('button'); add.type = 'button'; add.className = 'icon-btn session-work-add'; add.dataset.work = name; add.title = `为${name}新建会话`; add.setAttribute('aria-label', `为${name}新建会话`); add.innerHTML = '<i data-lucide="plus"></i>';
+        const list = document.createElement('div'); list.className = 'session-group-list';
+        const empty = document.createElement('div'); empty.className = 'session-empty group-empty'; empty.textContent = '暂无会话'; list.append(empty);
+        head.append(open, add); group.append(head, list); $('session-list').append(group);
+      });
+      groups.forEach((group) => { if (!Array.from(document.querySelectorAll('.book[data-work]')).some((book) => book.dataset.work === group.dataset.work)) group.remove(); });
+      iconRefresh();
+    }
     function filterKnowledge() {
       const query = $('knowledge-search').value.trim().toLocaleLowerCase();
-      $('knowledge-current-work').textContent = state.work;
-      $('knowledge-view').dataset.scope = state.knowledgeScope;
+      state.knowledgeScope = $('knowledge-scope').value;
+      $('knowledge-view').dataset.scope = state.knowledgeScope === 'all' ? 'all' : state.knowledgeScope === 'current' ? 'current' : 'work';
       const entries = Array.from(document.querySelectorAll('.knowledge-entry'));
       entries.forEach((entry) => {
-        const searchable = `${entry.dataset.entry || ''} ${entry.textContent}`.toLocaleLowerCase();
-        const entryTags = (entry.dataset.tags || '').split(' ').filter(Boolean);
-        const matchWork = state.knowledgeScope === 'all' || entry.dataset.ownerWork === state.work;
+        const tags = entryTags(entry);
+        const searchable = `${entry.querySelector('.entry-summary')?.textContent || ''} ${entry.querySelector('.entry-source')?.textContent || ''} ${tags.join(' ')}`.toLocaleLowerCase();
+        const matchWork = knowledgeScopeMatches(entry.dataset.ownerWork);
         const matchQuery = !query || searchable.includes(query);
         const matchCategory = state.category === 'all' || entry.dataset.category === state.category;
-        const matchTags = Array.from(state.tags).every((tag) => entryTags.includes(tag));
+        const matchTags = Array.from(state.tags).every((tag) => tags.includes(tag));
         entry.hidden = !(matchWork && matchQuery && matchCategory && matchTags);
       });
-      $('knowledge-scope-current').classList.toggle('active', state.knowledgeScope === 'current');
-      $('knowledge-scope-current').setAttribute('aria-pressed', String(state.knowledgeScope === 'current'));
-      $('knowledge-scope-all').classList.toggle('active', state.knowledgeScope === 'all');
-      $('knowledge-scope-all').setAttribute('aria-pressed', String(state.knowledgeScope === 'all'));
       $('knowledge-empty').hidden = entries.some((entry) => !entry.hidden);
     }
     function selectEntry(entry) { const expanded = entry.classList.contains('expanded'); document.querySelectorAll('.knowledge-entry').forEach((item) => { item.classList.remove('active', 'expanded'); item.setAttribute('aria-expanded', 'false'); }); if (!expanded) { entry.classList.add('active', 'expanded'); entry.setAttribute('aria-expanded', 'true'); } }
     function updateKnowledgeCounts() {
-      const entries = Array.from(document.querySelectorAll('.knowledge-entry')).filter((entry) => state.knowledgeScope === 'all' || entry.dataset.ownerWork === state.work);
+      const entries = Array.from(document.querySelectorAll('.knowledge-entry')).filter((entry) => knowledgeScopeMatches(entry.dataset.ownerWork));
       document.querySelectorAll('#knowledge-view .category-list [data-category]').forEach((button) => {
         const count = button.dataset.category === 'all' ? entries.length : entries.filter((entry) => entry.dataset.category === button.dataset.category).length;
         const value = button.querySelector('span'); if (value) value.textContent = count;
@@ -605,7 +682,7 @@
         const count = document.createElement('span'); count.textContent = '0'; filter.append(count); $('knowledge-view').querySelector('.category-list').append(filter);
         const option = document.createElement('option'); option.value = key; option.textContent = value; $('knowledge-category-input').append(option);
       } else {
-        const filter = document.createElement('button'); filter.type = 'button'; filter.className = 'tag'; filter.dataset.tag = value; filter.textContent = value; $('add-tag').before(filter);
+        const filter = document.createElement('button'); filter.type = 'button'; filter.className = 'tag'; filter.dataset.tag = value; filter.textContent = value; $('knowledge-view').querySelector('.tag-row').append(filter);
       }
       iconRefresh(); updateKnowledgeCounts(); return key;
     }
@@ -648,8 +725,8 @@
     }
     function removeTag(value) {
       document.querySelectorAll('.knowledge-entry').forEach((entry) => {
-        const tags = (entry.dataset.tags || '').split(' ').filter(Boolean);
-        if (tags.includes(value)) entry.dataset.tags = tags.filter((tag) => tag !== value).join(' ');
+        const tags = entryTags(entry);
+        if (tags.includes(value)) entry.dataset.tags = JSON.stringify(tags.filter((tag) => tag !== value));
         entry.querySelectorAll('.entry-tag').forEach((chip) => { if (chip.textContent.trim() === value) chip.remove(); });
       });
       Array.from($('tag-maintenance-list').querySelectorAll('.maintenance-row')).find((item) => item.dataset.tag === value)?.remove();
@@ -668,11 +745,8 @@
       appendMaintenanceItem(type, value); input.value = '';
       showToast(`已添加${type === 'category' ? '分类' : '标签'}“${value}”。`);
     }
-    function ensureTagExists(value) {
-      const exists = Array.from($('tag-maintenance-list').querySelectorAll('span')).some((item) => item.textContent.trim() === value);
-      if (!exists) appendMaintenanceItem('tag', value);
-    }
     function openKnowledgeDialog() {
+      if (!state.work) return;
       $('knowledge-form').reset(); $('knowledge-owner-hint').textContent = `添加到当前作品：${state.work}`; openModal('knowledge-dialog', 'knowledge-body-input');
     }
     function closeKnowledgeDialog(restoreFocus = true) { closeModal('knowledge-dialog', restoreFocus); }
@@ -680,36 +754,54 @@
       const content = $('knowledge-body-input').value.trim();
       if (!content) { $('knowledge-body-input').focus(); return; }
       const tags = $('knowledge-tags-input').value.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean);
-      tags.forEach(ensureTagExists);
-      const entry = document.createElement('article'); entry.className = 'knowledge-entry'; entry.dataset.ownerWork = state.work; entry.dataset.entry = content; entry.dataset.category = $('knowledge-category-input').value; entry.dataset.tags = tags.join(' '); entry.setAttribute('role', 'button'); entry.tabIndex = 0; entry.setAttribute('aria-expanded', 'false');
-      const summary = document.createElement('div'); summary.className = 'entry-summary'; summary.textContent = content;
-      const full = document.createElement('div'); full.className = 'entry-full'; full.textContent = content;
-      const tagList = document.createElement('div'); tagList.className = 'entry-tags'; tags.forEach((tag) => { const chip = document.createElement('span'); chip.className = 'entry-tag'; chip.textContent = tag; tagList.append(chip); });
-      const head = document.createElement('div'); head.className = 'entry-head'; const source = document.createElement('span'); source.className = 'entry-source'; source.textContent = $('knowledge-source-input').value.trim() || '手工录入'; const owner = document.createElement('span'); owner.className = 'entry-owner'; owner.textContent = state.work; head.append(source, owner);
-      entry.append(summary, full, tagList, head); $('knowledge-list').prepend(entry);
+      const available = new Set(Array.from($('tag-maintenance-list').querySelectorAll('.maintenance-row')).map((row) => row.dataset.tag));
+      const unknown = tags.find((tag) => !available.has(tag));
+      if (unknown) { showToast(`标签“${unknown}”尚未在设置中创建。`); $('knowledge-tags-input').focus(); return; }
+      const entry = createKnowledgeEntry({ ownerWork: state.work, content, category: $('knowledge-category-input').value, tags, source: $('knowledge-source-input').value.trim() || '手工录入' });
+      $('knowledge-list').prepend(entry);
       state.category = 'all'; state.tags.clear(); $('knowledge-search').value = '';
       document.querySelectorAll('#knowledge-view .category-list [data-category]').forEach((item) => item.classList.toggle('active', item.dataset.category === 'all'));
       document.querySelectorAll('#knowledge-view .tag-row [data-tag]').forEach((item) => item.classList.toggle('active', item.dataset.tag === 'all'));
       updateKnowledgeCounts(); filterKnowledge(); closeKnowledgeDialog(); selectEntry(entry); showToast('知识已添加。');
     }
+    function createKnowledgeEntry({ ownerWork, content, category, tags, source }) {
+      const entry = document.createElement('article'); entry.className = 'knowledge-entry'; entry.dataset.ownerWork = ownerWork; entry.dataset.entry = `entry-${Date.now()}-${Math.random().toString(16).slice(2)}`; entry.dataset.category = category; entry.dataset.tags = JSON.stringify(tags); entry.setAttribute('role', 'button'); entry.tabIndex = 0; entry.setAttribute('aria-expanded', 'false');
+      const summary = document.createElement('div'); summary.className = 'entry-summary'; summary.textContent = content;
+      const tagList = document.createElement('div'); tagList.className = 'entry-tags'; tags.forEach((tag) => { const chip = document.createElement('span'); chip.className = 'entry-tag'; chip.textContent = tag; tagList.append(chip); });
+      const head = document.createElement('div'); head.className = 'entry-head'; const sourceNode = document.createElement('span'); sourceNode.className = 'entry-source'; sourceNode.textContent = source; const owner = document.createElement('span'); owner.className = 'entry-owner'; owner.textContent = ownerWork; head.append(sourceNode, owner);
+      entry.append(summary, tagList, head); return entry;
+    }
     const sessionMessages = {
       structure: [{ text: '我想确认第一章里的灯塔线索应该在哪一卷回收。' }, { text: '先把它标记为伏笔，关联第一章和第三章，暂时不要自动改稿。', user: true }, { text: '已记录为待回收伏笔。后续分析会显示证据段落和不确定性。' }],
       learning: [{ text: '把这次接口设计写进学习路径，说明前端如何通过预加载层调用主进程。' }, { text: '已整理为数据流节点，等待你继续补充边界。' }],
-      plot: [{ text: '伏笔清单里需要保留埋设、触发和回收的章节证据。' }, { text: '可以，证据会链接回正文书签。' }]
+      plot: [{ text: '伏笔清单里需要保留埋设、触发和回收的章节证据。' }, { text: '可以，证据会链接回正文书签。' }],
+      train: [{ text: '第二章的站台描写如何和人物动作形成节奏？' }, { text: '可以把广播声作为环境锚点，再用短句切入人物动作。' }],
+      'path-notes': [{ text: '把预加载层的接口关系整理到学习路径。' }, { text: '已记录为接口与数据流章节的待整理节点。' }]
     };
+    const sessionWork = { structure: '雾港来信', learning: '雾港来信', plot: '雾港来信', train: '长夜列车', 'path-notes': '学习路径' };
     function renderSession(session) {
       const item = Array.from($('session-list').querySelectorAll('.session')).find((entry) => entry.dataset.session === session); if (!item) return;
-      state.session = session; document.querySelectorAll('.session').forEach((entry) => entry.classList.toggle('active', entry === item)); $('conversation-title').textContent = item.querySelector('.session-open strong').textContent;
+      state.session = session; state.conversationWork = item.closest('.session-group')?.dataset.work || sessionWork[session] || state.work; document.querySelectorAll('.session').forEach((entry) => entry.classList.toggle('active', entry === item)); document.querySelectorAll('.session-work-open').forEach((entry) => entry.classList.toggle('active', entry.dataset.work === state.conversationWork)); $('conversation-project').textContent = state.conversationWork; $('conversation-title').textContent = item.querySelector('.session-open strong').textContent;
       $('message-list').replaceChildren(...(sessionMessages[session] || []).map((message) => { const node = document.createElement('div'); node.className = `message${message.user ? ' user' : ''}`; node.textContent = message.text; return node; }));
       $('message-list').hidden = false; $('conversation-empty').hidden = true; $('conversation-form').hidden = false; $('session-empty').hidden = true;
       $('message-list').scrollTop = $('message-list').scrollHeight;
     }
-    function newSession() {
-      const id = `session-new-${++state.sessionSerial}`; sessionMessages[id] = [];
-      const item = document.createElement('div'); item.className = 'session'; item.dataset.session = id;
+    function renderEmptyConversation(work) {
+      state.session = ''; state.conversationWork = work;
+      document.querySelectorAll('.session').forEach((entry) => entry.classList.remove('active'));
+      document.querySelectorAll('.session-work-open').forEach((entry) => entry.classList.toggle('active', entry.dataset.work === work));
+      $('conversation-project').textContent = work || '作品'; $('conversation-title').textContent = '暂无会话';
+      $('message-list').replaceChildren(); $('message-list').hidden = true; $('conversation-form').hidden = true; $('conversation-empty').hidden = false;
+    }
+    function newSession(work = state.conversationWork || state.work) {
+      const group = Array.from($('session-list').querySelectorAll('.session-group')).find((entry) => entry.dataset.work === work) || $('session-list').querySelector('.session-group');
+      if (!group) return;
+      work = group.dataset.work;
+      const id = `session-new-${++state.sessionSerial}`; sessionMessages[id] = []; sessionWork[id] = work;
+      const item = document.createElement('div'); item.className = 'session'; item.dataset.session = id; item.dataset.ownerWork = work;
       const open = document.createElement('button'); open.type = 'button'; open.className = 'session-open'; const title = document.createElement('strong'); title.textContent = '新会话'; const detail = document.createElement('small'); detail.textContent = '刚刚 · 0 条消息'; open.append(title, detail);
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'session-delete'; remove.setAttribute('aria-label', '删除新会话'); remove.title = '删除会话'; remove.innerHTML = '<i data-lucide="trash-2"></i>';
-      item.append(open, remove); $('session-empty').hidden = true; $('session-list').insertBefore(item, $('session-empty')); renderSession(id); iconRefresh(); $('message-input').focus();
+      item.append(open, remove); const list = group.querySelector('.session-group-list'); list.querySelector('.group-empty')?.remove(); list.append(item); $('session-empty').hidden = true; renderSession(id); iconRefresh(); $('message-input').focus();
     }
     function requestSessionDelete(item) {
       const label = item.querySelector('.session-open strong').textContent;
@@ -718,10 +810,11 @@
       openModal('confirm-dialog', 'confirm-cancel');
     }
     function deleteSession(item) {
-      const wasActive = item.dataset.session === state.session; delete sessionMessages[item.dataset.session]; item.remove();
-      const next = $('session-list').querySelector('.session');
-      if (!next) { state.session = ''; $('conversation-title').textContent = '暂无会话'; $('message-list').replaceChildren(); $('message-list').hidden = true; $('conversation-form').hidden = true; $('conversation-empty').hidden = false; $('session-empty').hidden = false; showToast('会话列表已清空。'); return; }
-      if (wasActive) renderSession(next.dataset.session); showToast('会话已删除。');
+      const wasActive = item.dataset.session === state.session; const group = item.closest('.session-group'); delete sessionMessages[item.dataset.session]; delete sessionWork[item.dataset.session]; item.remove();
+      const sameGroupNext = group?.querySelector('.session');
+      if (!group?.querySelector('.session')) { const empty = document.createElement('div'); empty.className = 'session-empty group-empty'; empty.textContent = '暂无会话'; group?.querySelector('.session-group-list')?.append(empty); }
+      if (wasActive) { if (sameGroupNext) renderSession(sameGroupNext.dataset.session); else renderEmptyConversation(group?.dataset.work || state.work); }
+      $('session-empty').hidden = !!$('session-list').querySelector('.session'); showToast('会话已删除。');
     }
     function confirmPendingAction() {
       if (state.pendingSession) { const item = state.pendingSession; deleteSession(item); closeConfirm(); return; }
@@ -730,6 +823,22 @@
     }
     function resetSplitterPreview() { $('splitter-empty').hidden = false; $('splitter-preview-list').hidden = true; $('splitter-confirm').disabled = true; }
     function isSupportedSplitFile(file) { if (!file) return false; const extension = file.name.toLowerCase().match(/\.[^.]+$/)?.[0]; return (extension === '.txt' && (!file.type || file.type === 'text/plain')) || (extension === '.docx' && (!file.type || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')); }
+    function addSplitKnowledgeEntries() {
+      const selected = Array.from(document.querySelectorAll('#splitter-preview-list input[type="checkbox"]:checked'));
+      if (!selected.length) { showToast('请至少选择一段内容再加入知识库。'); return false; }
+      selected.forEach((input) => {
+        const excerpt = input.closest('.splitter-excerpt');
+        const content = excerpt.querySelector('em').textContent.trim();
+        const title = excerpt.querySelector('strong').textContent.trim().replace(/^.+?·\s*/, '');
+        const source = `演示样例 · ${title}`;
+        const tags = input.dataset.splitTags.split(/\s+/).filter(Boolean);
+        $('knowledge-list').prepend(createKnowledgeEntry({ ownerWork: state.work, content, category: input.dataset.splitCategory, tags, source }));
+      });
+      state.knowledgeScope = 'current'; $('knowledge-scope').value = 'current'; state.category = 'all'; state.tags.clear();
+      document.querySelectorAll('#knowledge-view .category-list [data-category]').forEach((item) => item.classList.toggle('active', item.dataset.category === 'all'));
+      document.querySelectorAll('#knowledge-view .tag-row [data-tag]').forEach((item) => item.classList.toggle('active', item.dataset.tag === 'all'));
+      updateKnowledgeCounts(); filterKnowledge(); return true;
+    }
     document.querySelectorAll('[data-demo]').forEach((button) => button.addEventListener('click', () => {
       if (button.dataset.demo === 'error') { captureChapterDraft(); clearTimeout(state.timer); clearTimeout(state.forceTimer); clearTimeout(state.retryTimer); state.timer = null; state.forceTimer = null; state.retryTimer = null; state.retrySnapshot = null; state.failed = true; state.dirty = true; $('error-strip').classList.add('show'); setStatus('保存失败', true); show('editor'); document.querySelectorAll('[data-demo]').forEach((item) => item.classList.toggle('active', item === button)); return; }
       if (state.failed) { showToast('保存失败，请重试保存后再切换页面。'); return; }
@@ -737,9 +846,10 @@
     }));
     document.querySelectorAll('[data-nav]').forEach((button) => button.addEventListener('click', () => { if (state.failed) { showToast('保存失败，请重试保存后再切换页面。'); return; } show(button.dataset.nav); }));
     $('sidebar-toggle').addEventListener('click', () => { const collapsed = $('app').classList.toggle('is-collapsed'); $('sidebar-toggle').setAttribute('aria-expanded', String(!collapsed)); $('sidebar-toggle').setAttribute('aria-label', collapsed ? '展开侧栏' : '收起侧栏'); $('sidebar-toggle').title = collapsed ? '展开侧栏' : '收起侧栏'; });
-    $('books').addEventListener('click', (event) => { const card = event.target.closest('[data-work]'); if (card) openWork(card.dataset.work); });
+    $('sidebar-scrim').addEventListener('click', () => $('sidebar-toggle').click());
+    $('books').addEventListener('click', (event) => { const card = event.target.closest('.book[data-work]'); if (card) openWork(card.dataset.work); });
     $('chapter-tree').addEventListener('click', (event) => { const item = event.target.closest('.tree-item'); if (!item || state.failed) return; if (item.dataset.volume) { const collapsed = item.classList.toggle('collapsed'); document.querySelectorAll(`[data-parent="${item.dataset.volume}"]`).forEach((child) => { child.hidden = collapsed; }); } else activateChapter(item); });
-    document.addEventListener('contextmenu', (event) => { const target = event.target.closest('[data-work], [data-volume], [data-chapter]'); if (!target || state.failed) return; event.preventDefault(); openContextMenu(target, event); });
+    document.addEventListener('contextmenu', (event) => { const target = event.target.closest('.book[data-work], [data-volume], [data-chapter]'); if (!target || state.failed) return; event.preventDefault(); openContextMenu(target, event); });
     document.addEventListener('click', (event) => { if (!event.target.closest('#context-menu')) closeContextMenu(); });
     document.addEventListener('keydown', (event) => {
       const modal = document.querySelector('.dialog-backdrop.show');
@@ -762,7 +872,7 @@
       }
       if (event.key === 'Escape') { closeContextMenu(true); return; }
       if ((event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) && !state.failed) {
-        const target = event.target.closest?.('[data-work], [data-volume], [data-chapter]');
+        const target = event.target.closest?.('.book[data-work], [data-volume], [data-chapter]');
         if (target) { event.preventDefault(); const rect = target.getBoundingClientRect(); openContextMenu(target, { clientX: rect.left, clientY: rect.bottom }); }
       }
     });
@@ -775,7 +885,7 @@
       state.retryTimer = setTimeout(() => { const changedDuringRetry = JSON.stringify(state.chapterDrafts.get(draftKey()) || null) !== state.retrySnapshot; state.failed = false; state.retrySnapshot = null; state.retryTimer = null; $('error-strip').classList.remove('show'); $('retry-save').disabled = false; if (changedDuringRetry) saveVisual(); else { state.dirty = false; setStatus('已保存'); } }, 650);
     });
     $('new-work').addEventListener('click', openDialog); $('dialog-cancel').addEventListener('click', closeDialog); $('create-dialog').addEventListener('click', (event) => { if (event.target === $('create-dialog')) closeDialog(); });
-    $('dialog-confirm').addEventListener('click', () => { const entered = $('work-name').value.trim(); if (!entered) { $('work-name').focus(); return; } const name = uniqueWorkName(entered); $('books').prepend(createWorkCard(name, '新作品', '新建作品，准备开始第一章。', '0 章 · 0 字')); updateWorkTotal(); closeDialog(false); openWork(name); if (name !== entered) showToast(`作品已命名为“${name}”，以区分同名作品。`); });
+    $('dialog-confirm').addEventListener('click', () => { const entered = $('work-name').value.trim(); if (!entered) { $('work-name').focus(); return; } const name = uniqueWorkName(entered); state.workTrees.set(name, newWorkTreeHtml); $('books').prepend(createWorkCard(name, '新作品', '新建作品，准备开始第一章。', '1 章 · 0 字')); updateWorkTotal(); closeDialog(false); openWork(name); if (name !== entered) showToast(`作品已命名为“${name}”，以区分同名作品。`); });
     $('work-name').addEventListener('keydown', (event) => { if (event.key === 'Enter') $('dialog-confirm').click(); });
     $('tree-add').addEventListener('click', () => {
       if (state.failed) return;
@@ -799,8 +909,14 @@
       iconRefresh(); activateChapter(button);
     });
     $('knowledge-search').addEventListener('input', filterKnowledge);
-    $('knowledge-scope-current').addEventListener('click', () => { state.knowledgeScope = 'current'; updateKnowledgeCounts(); filterKnowledge(); });
-    $('knowledge-scope-all').addEventListener('click', () => { state.knowledgeScope = 'all'; updateKnowledgeCounts(); filterKnowledge(); });
+    $('knowledge-scope').addEventListener('change', () => { state.knowledgeScope = $('knowledge-scope').value; updateKnowledgeCounts(); filterKnowledge(); });
+    function toggleCategorySidebar() {
+      const collapsed = $('knowledge-layout').classList.toggle('is-collapsed');
+      $('category-collapse-toggle').hidden = collapsed; $('category-expand-toggle').hidden = !collapsed;
+      $('category-collapse-toggle').setAttribute('aria-expanded', String(!collapsed)); $('category-expand-toggle').setAttribute('aria-expanded', String(!collapsed));
+      $('category-collapse-toggle').setAttribute('aria-label', collapsed ? '分类侧栏已收起' : '收起分类侧栏'); $('category-expand-toggle').setAttribute('aria-label', collapsed ? '展开分类侧栏' : '分类侧栏已展开');
+    }
+    $('category-collapse-toggle').addEventListener('click', toggleCategorySidebar); $('category-expand-toggle').addEventListener('click', toggleCategorySidebar);
     $('knowledge-view').querySelector('.category-list').addEventListener('click', (event) => {
       const button = event.target.closest('[data-category]'); if (!button) return;
       state.category = button.dataset.category; document.querySelectorAll('#knowledge-view .category-list [data-category]').forEach((item) => item.classList.toggle('active', item === button)); filterKnowledge();
@@ -818,7 +934,6 @@
     $('new-entry').addEventListener('click', openKnowledgeDialog); $('knowledge-create').addEventListener('click', addKnowledgeEntry); $('knowledge-cancel').addEventListener('click', closeKnowledgeDialog);
     $('knowledge-dialog').addEventListener('click', (event) => { if (event.target === $('knowledge-dialog')) closeKnowledgeDialog(); });
     $('open-splitter').addEventListener('click', () => show('splitter')); $('back-knowledge').addEventListener('click', () => show('knowledge'));
-    $('add-tag').addEventListener('click', () => focusMaintenance('new-maintenance-tag')); $('manage-categories').addEventListener('click', () => focusMaintenance('new-category'));
     $('add-category').addEventListener('click', () => addMaintenanceItem('category')); $('new-category').addEventListener('keydown', (event) => { if (event.key === 'Enter') addMaintenanceItem('category'); });
     $('add-maintenance-tag').addEventListener('click', () => addMaintenanceItem('tag')); $('new-maintenance-tag').addEventListener('keydown', (event) => { if (event.key === 'Enter') addMaintenanceItem('tag'); });
     $('category-maintenance-list').addEventListener('click', (event) => {
@@ -828,7 +943,7 @@
     $('tag-maintenance-list').addEventListener('click', (event) => {
       const remove = event.target.closest('.maintenance-delete'); if (!remove) return;
       const row = remove.closest('.maintenance-row'); const value = row.dataset.tag;
-      const used = Array.from(document.querySelectorAll('.knowledge-entry')).filter((entry) => (entry.dataset.tags || '').split(' ').includes(value)).length;
+      const used = Array.from(document.querySelectorAll('.knowledge-entry')).filter((entry) => entryTags(entry).includes(value)).length;
       if (used) {
         state.pendingDelete = { kind: 'tag', label: value };
         state.pendingSession = null;
@@ -839,19 +954,18 @@
     });
     $('splitter-file').addEventListener('change', (event) => { const file = event.target.files[0]; $('splitter-file-name').textContent = file ? file.name : '选择 TXT / DOCX 文件'; resetSplitterPreview(); });
     $('splitter-reset').addEventListener('click', () => { $('splitter-file').value = ''; $('splitter-file-name').textContent = '选择 TXT / DOCX 文件'; resetSplitterPreview(); showToast('已清空文件选择。'); });
-    $('splitter-preview').addEventListener('click', () => { const file = $('splitter-file').files[0]; if (!file) { showToast('请先选择 TXT 或 DOCX 文件。'); return; } if (!isSupportedSplitFile(file)) { resetSplitterPreview(); showToast('仅支持 TXT 或 DOCX 文件，请重新选择。'); return; } $('splitter-empty').hidden = true; $('splitter-preview-list').hidden = false; $('splitter-confirm').disabled = false; showToast('已生成章节预览，请检查后确认导入。'); });
+    $('splitter-preview').addEventListener('click', () => { const file = $('splitter-file').files[0]; if (!file) { showToast('请先选择 TXT 或 DOCX 文件。'); return; } if (!isSupportedSplitFile(file)) { resetSplitterPreview(); showToast('仅支持 TXT 或 DOCX 文件，请重新选择。'); return; } $('splitter-empty').hidden = true; $('splitter-preview-list').hidden = false; $('splitter-confirm').disabled = false; showToast('已生成段落示例，请勾选后加入知识库。'); });
     $('splitter-confirm').addEventListener('click', () => {
       const file = $('splitter-file').files[0]; if ($('splitter-confirm').disabled || !isSupportedSplitFile(file)) { showToast('仅支持 TXT 或 DOCX 文件，请重新选择。'); return; }
-      const name = uniqueWorkName(file.name.replace(/\.[^.]+$/, '') || '导入作品');
-      $('books').prepend(createWorkCard(name, '导入手稿', '从手稿预览创建的作品，可继续整理章节。', '3 章 · 5,291 字'));
-      updateWorkTotal(); $('splitter-file').value = ''; $('splitter-file-name').textContent = '选择 TXT / DOCX 文件'; resetSplitterPreview(); show('shelf'); showToast(`“${name}”已加入作品集。`);
+      if (!addSplitKnowledgeEntries()) return;
+      $('splitter-file').value = ''; $('splitter-file-name').textContent = '选择 TXT / DOCX 文件'; resetSplitterPreview(); show('knowledge'); showToast(`已将选中段落加入“${state.work}”知识库。`);
     });
-    $('new-session').addEventListener('click', newSession);
-    $('session-list').addEventListener('click', (event) => { const remove = event.target.closest('.session-delete'); if (remove) { requestSessionDelete(remove.closest('.session')); return; } const open = event.target.closest('.session-open'); if (open) renderSession(open.closest('.session').dataset.session); });
+    $('new-session').addEventListener('click', () => newSession(state.conversationWork || state.work));
+    $('session-list').addEventListener('click', (event) => { const remove = event.target.closest('.session-delete'); if (remove) { requestSessionDelete(remove.closest('.session')); return; } const add = event.target.closest('.session-work-add'); if (add) { newSession(add.dataset.work); return; } const work = event.target.closest('.session-work-open'); if (work) { const first = work.closest('.session-group').querySelector('.session'); if (first) renderSession(first.dataset.session); else renderEmptyConversation(work.dataset.work); return; } const open = event.target.closest('.session-open'); if (open) renderSession(open.closest('.session').dataset.session); });
     $('conversation-form').addEventListener('submit', (event) => {
       event.preventDefault(); const input = $('message-input'); const value = input.value.trim(); if (!value || !state.session) return;
       const message = { text: value, user: true }; sessionMessages[state.session].push(message); const node = document.createElement('div'); node.className = 'message user'; node.textContent = value; $('message-list').append(node);
-      const active = Array.from($('session-list').querySelectorAll('.session')).find((item) => item.dataset.session === state.session); active.querySelector('.session-open small').textContent = `刚刚 · ${sessionMessages[state.session].length} 条消息`;
+      const active = Array.from($('session-list').querySelectorAll('.session')).find((item) => item.dataset.session === state.session); if (active) active.querySelector('.session-open small').textContent = `刚刚 · ${sessionMessages[state.session].length} 条消息`;
       input.value = ''; $('message-list').scrollTop = $('message-list').scrollHeight;
     });
     $('save-profile').addEventListener('click', () => { const name = $('display-name').value.trim() || '山间雨'; $('settings-name-preview').textContent = name; $('rail-name').textContent = name; showToast('个人资料已更新。'); });
@@ -866,6 +980,9 @@
       event.preventDefault();
       event.returnValue = '';
     });
+    let wasNarrow = window.matchMedia('(max-width: 760px)').matches;
+    if (wasNarrow) toggleCategorySidebar();
+    window.addEventListener('resize', () => { const narrow = window.matchMedia('(max-width: 760px)').matches; if (narrow && !wasNarrow && !$('knowledge-layout').classList.contains('is-collapsed')) toggleCategorySidebar(); wasNarrow = narrow; });
     updateWorkTotal(); renderCount(); iconRefresh();
   </script>
 </body>
