@@ -106,6 +106,18 @@ test('新的失败状态会取消旧的重试回调', async ({ page }) => {
   await expect(page.locator('#toast')).toContainText('保存失败');
 });
 
+test('重试保存期间的新输入会重新排队保存', async ({ page }) => {
+  await page.locator('.book[data-work="雾港来信"]').click();
+  await page.locator('[data-demo="error"]').click();
+  await page.locator('#retry-save').click();
+  await page.locator('#editor').fill('重试期间的新正文');
+  await page.waitForTimeout(800);
+  await expect(page.locator('#save-status')).toHaveText('未保存');
+  await expect(page.locator('#editor')).toContainText('重试期间的新正文');
+  await page.waitForTimeout(600);
+  await expect(page.locator('#save-status')).toHaveText('已保存');
+});
+
 test('作品结构和非当前章节草稿按作品隔离', async ({ page }) => {
   await page.locator('.book[data-work="长夜列车"]').click();
   await page.locator('.tree-item[data-volume="volume-1"]').click({ button: 'right' });
@@ -143,6 +155,30 @@ test('模糊搜索匹配正文和出处', async ({ page }) => {
   await expect(page.locator('.knowledge-entry:not([hidden])')).toHaveCount(1);
   await search.fill('经典引用 · 手工录入');
   await expect(page.locator('.knowledge-entry:not([hidden])')).toHaveCount(1);
+});
+
+test('知识库按当前作品隔离并支持全部作品汇总', async ({ page }) => {
+  await page.locator('[data-demo="knowledge"]').click();
+  await expect(page.locator('.knowledge-entry:not([hidden])')).toHaveCount(6);
+  await page.locator('#knowledge-scope-all').click();
+  await expect(page.locator('.knowledge-entry:not([hidden])')).toHaveCount(8);
+
+  await page.locator('[data-demo="shelf"]').click();
+  await page.locator('.book[data-work="长夜列车"]').click();
+  await page.locator('[data-demo="knowledge"]').click();
+  await expect(page.locator('.knowledge-entry:not([hidden])')).toHaveCount(2);
+  await expect(page.locator('.knowledge-entry:not([hidden])').first()).toContainText('长夜列车');
+  await page.locator('#knowledge-scope-all').click();
+  await expect(page.locator('.knowledge-entry:not([hidden])')).toHaveCount(8);
+
+  await page.locator('#new-entry').click();
+  await page.locator('#knowledge-body-input').fill('只属于长夜列车的测试知识');
+  await page.locator('#knowledge-source-input').fill('第三章');
+  await page.locator('#knowledge-create').click();
+  await expect(page.locator('.knowledge-entry:not([hidden])')).toHaveCount(9);
+  await expect(page.locator('.knowledge-entry').first()).toHaveAttribute('data-owner-work', '长夜列车');
+  await page.locator('#knowledge-scope-current').click();
+  await expect(page.locator('.knowledge-entry:not([hidden])')).toHaveCount(3);
 });
 
 test('可以在设置维护动态分类和标签，并立即用于筛选', async ({ page }) => {
@@ -320,6 +356,22 @@ test('作品结构右键菜单支持键盘打开、关闭与弹窗焦点循环',
   await page.keyboard.press('Escape');
   await expect(page.locator('#confirm-dialog')).toBeHidden();
   await expect(volume).toBeFocused();
+});
+
+test('折叠当前卷时新建章节仍归入当前卷', async ({ page }) => {
+  await page.locator('.book[data-work="雾港来信"]').click();
+  await page.locator('.tree-item[data-chapter="第二章 旧信"]').click();
+  await page.locator('.tree-item[data-volume="volume-1"]').click();
+  await page.locator('#tree-add').click();
+  await expect(page.locator('.tree-item.chapter').last()).toHaveAttribute('data-parent', 'volume-1');
+});
+
+test('删除卷内章节会更新卷计数', async ({ page }) => {
+  await page.locator('.book[data-work="雾港来信"]').click();
+  await page.locator('.tree-item[data-chapter="第二章 旧信"]').click({ button: 'right' });
+  await page.locator('#context-delete').click();
+  await page.locator('#confirm-delete').click();
+  await expect(page.locator('.tree-item[data-volume="volume-1"] .count')).toHaveText('1 章');
 });
 
 test('窄屏知识库和会话页面没有文档级横向溢出', async ({ page }) => {

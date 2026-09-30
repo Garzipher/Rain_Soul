@@ -155,9 +155,13 @@
     .category-list span { color: #a1a9b1; font-size: 11px; }
     .knowledge-content { min-width: 0; }
     .knowledge-actions { display: flex; gap: 8px; align-items: center; }
-    .knowledge-search { position: relative; margin-bottom: 12px; }
+    .knowledge-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .knowledge-search { position: relative; min-width: 0; }
     .knowledge-search svg { position: absolute; left: 13px; top: 12px; width: 16px; height: 16px; color: #8a949e; }
     .knowledge-search input { width: 100%; padding: 10px 12px 10px 37px; border: 1px solid var(--line-strong); border-radius: 7px; background: #fff; color: var(--ink); }
+    .knowledge-scope { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: #f5f7fa; }
+    .knowledge-scope button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #68727d; font-size: 11px; white-space: nowrap; }
+    .knowledge-scope button.active { background: #fff; color: #315fa8; box-shadow: 0 1px 3px rgb(28 44 67 / 12%); }
     .tag-row { min-height: 52px; padding: 9px 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
     .tag { display: inline-flex; justify-content: center; padding: 6px 9px; border: 1px solid var(--line); background: #fff; }
     .tag.active { border-color: #a9c7fa; background: var(--accent-soft); color: #315fa8; }
@@ -173,6 +177,8 @@
     .entry-full { display: none; margin: -3px 0 11px; color: #4f5f6e; font-size: 12px; line-height: 1.8; }
     .knowledge-entry.expanded .entry-full { display: block; }
     .entry-source { white-space: nowrap; }
+    .entry-owner { display: none; color: var(--muted); font-size: 11px; white-space: nowrap; }
+    #knowledge-view[data-scope="all"] .entry-owner { display: inline; }
     .entry-tags { display: none; }
     .knowledge-entry.expanded .entry-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
     .entry-tag { padding: 3px 7px; border-radius: 4px; background: #f1f6fb; color: #607789; font-size: 10px; }
@@ -288,6 +294,8 @@
       .page-heading > div:first-child { flex: 1 1 100%; }
       .page-heading .secondary { flex: none; white-space: nowrap; }
       .knowledge-actions { flex-wrap: wrap; }
+      .knowledge-toolbar { grid-template-columns: 1fr; }
+      .knowledge-scope { justify-self: start; }
       .workspace { display: flex; flex-direction: column; }
       .chapter-pane { max-height: 180px; border-right: 0; border-bottom: 1px solid var(--line); }
       .pane-heading { min-height: 48px; }
@@ -382,16 +390,16 @@
         <div class="content-page"><div class="page-heading"><div><h2>知识库</h2><p>按分类、标签和来源整理作品素材。</p></div><div class="knowledge-actions"><button type="button" class="secondary" id="open-splitter"><i data-lucide="scissors"></i>拆书工具</button><button type="button" class="primary" id="new-entry"><i data-lucide="plus"></i>新增知识</button></div></div>
           <div class="knowledge-layout">
             <aside class="panel"><div class="panel-heading"><strong>分类</strong><button type="button" class="icon-btn" id="manage-categories" title="在设置中维护分类" aria-label="在设置中维护分类"><i data-lucide="settings-2"></i></button></div><div class="category-list"><button type="button" class="active" data-category="all">全部知识 <span>8</span></button><button type="button" data-category="character">人物描写 <span>2</span></button><button type="button" data-category="scene">景物描写 <span>2</span></button><button type="button" data-category="mind">内心描写 <span>1</span></button><button type="button" data-category="quote">经典引用 <span>1</span></button><button type="button" data-category="plot">剧情与伏笔 <span>2</span></button></div></aside>
-            <div class="knowledge-content"><div class="knowledge-search"><i data-lucide="search"></i><input id="knowledge-search" type="search" placeholder="模糊搜索知识内容、出处和标签"></div><div class="tag-row"><span class="entry-meta">标签</span><button type="button" class="tag active" data-tag="all">全部</button><button type="button" class="tag" data-tag="人物">人物</button><button type="button" class="tag" data-tag="景物">景物</button><button type="button" class="tag" data-tag="内心">内心</button><button type="button" class="tag" data-tag="引用">引用</button><button type="button" class="tag" data-tag="伏笔">伏笔</button><button type="button" class="tag" data-tag="叙述">叙述</button><button type="button" class="tag" data-tag="氛围">氛围</button><button type="button" class="tag" data-tag="道具">道具</button><button type="button" class="tag tag-add" id="add-tag"><i data-lucide="plus"></i>添加标签</button></div>
+            <div class="knowledge-content"><div class="knowledge-toolbar"><div class="knowledge-search"><i data-lucide="search"></i><input id="knowledge-search" type="search" placeholder="模糊搜索知识内容、出处和标签"></div><div class="knowledge-scope" role="group" aria-label="知识范围"><button type="button" class="active" id="knowledge-scope-current" aria-pressed="true">当前作品 · <span id="knowledge-current-work">雾港来信</span></button><button type="button" id="knowledge-scope-all" aria-pressed="false">全部作品</button></div></div><div class="tag-row"><span class="entry-meta">标签</span><button type="button" class="tag active" data-tag="all">全部</button><button type="button" class="tag" data-tag="人物">人物</button><button type="button" class="tag" data-tag="景物">景物</button><button type="button" class="tag" data-tag="内心">内心</button><button type="button" class="tag" data-tag="引用">引用</button><button type="button" class="tag" data-tag="伏笔">伏笔</button><button type="button" class="tag" data-tag="叙述">叙述</button><button type="button" class="tag" data-tag="氛围">氛围</button><button type="button" class="tag" data-tag="道具">道具</button><button type="button" class="tag tag-add" id="add-tag"><i data-lucide="plus"></i>添加标签</button></div>
               <div class="knowledge-list" id="knowledge-list">
-                <article class="knowledge-entry" data-entry="潮汐信标" data-category="plot" data-tags="景物 伏笔" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">旧港北侧的灯塔，每逢退潮会露出一段刻痕，是第三章回收的重要线索。</div><div class="entry-full">旧港北侧的灯塔，每逢退潮会露出一段刻痕。刻痕记录着历次潮位，也对应林晚收到的信件日期。</div><div class="entry-tags"><span class="entry-tag">景物</span><span class="entry-tag">伏笔</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第一章</span></div></article>
-                <article class="knowledge-entry" data-entry="林晚" data-category="character" data-tags="人物 内心" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">负责整理旧信的主角，习惯先观察再做决定，面对熟悉笔迹时会短暂失神。</div><div class="entry-full">林晚负责整理旧信，行动前会先观察环境和他人的反应。她不轻易解释自己的选择，但会把重要线索记录在潮汐表上。</div><div class="entry-tags"><span class="entry-tag">人物</span><span class="entry-tag">内心</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 人物卡</span></div></article>
-                <article class="knowledge-entry" data-entry="雨幕里的站台" data-category="scene" data-tags="景物" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">雨水把站台边缘的灯影拉成长线，远处的广播像从水底传来。</div><div class="entry-full">雨水把站台边缘的灯影拉成长线，远处的广播像从水底传来。人物进入站台后，环境声逐渐覆盖对话。</div><div class="entry-tags"><span class="entry-tag">景物</span></div><div class="entry-head"><span class="entry-source">长夜列车 · 第二章</span></div></article>
-                <article class="knowledge-entry" data-entry="迟到的回信" data-category="mind" data-tags="内心" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">她明知道信里不会有答案，却仍然把折痕一一抚平。</div><div class="entry-full">她明知道信里不会有答案，却仍然把折痕一一抚平。这个动作不是为了修复纸张，而是为了让自己相信事情仍可被整理。</div><div class="entry-tags"><span class="entry-tag">内心</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第四章</span></div></article>
-                <article class="knowledge-entry" data-entry="潮声落下之后" data-category="quote" data-tags="引用" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">“潮声落下之后，留下来的才是岸。” 用于表现人物在选择后的安静时刻。</div><div class="entry-full">“潮声落下之后，留下来的才是岸。” 用于表现人物在选择后的安静时刻，引用来源保留在作品资料中。</div><div class="entry-tags"><span class="entry-tag">引用</span></div><div class="entry-head"><span class="entry-source">经典引用 · 手工录入</span></div></article>
-                <article class="knowledge-entry" data-entry="陈砚" data-category="character" data-tags="人物 叙述" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">修船师傅说话直接，习惯把重要物件放在离门最近的抽屉里。</div><div class="entry-full">陈砚修船时不喜欢闲谈，回答问题常先看对方的手。他把旧船票留在工作台抽屉，只有遇到潮汐变化才会取出来。</div><div class="entry-tags"><span class="entry-tag">人物</span><span class="entry-tag">叙述</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 人物卡</span></div></article>
-                <article class="knowledge-entry" data-entry="冬晨的旧城区" data-category="scene" data-tags="景物 氛围" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜，脚步声显得格外清楚。</div><div class="entry-full">冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜。店铺尚未开门，巷口风铃声把远处的船笛衬得更慢。</div><div class="entry-tags"><span class="entry-tag">景物</span><span class="entry-tag">氛围</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第六章</span></div></article>
-                <article class="knowledge-entry" data-entry="空白车票" data-category="plot" data-tags="伏笔 道具" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">车票的目的地一栏被裁去，只留下日期和一枚褪色的检票印。</div><div class="entry-full">车票的目的地一栏被裁去，只留下日期和一枚褪色的检票印。日期早于车站封闭时间，是后续核对人物行程的线索。</div><div class="entry-tags"><span class="entry-tag">伏笔</span><span class="entry-tag">道具</span></div><div class="entry-head"><span class="entry-source">长夜列车 · 第三章</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="潮汐信标" data-category="plot" data-tags="景物 伏笔" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">旧港北侧的灯塔，每逢退潮会露出一段刻痕，是第三章回收的重要线索。</div><div class="entry-full">旧港北侧的灯塔，每逢退潮会露出一段刻痕。刻痕记录着历次潮位，也对应林晚收到的信件日期。</div><div class="entry-tags"><span class="entry-tag">景物</span><span class="entry-tag">伏笔</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第一章</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="林晚" data-category="character" data-tags="人物 内心" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">负责整理旧信的主角，习惯先观察再做决定，面对熟悉笔迹时会短暂失神。</div><div class="entry-full">林晚负责整理旧信，行动前会先观察环境和他人的反应。她不轻易解释自己的选择，但会把重要线索记录在潮汐表上。</div><div class="entry-tags"><span class="entry-tag">人物</span><span class="entry-tag">内心</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 人物卡</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="长夜列车" data-entry="雨幕里的站台" data-category="scene" data-tags="景物" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">雨水把站台边缘的灯影拉成长线，远处的广播像从水底传来。</div><div class="entry-full">雨水把站台边缘的灯影拉成长线，远处的广播像从水底传来。人物进入站台后，环境声逐渐覆盖对话。</div><div class="entry-tags"><span class="entry-tag">景物</span></div><div class="entry-head"><span class="entry-source">长夜列车 · 第二章</span><span class="entry-owner">长夜列车</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="迟到的回信" data-category="mind" data-tags="内心" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">她明知道信里不会有答案，却仍然把折痕一一抚平。</div><div class="entry-full">她明知道信里不会有答案，却仍然把折痕一一抚平。这个动作不是为了修复纸张，而是为了让自己相信事情仍可被整理。</div><div class="entry-tags"><span class="entry-tag">内心</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第四章</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="潮声落下之后" data-category="quote" data-tags="引用" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">“潮声落下之后，留下来的才是岸。” 用于表现人物在选择后的安静时刻。</div><div class="entry-full">“潮声落下之后，留下来的才是岸。” 用于表现人物在选择后的安静时刻，引用来源保留在作品资料中。</div><div class="entry-tags"><span class="entry-tag">引用</span></div><div class="entry-head"><span class="entry-source">经典引用 · 手工录入</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="陈砚" data-category="character" data-tags="人物 叙述" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">修船师傅说话直接，习惯把重要物件放在离门最近的抽屉里。</div><div class="entry-full">陈砚修船时不喜欢闲谈，回答问题常先看对方的手。他把旧船票留在工作台抽屉，只有遇到潮汐变化才会取出来。</div><div class="entry-tags"><span class="entry-tag">人物</span><span class="entry-tag">叙述</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 人物卡</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="雾港来信" data-entry="冬晨的旧城区" data-category="scene" data-tags="景物 氛围" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜，脚步声显得格外清楚。</div><div class="entry-full">冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜。店铺尚未开门，巷口风铃声把远处的船笛衬得更慢。</div><div class="entry-tags"><span class="entry-tag">景物</span><span class="entry-tag">氛围</span></div><div class="entry-head"><span class="entry-source">雾港来信 · 第六章</span><span class="entry-owner">雾港来信</span></div></article>
+                <article class="knowledge-entry" data-owner-work="长夜列车" data-entry="空白车票" data-category="plot" data-tags="伏笔 道具" role="button" tabindex="0" aria-expanded="false"><div class="entry-summary">车票的目的地一栏被裁去，只留下日期和一枚褪色的检票印。</div><div class="entry-full">车票的目的地一栏被裁去，只留下日期和一枚褪色的检票印。日期早于车站封闭时间，是后续核对人物行程的线索。</div><div class="entry-tags"><span class="entry-tag">伏笔</span><span class="entry-tag">道具</span></div><div class="entry-head"><span class="entry-source">长夜列车 · 第三章</span><span class="entry-owner">长夜列车</span></div></article>
               </div>
               <div class="knowledge-empty" id="knowledge-empty" role="status" hidden>没有匹配的知识内容</div>
             </div>
@@ -433,7 +441,7 @@
 
   <div class="context-menu" id="context-menu" role="menu"><button type="button" id="context-delete" role="menuitem"><i data-lucide="trash-2"></i><span>删除</span></button></div>
   <div class="dialog-backdrop" id="create-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="create-title"><h2 id="create-title">新建作品</h2><p>作品会出现在作品集里。</p><label for="work-name">作品名称</label><input id="work-name" maxlength="80" placeholder="输入作品名称"><div class="dialog-actions"><button type="button" class="secondary" id="dialog-cancel">取消</button><button type="button" class="primary" id="dialog-confirm">创建作品</button></div></div></div>
-  <div class="dialog-backdrop" id="knowledge-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="knowledge-title"><h2 id="knowledge-title">新增知识</h2><p>保存正文片段、分类、标签和出处。</p><form id="knowledge-form"><div class="field"><label for="knowledge-body-input">内容</label><textarea id="knowledge-body-input" maxlength="2000" placeholder="输入知识内容"></textarea></div><div class="field"><label for="knowledge-category-input">分类</label><select id="knowledge-category-input"><option value="character">人物描写</option><option value="scene">景物描写</option><option value="mind">内心描写</option><option value="quote">经典引用</option><option value="plot">剧情与伏笔</option></select></div><div class="field"><label for="knowledge-tags-input">标签</label><input id="knowledge-tags-input" placeholder="用逗号分隔多个标签"></div><div class="field"><label for="knowledge-source-input">出处</label><input id="knowledge-source-input" placeholder="作品、章节或来源"></div><div class="dialog-actions"><button type="button" class="secondary" id="knowledge-cancel">取消</button><button type="button" class="primary" id="knowledge-create">添加知识</button></div></form></div></div>
+  <div class="dialog-backdrop" id="knowledge-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="knowledge-title"><h2 id="knowledge-title">新增知识</h2><p id="knowledge-owner-hint">添加到当前作品：雾港来信</p><form id="knowledge-form"><div class="field"><label for="knowledge-body-input">内容</label><textarea id="knowledge-body-input" maxlength="2000" placeholder="输入知识内容"></textarea></div><div class="field"><label for="knowledge-category-input">分类</label><select id="knowledge-category-input"><option value="character">人物描写</option><option value="scene">景物描写</option><option value="mind">内心描写</option><option value="quote">经典引用</option><option value="plot">剧情与伏笔</option></select></div><div class="field"><label for="knowledge-tags-input">标签</label><input id="knowledge-tags-input" placeholder="用逗号分隔多个标签"></div><div class="field"><label for="knowledge-source-input">出处</label><input id="knowledge-source-input" placeholder="作品、章节或来源"></div><div class="dialog-actions"><button type="button" class="secondary" id="knowledge-cancel">取消</button><button type="button" class="primary" id="knowledge-create">添加知识</button></div></form></div></div>
   <div class="dialog-backdrop" id="confirm-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><h2 id="confirm-title">确认删除</h2><p id="confirm-message">删除后无法在当前 Demo 中恢复。</p><div class="dialog-actions"><button type="button" class="secondary" id="confirm-cancel">取消</button><button type="button" class="primary danger" id="confirm-delete">确认删除</button></div></div></div>
   <div class="dialog-backdrop" id="migration-dialog"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="migration-title"><h2 id="migration-title">迁移分类</h2><p id="migration-message">选择目标分类，迁移后将删除原分类。</p><label for="migration-target">目标分类</label><select id="migration-target"></select><div class="dialog-actions"><button type="button" class="secondary" id="migration-cancel">取消</button><button type="button" class="primary" id="migration-confirm">迁移并删除</button></div></div></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -441,7 +449,7 @@
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
-    const state = { view: 'shelf', work: '雾港来信', chapter: '第一章 潮汐', failed: false, dirty: false, timer: null, forceTimer: null, retryTimer: null, context: null, pendingDelete: null, pendingSession: null, pendingCategory: null, modalReturn: null, category: 'all', tags: new Set(), session: 'structure', sessionSerial: 0, categorySerial: 0, chapterDrafts: new Map(), workTrees: new Map() };
+    const state = { view: 'shelf', work: '雾港来信', chapter: '第一章 潮汐', failed: false, dirty: false, timer: null, forceTimer: null, retryTimer: null, retrySnapshot: null, context: null, pendingDelete: null, pendingSession: null, pendingCategory: null, modalReturn: null, category: 'all', tags: new Set(), knowledgeScope: 'current', session: 'structure', sessionSerial: 0, categorySerial: 0, chapterDrafts: new Map(), workTrees: new Map() };
     const sampleText = $('editor').innerHTML;
     const initialTreeHtml = $('chapter-tree').innerHTML;
     state.workTrees.set(state.work, initialTreeHtml);
@@ -469,6 +477,7 @@
       const meta = viewMeta[view] || viewMeta.shelf;
       $('top-eyebrow').textContent = meta[0]; $('top-title').textContent = typeof meta[1] === 'function' ? meta[1]() : meta[1];
       $('new-work').hidden = view !== 'shelf'; $('save-status').hidden = view !== 'editor';
+      if (view === 'knowledge') { $('knowledge-current-work').textContent = state.work; updateKnowledgeCounts(); filterKnowledge(); }
       if (view === 'editor') { $('crumbs').textContent = `${state.work} / ${state.chapter}`; renderCount(); }
     }
     function showToast(message) { const toast = $('toast'); toast.textContent = message; toast.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => toast.classList.remove('show'), 2300); }
@@ -478,7 +487,7 @@
     function loadWorkTree(name) { $('chapter-tree').innerHTML = state.workTrees.get(name) || initialTreeHtml; iconRefresh(); }
     function renderChapter(button) { if (!button) return; state.chapter = button.dataset.chapter; document.querySelectorAll('[data-chapter]').forEach((item) => item.classList.toggle('active', item === button)); const draft = state.chapterDrafts.get(draftKey()); $('chapter-title').value = draft?.title || state.chapter; $('crumbs').textContent = `${state.work} / ${state.chapter}`; $('chapter-kicker').textContent = state.chapter.includes('第一') ? '未分卷 · 第 1 章' : '第一卷 · 归港'; $('editor').innerHTML = draft?.html || (state.chapter === '第一章 潮汐' && state.work === '雾港来信' ? sampleText : '<p>在这里开始写作。</p>'); renderCount(); }
     function flushPendingSave() { captureChapterDraft(); clearTimeout(state.timer); clearTimeout(state.forceTimer); state.timer = null; state.forceTimer = null; state.dirty = false; if (!state.failed) setStatus('已保存'); }
-    function openWork(name) { flushPendingSave(); saveWorkTree(); state.work = name; loadWorkTree(name); const firstChapter = $('chapter-tree').querySelector('[data-chapter]'); state.chapter = firstChapter?.dataset.chapter || ''; renderChapter(firstChapter); $('error-strip').classList.remove('show'); state.failed = false; state.dirty = false; $('conversation-project').textContent = name; setStatus('已保存'); show('editor'); }
+    function openWork(name) { flushPendingSave(); saveWorkTree(); state.work = name; state.knowledgeScope = 'current'; loadWorkTree(name); const firstChapter = $('chapter-tree').querySelector('[data-chapter]'); state.chapter = firstChapter?.dataset.chapter || ''; renderChapter(firstChapter); $('error-strip').classList.remove('show'); state.failed = false; state.dirty = false; $('conversation-project').textContent = name; setStatus('已保存'); show('editor'); }
     function openModal(id, focusTarget) {
       state.modalReturn = document.activeElement;
       $(id).classList.add('show');
@@ -541,7 +550,9 @@
         document.querySelectorAll(`[data-parent="${id}"]`).forEach((item) => { if (item.dataset.chapter === state.chapter) currentRemoved = true; state.chapterDrafts.delete(draftKey(state.work, item.dataset.chapter)); item.remove(); });
         context.element.remove();
       }
-      if (context.kind === 'chapter') { currentRemoved = context.element.dataset.chapter === state.chapter; state.chapterDrafts.delete(draftKey(state.work, context.element.dataset.chapter)); context.element.remove(); }
+      let parentNodeToUpdate = null;
+      if (context.kind === 'chapter') { currentRemoved = context.element.dataset.chapter === state.chapter; state.chapterDrafts.delete(draftKey(state.work, context.element.dataset.chapter)); parentNodeToUpdate = document.querySelector(`[data-volume="${context.element.dataset.parent}"]`); context.element.remove(); }
+      if (parentNodeToUpdate) { const count = parentNodeToUpdate.querySelector('.count'); const remaining = document.querySelectorAll(`[data-parent="${parentNodeToUpdate.dataset.volume}"]`).length; if (count) count.textContent = `${remaining} 章`; }
       saveWorkTree();
       if (currentRemoved) {
         const firstChapter = document.querySelector('[data-chapter]');
@@ -552,20 +563,27 @@
     }
     function filterKnowledge() {
       const query = $('knowledge-search').value.trim().toLocaleLowerCase();
+      $('knowledge-current-work').textContent = state.work;
+      $('knowledge-view').dataset.scope = state.knowledgeScope;
       const entries = Array.from(document.querySelectorAll('.knowledge-entry'));
       entries.forEach((entry) => {
         const searchable = `${entry.dataset.entry || ''} ${entry.textContent}`.toLocaleLowerCase();
         const entryTags = (entry.dataset.tags || '').split(' ').filter(Boolean);
+        const matchWork = state.knowledgeScope === 'all' || entry.dataset.ownerWork === state.work;
         const matchQuery = !query || searchable.includes(query);
         const matchCategory = state.category === 'all' || entry.dataset.category === state.category;
         const matchTags = Array.from(state.tags).every((tag) => entryTags.includes(tag));
-        entry.hidden = !(matchQuery && matchCategory && matchTags);
+        entry.hidden = !(matchWork && matchQuery && matchCategory && matchTags);
       });
+      $('knowledge-scope-current').classList.toggle('active', state.knowledgeScope === 'current');
+      $('knowledge-scope-current').setAttribute('aria-pressed', String(state.knowledgeScope === 'current'));
+      $('knowledge-scope-all').classList.toggle('active', state.knowledgeScope === 'all');
+      $('knowledge-scope-all').setAttribute('aria-pressed', String(state.knowledgeScope === 'all'));
       $('knowledge-empty').hidden = entries.some((entry) => !entry.hidden);
     }
     function selectEntry(entry) { const expanded = entry.classList.contains('expanded'); document.querySelectorAll('.knowledge-entry').forEach((item) => { item.classList.remove('active', 'expanded'); item.setAttribute('aria-expanded', 'false'); }); if (!expanded) { entry.classList.add('active', 'expanded'); entry.setAttribute('aria-expanded', 'true'); } }
     function updateKnowledgeCounts() {
-      const entries = Array.from(document.querySelectorAll('.knowledge-entry'));
+      const entries = Array.from(document.querySelectorAll('.knowledge-entry')).filter((entry) => state.knowledgeScope === 'all' || entry.dataset.ownerWork === state.work);
       document.querySelectorAll('#knowledge-view .category-list [data-category]').forEach((button) => {
         const count = button.dataset.category === 'all' ? entries.length : entries.filter((entry) => entry.dataset.category === button.dataset.category).length;
         const value = button.querySelector('span'); if (value) value.textContent = count;
@@ -655,7 +673,7 @@
       if (!exists) appendMaintenanceItem('tag', value);
     }
     function openKnowledgeDialog() {
-      $('knowledge-form').reset(); openModal('knowledge-dialog', 'knowledge-body-input');
+      $('knowledge-form').reset(); $('knowledge-owner-hint').textContent = `添加到当前作品：${state.work}`; openModal('knowledge-dialog', 'knowledge-body-input');
     }
     function closeKnowledgeDialog(restoreFocus = true) { closeModal('knowledge-dialog', restoreFocus); }
     function addKnowledgeEntry() {
@@ -663,11 +681,11 @@
       if (!content) { $('knowledge-body-input').focus(); return; }
       const tags = $('knowledge-tags-input').value.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean);
       tags.forEach(ensureTagExists);
-      const entry = document.createElement('article'); entry.className = 'knowledge-entry'; entry.dataset.entry = content; entry.dataset.category = $('knowledge-category-input').value; entry.dataset.tags = tags.join(' '); entry.setAttribute('role', 'button'); entry.tabIndex = 0; entry.setAttribute('aria-expanded', 'false');
+      const entry = document.createElement('article'); entry.className = 'knowledge-entry'; entry.dataset.ownerWork = state.work; entry.dataset.entry = content; entry.dataset.category = $('knowledge-category-input').value; entry.dataset.tags = tags.join(' '); entry.setAttribute('role', 'button'); entry.tabIndex = 0; entry.setAttribute('aria-expanded', 'false');
       const summary = document.createElement('div'); summary.className = 'entry-summary'; summary.textContent = content;
       const full = document.createElement('div'); full.className = 'entry-full'; full.textContent = content;
       const tagList = document.createElement('div'); tagList.className = 'entry-tags'; tags.forEach((tag) => { const chip = document.createElement('span'); chip.className = 'entry-tag'; chip.textContent = tag; tagList.append(chip); });
-      const head = document.createElement('div'); head.className = 'entry-head'; const source = document.createElement('span'); source.className = 'entry-source'; source.textContent = $('knowledge-source-input').value.trim() || '手工录入'; head.append(source);
+      const head = document.createElement('div'); head.className = 'entry-head'; const source = document.createElement('span'); source.className = 'entry-source'; source.textContent = $('knowledge-source-input').value.trim() || '手工录入'; const owner = document.createElement('span'); owner.className = 'entry-owner'; owner.textContent = state.work; head.append(source, owner);
       entry.append(summary, full, tagList, head); $('knowledge-list').prepend(entry);
       state.category = 'all'; state.tags.clear(); $('knowledge-search').value = '';
       document.querySelectorAll('#knowledge-view .category-list [data-category]').forEach((item) => item.classList.toggle('active', item.dataset.category === 'all'));
@@ -713,7 +731,7 @@
     function resetSplitterPreview() { $('splitter-empty').hidden = false; $('splitter-preview-list').hidden = true; $('splitter-confirm').disabled = true; }
     function isSupportedSplitFile(file) { if (!file) return false; const extension = file.name.toLowerCase().match(/\.[^.]+$/)?.[0]; return (extension === '.txt' && (!file.type || file.type === 'text/plain')) || (extension === '.docx' && (!file.type || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')); }
     document.querySelectorAll('[data-demo]').forEach((button) => button.addEventListener('click', () => {
-      if (button.dataset.demo === 'error') { captureChapterDraft(); clearTimeout(state.timer); clearTimeout(state.forceTimer); clearTimeout(state.retryTimer); state.timer = null; state.forceTimer = null; state.retryTimer = null; state.failed = true; state.dirty = true; $('error-strip').classList.add('show'); setStatus('保存失败', true); show('editor'); document.querySelectorAll('[data-demo]').forEach((item) => item.classList.toggle('active', item === button)); return; }
+      if (button.dataset.demo === 'error') { captureChapterDraft(); clearTimeout(state.timer); clearTimeout(state.forceTimer); clearTimeout(state.retryTimer); state.timer = null; state.forceTimer = null; state.retryTimer = null; state.retrySnapshot = null; state.failed = true; state.dirty = true; $('error-strip').classList.add('show'); setStatus('保存失败', true); show('editor'); document.querySelectorAll('[data-demo]').forEach((item) => item.classList.toggle('active', item === button)); return; }
       if (state.failed) { showToast('保存失败，请重试保存后再切换页面。'); return; }
       $('error-strip').classList.remove('show'); setStatus('已保存'); show(button.dataset.demo);
     }));
@@ -753,8 +771,8 @@
     $('editor').addEventListener('input', () => { renderCount(); saveVisual(); }); $('chapter-title').addEventListener('input', saveVisual);
     $('back-shelf').addEventListener('click', () => { if (!state.failed) { flushPendingSave(); saveWorkTree(); } show('shelf'); });
     $('retry-save').addEventListener('click', () => {
-      captureChapterDraft(); clearTimeout(state.timer); clearTimeout(state.forceTimer); clearTimeout(state.retryTimer); state.timer = null; state.forceTimer = null; $('retry-save').disabled = true; setStatus('保存中');
-      state.retryTimer = setTimeout(() => { state.failed = false; state.dirty = false; state.retryTimer = null; $('error-strip').classList.remove('show'); $('retry-save').disabled = false; setStatus('已保存'); }, 650);
+      captureChapterDraft(); clearTimeout(state.timer); clearTimeout(state.forceTimer); clearTimeout(state.retryTimer); state.timer = null; state.forceTimer = null; state.retrySnapshot = JSON.stringify(state.chapterDrafts.get(draftKey()) || null); $('retry-save').disabled = true; setStatus('保存中');
+      state.retryTimer = setTimeout(() => { const changedDuringRetry = JSON.stringify(state.chapterDrafts.get(draftKey()) || null) !== state.retrySnapshot; state.failed = false; state.retrySnapshot = null; state.retryTimer = null; $('error-strip').classList.remove('show'); $('retry-save').disabled = false; if (changedDuringRetry) saveVisual(); else { state.dirty = false; setStatus('已保存'); } }, 650);
     });
     $('new-work').addEventListener('click', openDialog); $('dialog-cancel').addEventListener('click', closeDialog); $('create-dialog').addEventListener('click', (event) => { if (event.target === $('create-dialog')) closeDialog(); });
     $('dialog-confirm').addEventListener('click', () => { const entered = $('work-name').value.trim(); if (!entered) { $('work-name').focus(); return; } const name = uniqueWorkName(entered); $('books').prepend(createWorkCard(name, '新作品', '新建作品，准备开始第一章。', '0 章 · 0 字')); updateWorkTotal(); closeDialog(false); openWork(name); if (name !== entered) showToast(`作品已命名为“${name}”，以区分同名作品。`); });
@@ -763,7 +781,7 @@
       if (state.failed) return;
       const tree = $('chapter-tree'); const active = tree.querySelector('[data-chapter].active');
       const volumes = Array.from(tree.querySelectorAll('[data-volume]')); const activeParent = active?.dataset.parent;
-      const activeVolume = volumes.find((item) => item.dataset.volume === activeParent && !item.classList.contains('collapsed'));
+      const activeVolume = volumes.find((item) => item.dataset.volume === activeParent);
       let parentNode = activeVolume || volumes.find((item) => !item.classList.contains('collapsed')) || volumes[0];
       if (!parentNode) {
         parentNode = document.createElement('button'); parentNode.type = 'button'; parentNode.className = 'tree-item volume'; parentNode.dataset.volume = 'unassigned';
@@ -781,6 +799,8 @@
       iconRefresh(); activateChapter(button);
     });
     $('knowledge-search').addEventListener('input', filterKnowledge);
+    $('knowledge-scope-current').addEventListener('click', () => { state.knowledgeScope = 'current'; updateKnowledgeCounts(); filterKnowledge(); });
+    $('knowledge-scope-all').addEventListener('click', () => { state.knowledgeScope = 'all'; updateKnowledgeCounts(); filterKnowledge(); });
     $('knowledge-view').querySelector('.category-list').addEventListener('click', (event) => {
       const button = event.target.closest('[data-category]'); if (!button) return;
       state.category = button.dataset.category; document.querySelectorAll('#knowledge-view .category-list [data-category]').forEach((item) => item.classList.toggle('active', item === button)); filterKnowledge();
