@@ -10,9 +10,11 @@ const api: DesktopApi = {
   listWorks: () => invoke('listWorks', {}),
   createWork: title => invoke('createWork', { title }),
   openWork: id => invoke('openWork', { id }),
-  addChapter: (workId, title, expectedRevision, operationId) => invoke('addChapter', { workId, title, expectedRevision, operationId }),
+  addChapter: (workId, title, expectedRevision, operationId, volumeId = null) => invoke('addChapter', { workId, title, expectedRevision, operationId, volumeId }),
   saveChapter: (workId, chapterId, title, document, expectedRevision, operationId) => invoke('saveChapter', { workId, chapterId, title, document, expectedRevision, operationId }),
   getRuntimeInfo: () => invoke('runtimeInfo', {}),
+  manageStructure: request => invoke('manageStructure', request),
+  listDeletedWorks: () => invoke('listDeletedWorks', {}),
   onCloseRequested: handler => {
     const listener = (_event: Electron.IpcRendererEvent, token: string) => { void handler().then(() => ipcRenderer.send('rainsoul:close-confirm', token)).catch(() => {}); };
     ipcRenderer.on('rainsoul:close-request', listener);

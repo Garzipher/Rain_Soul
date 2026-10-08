@@ -110,6 +110,27 @@ button svg { width: 18px; height: 18px; flex: none; }
 .create-dialog input { width: 100%; border: 1px solid #cdd8e1; border-radius: 6px; padding: 10px 12px; color: #20242a; background: #fff; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 27px; }
 .dialog-error { color: #a34037; font-size: 13px; line-height: 1.6; }
+.pane-actions { display: flex; gap: 6px; }
+.volume-group { min-width: 0; }
+.chapter-tree .volume-heading { width: 100%; font-weight: 600; color: #405f77; }
+.volume-chevron { width: 12px; flex: none; font-size: 18px; }
+.volume-chapters { display: grid; gap: 3px; padding-left: 16px; }
+.empty-volume { margin: 8px 12px; color: var(--muted); font-size: 12px; }
+.context-menu { position: fixed; z-index: 50; min-width: 180px; max-width: min(360px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; padding: 5px; background: #fff; border: 1px solid #dce5ed; border-radius: 9px; box-shadow: 0 9px 32px rgb(26 49 69 / 14%); }
+.context-menu button { display: block; width: 100%; padding: 9px 12px; background: transparent; border: 0; border-radius: 5px; text-align: left; color: #38546b; }
+.context-menu button:hover, .context-menu button:focus-visible { background: var(--accent-soft); }
+.context-menu button:disabled { cursor: default; color: #81909c; }
+.context-menu button.danger { color: #a83a39; border-top: 1px solid #edf0f3; margin-top: 3px; }
+.dialog-description { color: #617282; line-height: 1.8; font-size: 13px; overflow-wrap: anywhere; }
+.delete-button { padding: 9px 13px; border: 1px solid #a84444; border-radius: 7px; color: #fff; background: #b94c4c; font-weight: 600; }
+.recovery-list { display: grid; gap: 8px; }
+.recovery-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 16px; border: 1px solid #e1e8ef; border-radius: 7px; }
+.recovery-row > span { display: grid; gap: 5px; overflow-wrap: anywhere; }
+.recovery-row strong { font-size: 13px; font-weight: 600; }
+.recovery-row small { color: var(--muted); font-size: 11px; }
+.recovery-row button { flex: none; }
+.recovery-select { display: flex; gap: 20px; align-items: center; margin-bottom: 18px; color: #617282; font-size: 13px; }
+.recovery-select select { border: 1px solid #d2dce5; background: #fff; color: #2f485d; padding: 8px 12px; border-radius: 6px; max-width: 75%; font: inherit; }
 @media (max-width: 900px) {
   .app.is-expanded { grid-template-columns: 60px minmax(0, 1fr); }
   .is-expanded .rail { position: fixed; top: 0; bottom: 0; left: 0; width: 236px; z-index: 20; box-shadow: 10px 0 30px rgb(28 49 68 / 7%); }

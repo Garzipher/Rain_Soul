@@ -44,5 +44,7 @@ export interface DesktopApi {
   addChapter(workId: string, title: string, expectedRevision: number, operationId: string, volumeId?: string | null): Promise<WorkDetail>;
   saveChapter(workId: string, chapterId: string, title: string, document: WritingDocument, expectedRevision: number, operationId: string): Promise<SaveResult>;
   getRuntimeInfo(): Promise<RuntimeInfo>;
+  manageStructure(request: StructureRequest): Promise<WorkDetail | null>;
+  listDeletedWorks(): Promise<DeletedWork[]>;
   onCloseRequested(handler: () => Promise<void>): () => void;
 }

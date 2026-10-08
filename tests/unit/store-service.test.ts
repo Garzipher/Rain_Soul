@@ -43,4 +43,62 @@ describe('主进程作品权限', () => {
     await expect(service.execute('openWork', { id: crypto.randomUUID() })).rejects.toThrow('读失败');
     await expect(service.execute('addChapter', { workId: id, title: '章', expectedRevision: 1, operationId: crypto.randomUUID() })).resolves.toBe('成功');
   });
+  it('结构修改只写当前作品，恢复作品是明确的全局例外', async () => {
+    const workId = crypto.randomUUID();
+    const other = crypto.randomUUID();
+    const service = new StoreService(async (command) => command === 'openWork' ? { id: workId } : '成功');
+    const request = { workId: other, expectedRevision: 1, operationId: crypto.randomUUID(), action: { type: 'renameWork', title: '改名' } };
+    await service.execute('openWork', { id: workId });
+    await expect(service.execute('manageStructure', request)).rejects.toThrow('当前作品');
+    await expect(service.execute('manageStructure', { ...request, action: { type: 'restoreWork' } })).resolves.toBe('成功');
+  });
+  it('删除当前作品成功后撤销写入权限，失败不撤销', async () => {
+    const id = crypto.randomUUID();
+    let failing = true;
+    const service = new StoreService(async command => {
+      if (command === 'openWork') return { id };
+      if (command === 'manageStructure' && failing) throw new Error('磁盘忙');
+      return null;
+    });
+    const request = { workId: id, expectedRevision: 1, operationId: crypto.randomUUID(), action: { type: 'deleteWork' } };
+    await service.execute('openWork', { id });
+    await expect(service.execute('manageStructure', request)).rejects.toThrow('磁盘忙');
+    await expect(service.execute('addChapter', { workId: id, title: '章', expectedRevision: 1, operationId: crypto.randomUUID() })).resolves.toBeNull();
+    failing = false;
+    await service.execute('manageStructure', request);
+    await expect(service.execute('manageStructure', request)).resolves.toBeNull();
+    await expect(service.execute('manageStructure', { ...request, operationId: crypto.randomUUID() })).rejects.toThrow('当前作品');
+    await expect(service.execute('addChapter', { workId: id, title: '章', expectedRevision: 2, operationId: crypto.randomUUID() })).rejects.toThrow('当前作品');
+  });
+  it('未知结构动作、外来字段或路径不得进入 Worker；已删除列表是只读命令', async () => {
+    const calls: string[] = [];
+    const service = new StoreService(async command => { calls.push(command); return []; });
+    const request = { workId: crypto.randomUUID(), expectedRevision: 1, operationId: crypto.randomUUID() };
+    await expect(service.execute('manageStructure', { ...request, action: { type: 'deleteAll' } })).rejects.toThrow();
+    await expect(service.execute('manageStructure', { ...request, action: { type: 'restoreWork', file: '../' } })).rejects.toThrow();
+    await expect(service.execute('manageStructure', { ...request, action: { type: 'setChapterVolume', chapterId: '../', volumeId: null } })).rejects.toThrow();
+    await expect(service.execute('listDeletedWorks', {})).resolves.toEqual([]);
+    expect(calls).toEqual(['listDeletedWorks']);
+  });
+  it('作品已恢复时旧删除回执不能撤销当前作品权限', async () => {
+    const id = crypto.randomUUID();
+    let deleted = false;
+    const service = new StoreService(async (command, payload) => {
+      if (command === 'manageStructure') {
+        const type = (payload as { action: { type: string } }).action.type;
+        if (type === 'restoreWork') deleted = false;
+        else if (!deleted) return { id };
+        return null;
+      }
+      return { id };
+    });
+    await service.execute('openWork', { id });
+    const request = { workId: id, expectedRevision: 1, operationId: crypto.randomUUID(), action: { type: 'deleteWork' } };
+    deleted = true;
+    await service.execute('manageStructure', request);
+    await service.execute('manageStructure', { ...request, operationId: crypto.randomUUID(), action: { type: 'restoreWork' } });
+    await service.execute('openWork', { id });
+    await service.execute('manageStructure', request);
+    await expect(service.execute('addChapter', { workId: id, title: '新章', expectedRevision: 3, operationId: crypto.randomUUID() })).resolves.toEqual({ id });
+  });
 });

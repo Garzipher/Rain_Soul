@@ -66,7 +66,16 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
     setDraft(next);
     coordinator.current?.update(next);
   }, []);
-  const flush = useCallback(async () => { await coordinator.current?.flush(); }, []);
+  const flush = useCallback(async () => {
+    if (composing.current) throw new Error('输入法正在组词，请先确认输入后再操作');
+    await coordinator.current?.flush();
+  }, []);
+  const acceptWork = useCallback((detail: WorkDetail) => {
+    workRef.current = detail; revision.current = detail.revision;
+    const currentDraft = draftRef.current;
+    const chapter = detail.chapters.find((item) => item.id === currentDraft?.id);
+    if (currentDraft && chapter && currentDraft.volumeId !== chapter.volumeId) { const next = { ...currentDraft, volumeId: chapter.volumeId }; draftRef.current = next; setDraft(next); }
+  }, []);
   const retry = useCallback(async () => { await coordinator.current?.retry(); }, []);
   useEffect(() => api.onCloseRequested(async () => {
     if (composing.current) {
@@ -82,5 +91,5 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
   }), [api]);
   const setComposing = (value: boolean) => { composing.current = value; if (!value) setCloseError(null); };
 
-  return { draft, status, flush, retry, closing, closeError, isClosing: () => closingRef.current, setComposing, updateTitle: (title: string) => update({ title }), updateDocument: (document: WritingDocument) => update({ document }) };
+  return { draft, status, flush, retry, acceptWork, closing, closeError, isClosing: () => closingRef.current, setComposing, updateTitle: (title: string) => update({ title }), updateDocument: (document: WritingDocument) => update({ document }) };
 }
