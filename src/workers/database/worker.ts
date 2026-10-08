@@ -1,8 +1,13 @@
 import { parentPort, workerData } from 'node:worker_threads';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { WorkRepository } from './repository';
+import { ensureLearningWork } from './learning-seed';
 import type { StructureRequest, WritingDocument } from '../../shared/contracts';
 
-const repository = new WorkRepository((workerData as { directory: string }).directory);
+const directory = (workerData as { directory: string }).directory;
+ensureLearningWork(join(directory, 'Projects'), JSON.parse(readFileSync(join(__dirname, 'learning-course.json'), 'utf8')));
+const repository = new WorkRepository(directory);
 parentPort?.on('message', ({ requestId, command, payload }: { requestId: string; command: string; payload: Record<string, unknown> }) => {
   try {
     let data: unknown;

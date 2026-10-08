@@ -23,6 +23,12 @@ it('主进程与实际 Worker 往返保留卷章归属、删除及恢复权限',
   });
   const service = new StoreService(transport);
   try {
+    const initial = await service.execute('listWorks', {}) as { id: string; title: string; chapterCount: number }[];
+    expect(initial).toEqual([expect.objectContaining({ title: '项目全流程开发学习' })]);
+    const learning = await service.execute('openWork', { id: initial[0].id }) as WorkDetail;
+    expect(learning.volumes.length).toBeGreaterThanOrEqual(4);
+    expect(learning.chapters.length).toBeGreaterThanOrEqual(12);
+    expect(JSON.stringify(learning.chapters[0].document)).toContain('学习目标');
     let work = await service.execute('createWork', { title: '链路验收' }) as WorkDetail;
     const change = async (action: StructureAction) => {
       const result = await service.execute('manageStructure', { workId: work.id, expectedRevision: work.revision, operationId: crypto.randomUUID(), action });
@@ -43,7 +49,7 @@ it('主进程与实际 Worker 往返保留卷章归属、删除及恢复权限',
     await change({ type: 'restoreVolume', volumeId });
     expect(work.chapters.find(item => item.id === chapter.id)).toMatchObject({ volumeId, document });
     await change({ type: 'deleteWork' });
-    await expect(service.execute('listWorks', {})).resolves.toEqual([]);
+    await expect(service.execute('listWorks', {})).resolves.toEqual(initial);
     const deleted = await service.execute('listDeletedWorks', {}) as { id: string; revision: number }[];
     expect(deleted[0].id).toBe(work.id);
     await expect(service.execute('openWork', { id: work.id })).rejects.toThrow();

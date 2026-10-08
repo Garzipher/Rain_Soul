@@ -187,12 +187,12 @@ test('同名作品删除和恢复按身份隔离，重启不串稿', async () =>
     await writeChapter(page, '甲作品章', '甲作品独有正文');
     await activate(page.getByRole('button', { name: '返回作品集', exact: true }));
     await expect(page.getByRole('heading', { name: '作品集', exact: true })).toBeVisible();
-    const firstId = await page.evaluate(async () => (await window.rainSoul.listWorks())[0].id);
+    const firstId = await page.evaluate(async () => (await window.rainSoul.listWorks()).find(work => work.title === '同名作品').id);
     await createWork(page, '同名作品');
     await writeChapter(page, '乙作品章', '乙作品独有正文');
     await activate(page.getByRole('button', { name: '返回作品集', exact: true }));
     await expect(page.getByRole('heading', { name: '作品集', exact: true })).toBeVisible();
-    const secondId = await page.evaluate(async first => (await window.rainSoul.listWorks()).find(work => work.id !== first).id, firstId);
+    const secondId = await page.evaluate(async first => (await window.rainSoul.listWorks()).find(work => work.title === '同名作品' && work.id !== first).id, firstId);
     const card = id => page.getByRole('button', { name: '打开作品：同名作品', exact: true }).and(page.locator(`[data-work-id="${id}"]`));
     await contextAction(page, card(firstId), '删除作品');
     let dialog = await deleteConfirmation(page, '删除作品');
@@ -204,7 +204,7 @@ test('同名作品删除和恢复按身份隔离，重启不串稿', async () =>
       await activate(dialog.getByRole('button', { name: '确认删除', exact: true }));
       await expect(page.locator(`[data-work-id="${id}"]`)).toHaveCount(0);
     }
-    await expect(page.getByRole('heading', { name: '还没有作品', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '打开作品：项目全流程开发学习', exact: true })).toBeVisible();
     await expect(page.getByRole('menu')).toHaveCount(0);
     await activate(page.getByRole('button', { name: '设置', exact: true }));
     const deletedCard = id => page.getByRole('group', { name: '已删除作品：同名作品', exact: true }).and(page.locator(`[data-work-id="${id}"]`));
