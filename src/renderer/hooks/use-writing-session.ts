@@ -49,7 +49,7 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
         const updated = {
           ...savedWork,
           revision: result.revision,
-          chapters: savedWork.chapters.map((item) => item.id === snapshot.id ? { id: snapshot.id, title: snapshot.title, document: snapshot.document, wordCount: result.wordCount } : item),
+          chapters: savedWork.chapters.map((item) => item.id === snapshot.id ? { ...item, title: snapshot.title, document: snapshot.document, wordCount: result.wordCount } : item),
         };
         workRef.current = updated;
         onSavedRef.current(updated);

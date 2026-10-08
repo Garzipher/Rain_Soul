@@ -14,7 +14,7 @@ function createAdapter() {
       return [...works.values()].map((work) => ({ id: work.id, title: work.title, wordCount: work.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0), chapterCount: work.chapters.length, updatedAt: new Date().toISOString() }));
     },
     async createWork(title) {
-      const work = { id: crypto.randomUUID(), title, revision: 0, chapters: [{ id: crypto.randomUUID(), title: '第一章', document: emptyDocument(), wordCount: 0 }] };
+      const work: WorkDetail = { id: crypto.randomUUID(), title, revision: 0, volumes: [], deletedItems: [], chapters: [{ id: crypto.randomUUID(), title: '第一章', document: emptyDocument(), wordCount: 0, volumeId: null }] };
       works.set(work.id, work);
       return structuredClone(work);
     },
@@ -26,7 +26,7 @@ function createAdapter() {
     async addChapter(workId, title, expectedRevision) {
       const work = works.get(workId)!;
       if (work.revision !== expectedRevision) throw new Error('作品版本已变化');
-      work.chapters.push({ id: crypto.randomUUID(), title, document: emptyDocument(), wordCount: 0 });
+      work.chapters.push({ id: crypto.randomUUID(), title, document: emptyDocument(), wordCount: 0, volumeId: null });
       work.revision += 1;
       return structuredClone(work);
     },

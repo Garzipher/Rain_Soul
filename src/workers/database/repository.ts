@@ -2,13 +2,13 @@ import Database from 'better-sqlite3';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { Chapter, SaveResult, WorkDetail, WorkSummary, WritingDocument } from '../../shared/contracts';
+import type { Chapter, DeletedItem, SaveResult, Volume, WorkDetail, WorkSummary, WritingDocument } from '../../shared/contracts';
 import { countDocumentWords, emptyDocument, validateDocument } from '../../shared/document';
 import { initializeSchema, RepositoryError } from './schema';
 export { RepositoryError } from './schema';
 
-interface Meta { id: string; title: string; revision: number; updated_at: string }
-interface ChapterRow { id: string; title: string; document_json: string; word_count: number }
+interface Meta { id: string; title: string; revision: number; updated_at: string; deleted_at: string | null }
+interface ChapterRow { id: string; title: string; document_json: string; word_count: number; volume_id: string | null }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const validId = (value: string) => {
   if (typeof value !== 'string' || !uuid.test(value)) throw new RepositoryError('INVALID_INPUT', '标识无效。');
@@ -56,12 +56,23 @@ export class WorkRepository {
     }
     const db = new Database(file, { fileMustExist: true });
     try {
+      const version = db.pragma('user_version', { simple: true });
+      if (version === 1 || version === 2) this.checkMetadata(db, id);
       initializeSchema(db, 'project');
-      if (this.meta(db).id !== id) throw new RepositoryError('INVALID_FILE', '作品标识与目录不一致。');
+      this.checkMetadata(db, id);
     } catch (error) { db.close(); throw error; }
     this.current?.db.close();
     this.current = { id, db };
     return db;
+  }
+
+  private checkMetadata(db: Database.Database, id: string) {
+    let rows: { id: string }[];
+    try { rows = db.prepare('SELECT id FROM work_meta LIMIT 2').all() as { id: string }[]; }
+    catch { throw new RepositoryError('INVALID_FILE', '作品元数据结构缺失。'); }
+    if (rows.length !== 1 || rows[0].id !== id) {
+      throw new RepositoryError('INVALID_FILE', '作品元数据必须唯一且标识与目录一致。');
+    }
   }
 
   private meta(db: Database.Database): Meta {
@@ -73,7 +84,12 @@ export class WorkRepository {
   private updateCatalog(id: string) {
     const db = this.projectDb(id);
     const meta = this.meta(db);
-    const totals = db.prepare('SELECT COALESCE(SUM(word_count), 0) AS words, COUNT(*) AS chapters FROM chapter')
+    if (meta.deleted_at) {
+      this.catalog.prepare('DELETE FROM work_catalog WHERE work_id = ?').run(id);
+      this.pending.delete(id);
+      return;
+    }
+    const totals = db.prepare('SELECT COALESCE(SUM(word_count), 0) AS words, COUNT(*) AS chapters FROM chapter WHERE deleted_at IS NULL')
       .get() as { words: number; chapters: number };
     this.catalog.prepare(`INSERT INTO work_catalog VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(work_id) DO UPDATE SET title=excluded.title, word_count=excluded.word_count,
@@ -114,8 +130,8 @@ export class WorkRepository {
       initializeSchema(db, 'project');
       const project = db;
       project.transaction(() => {
-        project.prepare('INSERT INTO work_meta VALUES (?, ?, 1, ?)').run(id, title, new Date().toISOString());
-        project.prepare('INSERT INTO chapter VALUES (?, ?, ?, 0, 0)')
+        project.prepare('INSERT INTO work_meta (id, title, revision, updated_at) VALUES (?, ?, 1, ?)').run(id, title, new Date().toISOString());
+        project.prepare('INSERT INTO chapter (id, title, document_json, word_count, sort_order) VALUES (?, ?, ?, 0, 0)')
           .run(randomUUID(), '第一章', JSON.stringify(emptyDocument()));
       }).immediate();
       project.close();
@@ -138,19 +154,27 @@ export class WorkRepository {
   openWork(id: string): WorkDetail {
     const db = this.projectDb(id);
     const meta = this.meta(db);
-    const chapters = (db.prepare('SELECT * FROM chapter ORDER BY sort_order').all() as ChapterRow[])
+    if (meta.deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除，可从设置的本机数据恢复。');
+    const chapters = (db.prepare(`SELECT chapter.* FROM chapter LEFT JOIN volume ON chapter.volume_id = volume.id
+      WHERE chapter.deleted_at IS NULL ORDER BY CASE WHEN chapter.volume_id IS NULL THEN 0 ELSE 1 END,
+      volume.sort_order, chapter.sort_order, chapter.id`).all() as ChapterRow[])
       .map((row): Chapter => ({ id: row.id, title: row.title,
-        document: validateDocument(JSON.parse(row.document_json)), wordCount: row.word_count }));
-    return { id: meta.id, title: meta.title, revision: meta.revision, chapters };
+        document: validateDocument(JSON.parse(row.document_json)), wordCount: row.word_count, volumeId: row.volume_id }));
+    const volumes = db.prepare('SELECT id, title FROM volume WHERE deleted_at IS NULL ORDER BY sort_order, id').all() as Volume[];
+    const deletedItems = db.prepare(`SELECT id, title, 'chapter' AS kind, deleted_at AS deletedAt FROM chapter WHERE deleted_at IS NOT NULL
+      UNION ALL SELECT id, title, 'volume' AS kind, deleted_at AS deletedAt FROM volume WHERE deleted_at IS NOT NULL
+      ORDER BY deletedAt DESC, kind, id`).all() as DeletedItem[];
+    return { id: meta.id, title: meta.title, revision: meta.revision, chapters, volumes, deletedItems };
   }
 
   private commit<T>(workId: string, expectedRevision: number, operationId: string,
-    request: unknown[], mutate: (db: Database.Database, revision: number) => T): T {
+    request: unknown[], mutate: (db: Database.Database, revision: number) => T, allowDeleted = false): T {
     validId(operationId);
     if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) {
       throw new RepositoryError('INVALID_INPUT', '版本号无效。');
     }
     const db = this.projectDb(workId);
+    if (!allowDeleted && this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除，可从设置的本机数据恢复。');
     const hash = createHash('sha256').update(JSON.stringify(request)).digest('hex');
     const result = db.transaction(() => {
       const prior = db.prepare('SELECT request_hash, result_json FROM operation_log WHERE operation_id = ?')
@@ -176,7 +200,7 @@ export class WorkRepository {
       const order = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM chapter')
         .get() as { next: number };
       const chapterId = randomUUID();
-      db.prepare('INSERT INTO chapter VALUES (?, ?, ?, 0, ?)')
+      db.prepare('INSERT INTO chapter (id, title, document_json, word_count, sort_order) VALUES (?, ?, ?, 0, ?)')
         .run(chapterId, title, JSON.stringify(emptyDocument()), order.next);
       return { chapterId, revision };
     });
@@ -194,7 +218,7 @@ export class WorkRepository {
     const words = countDocumentWords(document);
     return this.commit(workId, expectedRevision, operationId,
       ['saveChapter', chapterId, title, document, expectedRevision], (db, revision) => {
-        const changed = db.prepare('UPDATE chapter SET title = ?, document_json = ?, word_count = ? WHERE id = ?')
+        const changed = db.prepare('UPDATE chapter SET title = ?, document_json = ?, word_count = ? WHERE id = ? AND deleted_at IS NULL')
           .run(title, JSON.stringify(document), words, chapterId);
         if (!changed.changes) throw new RepositoryError('NOT_FOUND', '章节不属于当前作品。');
         return { revision, wordCount: words };
