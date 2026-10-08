@@ -25,6 +25,8 @@ __pycache__/
 
 # Playwright
 test-results/
+test-results-desktop/
+test-results-desktop-pack/
 playwright-report/
 playwright/.cache/
 
