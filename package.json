@@ -1,19 +1,32 @@
 {
   "name": "soulrain",
   "version": "1.0.0",
-  "description": "",
-  "main": "playwright.config.js",
+  "description": "本地优先的中文写作工作台",
+  "main": "dist/desktop/main.cjs",
   "scripts": {
-    "test": "playwright test --project=chrome-headless",
+    "test": "npm run test:coverage && npm run test:desktop && npm run test:demo",
     "test:headed": "playwright test --project=chrome",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "test:demo": "playwright test --project=chrome-headless",
+    "pretest:unit": "node scripts/build-desktop.mjs",
+    "test:unit": "vitest run --pool=threads --maxWorkers=1",
+    "pretest:coverage": "node scripts/build-desktop.mjs",
+    "test:coverage": "vitest run --coverage --pool=threads --maxWorkers=1",
+    "pretest:desktop": "npm run build",
+    "test:desktop": "playwright test --config playwright.desktop.config.cjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests/unit scripts *.mts",
+    "build": "vite build && node scripts/build-desktop.mjs",
+    "start": "npm run build && electron .",
+    "pack": "npm run build && electron-builder --dir --win --x64 --config.electronDist=node_modules/electron/dist",
+    "verify": "npm run typecheck && npm run lint && npm test"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Garzipher/Rain_Soul.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "RainSoul",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/Garzipher/Rain_Soul/issues"
@@ -56,5 +69,30 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.5"
+  },
+  "build": {
+    "appId": "com.rainsoul.desktop",
+    "productName": "RainSoul",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/prebuilds/*.node"
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
