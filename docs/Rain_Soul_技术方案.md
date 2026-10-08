@@ -16,7 +16,7 @@ P0 必须覆盖写作特点、大纲、知识/分类/引用、伏笔、基础 AI
 | --- | --- | --- |
 | 客户端进程 | 主进程协调权限；渲染进程只管交互；数据库 Worker 单写者 | 隔离阻塞与权限；需维护 IPC 和进程恢复协议 |
 | 编辑器 | Tiptap/ProseMirror，受限结构化文档 | 支持中文输入、事务和原子书签；自定义节点与 ID 插件需验证 |
-| 数据持久化 | `better-sqlite3` 放入 Worker，参数化 SQL 与版本化迁移 | 事务直接、离线简单；原生模块必须匹配 Electron ABI |
+| 数据持久化 | `better-sqlite3` 放入 Worker，参数化 SQL 与版本化迁移 | 事务直接、离线简单；原生模块必须匹配当前 Electron 的 Node-API/ABI 与系统架构 |
 | 作品隔离 | 全局目录库 + 每作品独立 SQLite | 快照/导入/删除互不污染；全局汇总需合并只读结果 |
 | 搜索 | FTS5 trigram + 单字/双字子串兜底 | 支持中文短词；兜底扫描必须实测，不假定达标 |
 | 文件格式 | `.rainsoul` ZIP 归档；受限 OOXML 导入；`docx` 库导出 | 可检查、可往返；解析限制、字体映射和格式样例需覆盖 |
@@ -42,7 +42,7 @@ flowchart LR
 
 主进程负责单实例锁、窗口、文件对话框、活动作品会话、命令校验、密钥和网络请求。数据库 Worker 持有写连接并串行执行命令；渲染进程和文件任务不能直接打开可写数据库。文件 Worker 处理压缩、解析、导出，避免冻结窗口；数据库 Worker 失联后进入失败保护，禁止静默重启并重放写命令。
 
-建议使用 Vite 的 React/TypeScript 构建链与 `electron-builder` Windows NSIS 打包，工程目录如下；这是目标结构，当前仓库仅有 Demo 和测试，创建后才能使用相应命令。
+使用 Vite 的 React/TypeScript 构建链与 `electron-builder` Windows 打包。首批已建立模块化桌面工程，启动与验证命令见根目录 README；下面仍是完整 P0 的目标结构，尚未创建的目录随对应批次实现。
 
 ```text
 src/main/               窗口、IPC、权限、密钥、AI、任务编排
@@ -258,7 +258,9 @@ AI 请求状态：`prepared → awaiting_authorization → sending → streaming
 
 ## 13 Windows 交付、升级与可观测性
 
-Electron、Node、SQLite 原生模块、Tiptap、构建链与文件库固定验证版本，提交 lockfile；不在方案中指定未经验证的“最新”版本。构建以 Windows x64 为目标，原生依赖按 Electron ABI 重建，并在干净机器安装后的程序里执行 SQLite/FTS 自检；开发机 Node 加载成功不代表安装包成功。
+Electron、Node、SQLite 原生模块、Tiptap、构建链与文件库固定验证版本，提交 lockfile；不在方案中指定未经验证的“最新”版本。构建以 Windows x64 为目标，按驱动实际使用的 Node-API/ABI 选择预编译文件或重建，并在干净机器安装后的程序里执行 SQLite/FTS 自检；开发机 Node 加载成功不代表安装包成功。
+
+首批锁定 `Electron 44.7.0`、`better-sqlite3 13.0.3`、`Tiptap 3.31.4`。该驱动使用 Node-API 10 的随包预编译文件；已在本机 Electron 的 Node 24.21.0 / N-API 10 下确认加载 SQLite 3.53.4，FTS5 编译选项可用，因此本组合不套用旧驱动的强制 ABI 重建流程。目录包仍需从真实程序入口验证预编译文件收集和 Worker 建库。FTS5 可加载不表示中文搜索性能、备份恢复或完整 SP-02 已通过。后续升级任一版本重新验证。
 
 NSIS 使用普通用户安装，默认保留 `%LOCALAPPDATA%\RainSoul`；删除数据只允许作者明确选择。安装/原位升级/卸载在 Windows 10 与 11 x64 记录具体系统构建、路径含中文/空格、权限、第二次启动聚焦及杀毒提示。发布签名证书、分发渠道和具体最低系统构建由资源决策确定，不擅自加入自动在线升级。
 
