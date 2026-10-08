@@ -2,9 +2,11 @@ import Database from 'better-sqlite3';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import type { Chapter, DeletedItem, SaveResult, Volume, WorkDetail, WorkSummary, WritingDocument } from '../../shared/contracts';
+import type { Chapter, DeletedItem, DeletedWork, SaveResult, StructureRequest, Volume, WorkDetail, WorkSummary, WritingDocument } from '../../shared/contracts';
 import { countDocumentWords, emptyDocument, validateDocument } from '../../shared/document';
+import { structureRequestSchema } from '../../shared/structure-schema';
 import { initializeSchema, RepositoryError } from './schema';
+import { applyStructure, assertVolume, nextChapterOrder } from './structure';
 export { RepositoryError } from './schema';
 
 interface Meta { id: string; title: string; revision: number; updated_at: string; deleted_at: string | null }
@@ -118,6 +120,21 @@ export class WorkRepository {
       ORDER BY updated_at DESC, work_id`).all() as WorkSummary[];
   }
 
+  listDeletedWorks(): DeletedWork[] {
+    this.assertOpen();
+    const deleted: DeletedWork[] = [];
+    for (const entry of readdirSync(this.projects, { withFileTypes: true })) {
+      if (!entry.isDirectory() || !uuid.test(entry.name) || !existsSync(join(this.projects, entry.name, 'project.sqlite'))) continue;
+      const db = this.projectDb(entry.name);
+      const meta = this.meta(db);
+      if (!meta.deleted_at) continue;
+      const totals = db.prepare('SELECT COALESCE(SUM(word_count), 0) AS wordCount, COUNT(*) AS chapterCount FROM chapter WHERE deleted_at IS NULL')
+        .get() as { wordCount: number; chapterCount: number };
+      deleted.push({ id: meta.id, title: meta.title, revision: meta.revision, updatedAt: meta.updated_at, ...totals });
+    }
+    return deleted.sort((first, second) => second.updatedAt.localeCompare(first.updatedAt) || first.id.localeCompare(second.id));
+  }
+
   createWork(title: string): WorkDetail {
     this.assertOpen();
     title = validTitle(title);
@@ -194,14 +211,24 @@ export class WorkRepository {
     return result;
   }
 
-  addChapter(workId: string, title: string, expectedRevision: number, operationId: string): WorkDetail {
+  manageStructure(value: StructureRequest): WorkDetail | null {
+    const parsed = structureRequestSchema.safeParse(value);
+    if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '卷章操作参数无效。');
+    const { workId, expectedRevision, operationId, action } = parsed.data;
+    this.commit(workId, expectedRevision, operationId, ['structure', action, expectedRevision],
+      (db, revision) => applyStructure(db, action, revision), true);
+    return this.meta(this.projectDb(workId)).deleted_at ? null : this.openWork(workId);
+  }
+
+  addChapter(workId: string, title: string, expectedRevision: number, operationId: string, volumeId: string | null = null): WorkDetail {
     title = validTitle(title);
-    this.commit(workId, expectedRevision, operationId, ['addChapter', title, expectedRevision], (db, revision) => {
-      const order = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM chapter')
-        .get() as { next: number };
+    if (volumeId !== null) validId(volumeId);
+    const request = volumeId === null ? ['addChapter', title, expectedRevision] : ['addChapter', title, expectedRevision, volumeId];
+    this.commit(workId, expectedRevision, operationId, request, (db, revision) => {
+      assertVolume(db, volumeId);
       const chapterId = randomUUID();
-      db.prepare('INSERT INTO chapter (id, title, document_json, word_count, sort_order) VALUES (?, ?, ?, 0, ?)')
-        .run(chapterId, title, JSON.stringify(emptyDocument()), order.next);
+      db.prepare('INSERT INTO chapter (id, title, document_json, word_count, sort_order, volume_id) VALUES (?, ?, ?, 0, ?, ?)')
+        .run(chapterId, title, JSON.stringify(emptyDocument()), nextChapterOrder(db, volumeId), volumeId);
       return { chapterId, revision };
     });
     return this.openWork(workId);
