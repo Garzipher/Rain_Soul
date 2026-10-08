@@ -167,6 +167,19 @@
     .architecture-inline button { flex: none; white-space: nowrap; }
     .architecture-field textarea { min-height: 102px; resize: vertical; line-height: 1.6; }
     .architecture-links, .evidence-list { display: grid; gap: 7px; }
+    .association-trigger { width: 100%; min-height: 41px; display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: var(--ink); text-align: left; font: inherit; font-size: 12px; }
+    .association-trigger:hover, .association-trigger[aria-expanded="true"] { border-color: #92bde3; background: #fbfdff; }
+    .association-trigger small { margin-left: auto; color: var(--muted); font-size: 11px; }
+    .association-trigger svg { width: 15px; height: 15px; flex: none; margin-left: auto; }
+    .association-trigger small:not(:empty) + svg { margin-left: 0; }
+    .association-options { position: fixed; z-index: 15; overflow-y: auto; overscroll-behavior: contain; padding: 5px; border: 1px solid #d2dfe9; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px rgb(33 55 78 / 12%); }
+    .architecture-field .association-option { display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 9px; border-radius: 5px; color: var(--ink); font-weight: 400; cursor: pointer; }
+    .association-option:hover, .association-option:focus-within { background: #f2f8fd; }
+    .association-option:has(input:checked) { background: var(--accent-soft); }
+    .association-option > span { min-width: 0; flex: 1; overflow-wrap: anywhere; line-height: 1.6; }
+    .association-option small { display: block; color: var(--muted); font-size: 11px; }
+    .architecture-field .association-option input { width: 16px; height: 16px; flex: none; margin: 0; padding: 0; accent-color: var(--accent); }
+    .association-options .architecture-empty { padding: 16px 10px; }
     .architecture-link, .evidence-row { min-width: 0; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; color: #4d5b69; background: #fff; font-size: 12px; }
     .architecture-link span, .evidence-row span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
     .architecture-link button, .evidence-row button { flex: none; padding: 5px 7px; border: 0; border-radius: 5px; background: #f2f7fc; color: #3279aa; font-size: 11px; }
@@ -480,7 +493,16 @@
         </div>
         <div class="architecture-panel" id="plot-panel" role="tabpanel" aria-labelledby="work-tab-plot" hidden>
           <aside class="architecture-nav"><div class="architecture-nav-head"><strong>剧情节点</strong><div class="architecture-add"><select id="outline-add-kind" aria-label="新增节点类型"><option value="volume">卷</option><option value="chapter">章</option><option value="detail">详细节点</option></select><button type="button" class="icon-btn" id="outline-add" title="添加剧情节点" aria-label="添加剧情节点"><i data-lucide="plus"></i></button></div></div><div class="architecture-list" id="outline-list"></div></aside>
-          <div class="architecture-main"><div class="architecture-inner"><div class="architecture-title-row"><h2 id="outline-selected-type">剧情节点</h2><button type="button" class="icon-btn" id="outline-move-up" title="上移节点" aria-label="上移节点"><i data-lucide="arrow-up"></i></button><button type="button" class="icon-btn" id="outline-move-down" title="下移节点" aria-label="下移节点"><i data-lucide="arrow-down"></i></button><button type="button" class="icon-btn" id="outline-delete" title="删除节点" aria-label="删除节点"><i data-lucide="trash-2"></i></button></div><div class="architecture-empty" id="outline-empty">暂无剧情节点</div><div class="architecture-form" id="outline-fields" hidden><div class="architecture-field"><label for="outline-title">节点名称</label><input id="outline-title" maxlength="100"></div><div class="architecture-field"><label for="outline-summary">剧情内容</label><textarea id="outline-summary" maxlength="3000"></textarea></div><div class="architecture-field"><label for="outline-chapter">关联正文章节</label><div class="architecture-inline"><select id="outline-chapter"></select><button type="button" class="secondary" id="outline-open-chapter">定位章节</button></div></div><div class="architecture-field"><label for="outline-knowledge-link">关联知识</label><select id="outline-knowledge-link"></select><div class="architecture-links" id="outline-knowledge-links"></div></div><div class="architecture-field"><label for="outline-foreshadow-link">关联伏笔</label><select id="outline-foreshadow-link"></select><div class="architecture-links" id="outline-foreshadow-links"></div></div></div></div></div>
+          <div class="architecture-main"><div class="architecture-inner"><div class="architecture-title-row"><h2 id="outline-selected-type">剧情节点</h2><button type="button" class="icon-btn" id="outline-move-up" title="上移节点" aria-label="上移节点"><i data-lucide="arrow-up"></i></button><button type="button" class="icon-btn" id="outline-move-down" title="下移节点" aria-label="下移节点"><i data-lucide="arrow-down"></i></button><button type="button" class="icon-btn" id="outline-delete" title="删除节点" aria-label="删除节点"><i data-lucide="trash-2"></i></button></div><div class="architecture-empty" id="outline-empty">暂无剧情节点</div><div class="architecture-form" id="outline-fields" hidden><div class="architecture-field"><label for="outline-title">节点名称</label><input id="outline-title" maxlength="100"></div><div class="architecture-field"><label for="outline-summary">剧情内容</label><textarea id="outline-summary" maxlength="3000"></textarea></div><div class="architecture-field"><label for="outline-chapter">关联正文章节</label><div class="architecture-inline"><select id="outline-chapter"></select><button type="button" class="secondary" id="outline-open-chapter">定位章节</button></div></div>
+            <div class="architecture-field"><strong>关联知识</strong><div class="association-picker">
+              <button type="button" class="association-trigger" id="outline-knowledge-link" aria-label="关联知识条目" aria-expanded="false" aria-controls="outline-knowledge-options" aria-haspopup="dialog"><span>关联知识条目</span><small></small><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+              <div class="association-options" id="outline-knowledge-options" role="dialog" aria-label="选择关联知识" hidden></div>
+            </div><div class="architecture-links" id="outline-knowledge-links" role="group" aria-label="已关联知识"></div></div>
+            <div class="architecture-field"><strong>关联伏笔</strong><div class="association-picker">
+              <button type="button" class="association-trigger" id="outline-foreshadow-link" aria-label="关联伏笔" aria-expanded="false" aria-controls="outline-foreshadow-options" aria-haspopup="dialog"><span>关联伏笔</span><small></small><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+              <div class="association-options" id="outline-foreshadow-options" role="dialog" aria-label="选择关联伏笔" hidden></div>
+            </div><div class="architecture-links" id="outline-foreshadow-links" role="group" aria-label="已关联伏笔"></div></div>
+          </div></div></div>
         </div>
         <div class="architecture-panel" id="foreshadow-panel" role="tabpanel" aria-labelledby="work-tab-foreshadow" hidden>
           <aside class="architecture-nav"><div class="architecture-nav-head"><strong>伏笔</strong><div class="architecture-add"><input id="foreshadow-add-name" maxlength="100" placeholder="伏笔名称" aria-label="伏笔名称"><button type="button" class="icon-btn" id="foreshadow-add" title="添加伏笔" aria-label="添加伏笔"><i data-lucide="plus"></i></button></div></div><div class="architecture-list" id="foreshadow-list"></div></aside>
@@ -592,6 +614,7 @@
     const viewMeta = { shelf: ['RainSoul', '作品集'], editor: ['正在写作', () => state.work], knowledge: ['RainSoul', '知识库'], splitter: ['知识库', '拆书工具'], conversation: ['RainSoul', '需求会话'], settings: ['RainSoul', '设置'] };
     function show(view) {
       if (state.failed && view !== 'editor') { showToast('保存失败，请重试保存后再离开。'); return; }
+      closeAssociationPickers();
       if (state.view === 'editor' && view !== 'editor') flushPendingSave();
       state.view = view;
       document.querySelectorAll('.view').forEach((element) => element.classList.toggle('active', element.id === `${view}-view`));
@@ -629,6 +652,7 @@
     function refreshInlineBookmarks() { $('editor').querySelectorAll('[data-foreshadow-id]').forEach((marker) => { const item = findForeshadow(marker.dataset.foreshadowId); marker.textContent = item ? `[伏笔：${item.name || '未命名伏笔'}]` : '[伏笔：已删除]'; }); }
     function switchWorkTab(tab) {
       if (state.failed && tab !== 'writing') { showToast('保存失败，请重试保存后再切换。'); return; }
+      closeAssociationPickers();
       if (state.view === 'editor' && state.workTab === 'writing' && tab !== 'writing') flushPendingSave();
       state.workTab = tab;
       document.querySelectorAll('[data-work-tab]').forEach((button) => { const active = button.dataset.workTab === tab; button.classList.toggle('active', active); button.setAttribute('aria-selected', String(active)); button.tabIndex = active ? 0 : -1; });
@@ -644,7 +668,62 @@
       const remove = document.createElement('button'); remove.type = 'button'; remove.dataset[removeKey] = openId; remove.setAttribute('aria-label', `取消关联${label}`); remove.textContent = '移除';
       row.append(name, open, remove); return row;
     }
+    function closeAssociationPickers(restoreFocus = false) {
+      let openTrigger = null;
+      document.querySelectorAll('.association-trigger').forEach((trigger) => {
+        if (trigger.getAttribute('aria-expanded') === 'true') openTrigger = trigger;
+        trigger.setAttribute('aria-expanded', 'false'); $(trigger.getAttribute('aria-controls')).hidden = true;
+      });
+      if (restoreFocus) openTrigger?.focus();
+      return !!openTrigger;
+    }
+    function positionAssociationPicker(trigger) {
+      const panel = $(trigger.getAttribute('aria-controls')); const rect = trigger.getBoundingClientRect();
+      const scrollRect = trigger.closest('.architecture-main').getBoundingClientRect();
+      if (!trigger.getClientRects().length || rect.bottom <= Math.max(0, scrollRect.top) || rect.top >= Math.min(window.innerHeight, scrollRect.bottom)) { closeAssociationPickers(); return; }
+      const below = window.innerHeight - rect.bottom - 12; const above = rect.top - 12;
+      const opensAbove = below < 210 && above > below;
+      panel.style.width = `${Math.min(rect.width, window.innerWidth - 16)}px`;
+      panel.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8))}px`;
+      panel.style.maxHeight = `${Math.max(42, Math.min(256, opensAbove ? above : below))}px`;
+      const top = opensAbove ? rect.top - panel.offsetHeight - 6 : rect.bottom + 6;
+      panel.style.top = `${Math.max(8, Math.min(top, window.innerHeight - panel.offsetHeight - 8))}px`;
+    }
+    function openAssociationPicker(trigger, focusOptions = false) {
+      const wasOpen = trigger.getAttribute('aria-expanded') === 'true'; closeAssociationPickers();
+      if (wasOpen && !focusOptions) return;
+      trigger.setAttribute('aria-expanded', 'true'); const panel = $(trigger.getAttribute('aria-controls'));
+      panel.hidden = false; positionAssociationPicker(trigger);
+      if (focusOptions) panel.querySelector('input')?.focus();
+    }
+    function renderAssociationPicker(kind, options) {
+      const panel = $(`outline-${kind}-options`); panel.replaceChildren();
+      for (const option of options) {
+        const row = document.createElement('label'); row.className = 'association-option';
+        const text = document.createElement('span'); text.textContent = option.label;
+        if (option.note) { const note = document.createElement('small'); note.textContent = option.note; text.append(note); }
+        const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = option.id; checkbox.checked = option.checked;
+        row.append(text, checkbox); panel.append(row);
+      }
+      if (!options.length) { const empty = document.createElement('div'); empty.className = 'architecture-empty'; empty.textContent = kind === 'knowledge' ? '暂无可关联的知识条目' : '暂无可关联的伏笔'; panel.append(empty); }
+    }
+    function refreshOutlineAssociations() {
+      const node = findOutline(state.outlineId); if (!node) return;
+      const knowledge = Array.from(document.querySelectorAll('.knowledge-entry')).filter((entry) => entry.dataset.ownerWork === state.work);
+      const foreshadows = workArchitecture().foreshadows.filter((item) => item.outlineId === node.id);
+      $('outline-knowledge-links').replaceChildren(...node.knowledgeIds.map((id) => { const entry = knowledge.find((item) => item.dataset.entry === id); return entry ? architectureLinkRow(entry.querySelector('.entry-summary').textContent.slice(0, 45), 'openKnowledge', id, 'removeKnowledge') : null; }).filter(Boolean));
+      $('outline-foreshadow-links').replaceChildren(...foreshadows.map((item) => architectureLinkRow(item.name, 'openForeshadow', item.id, 'removeForeshadow')));
+      $('outline-knowledge-options').querySelectorAll('input').forEach((checkbox) => { checkbox.checked = node.knowledgeIds.includes(checkbox.value); });
+      $('outline-foreshadow-options').querySelectorAll('input').forEach((checkbox) => {
+        const item = findForeshadow(checkbox.value); checkbox.checked = item?.outlineId === node.id;
+        const note = checkbox.previousElementSibling.querySelector('small'); const owner = findOutline(item?.outlineId);
+        note.textContent = owner && owner.id !== node.id ? `当前关联：${owner.title}；勾选后移到本节点` : '';
+      });
+      $('outline-knowledge-link').querySelector('small').textContent = node.knowledgeIds.length ? `已选 ${node.knowledgeIds.length}` : '';
+      $('outline-foreshadow-link').querySelector('small').textContent = foreshadows.length ? `已选 ${foreshadows.length}` : '';
+    }
     function renderOutline() {
+      closeAssociationPickers();
       const data = workArchitecture(); const nodes = data.outlines;
       const selected = findOutline(state.outlineId) || nodes[0]; state.outlineId = selected?.id || '';
       const list = $('outline-list'); list.replaceChildren();
@@ -667,10 +746,9 @@
       fillSelect($('outline-chapter'), [['不关联章节', ''], ...chapterNames().map((name) => [name, name])], selected.chapterId);
       $('outline-open-chapter').disabled = !selected.chapterId;
       const knowledge = Array.from(document.querySelectorAll('.knowledge-entry')).filter((entry) => entry.dataset.ownerWork === state.work);
-      fillSelect($('outline-knowledge-link'), [['关联知识条目', ''], ...knowledge.filter((entry) => !selected.knowledgeIds.includes(entry.dataset.entry)).map((entry) => [entry.querySelector('.entry-summary').textContent.slice(0, 28), entry.dataset.entry])]);
-      $('outline-knowledge-links').replaceChildren(...selected.knowledgeIds.map((id) => { const entry = knowledge.find((item) => item.dataset.entry === id); return entry ? architectureLinkRow(entry.querySelector('.entry-summary').textContent.slice(0, 45), 'openKnowledge', id, 'removeKnowledge') : null; }).filter(Boolean));
-      fillSelect($('outline-foreshadow-link'), [['关联伏笔', ''], ...data.foreshadows.filter((item) => item.outlineId !== selected.id).map((item) => [item.name, item.id])]);
-      $('outline-foreshadow-links').replaceChildren(...data.foreshadows.filter((item) => item.outlineId === selected.id).map((item) => architectureLinkRow(item.name, 'openForeshadow', item.id, 'removeForeshadow')));
+      renderAssociationPicker('knowledge', knowledge.map((entry) => ({ label: entry.querySelector('.entry-summary').textContent.slice(0, 45), id: entry.dataset.entry, checked: selected.knowledgeIds.includes(entry.dataset.entry) })));
+      renderAssociationPicker('foreshadow', data.foreshadows.map((item) => ({ label: item.name, id: item.id, checked: item.outlineId === selected.id, note: ' ' })));
+      refreshOutlineAssociations();
     }
     function addOutline() {
       const data = workArchitecture(); const type = $('outline-add-kind').value; const selected = findOutline(state.outlineId);
@@ -864,6 +942,7 @@
       state.openedBookmark = null; saveVisual(); renderCount(); renderForeshadow(); $('foreshadow-name').focus(); showToast('已移除此处书签。');
     }
     function openModal(id, focusTarget) {
+      closeAssociationPickers();
       state.modalReturn = document.activeElement;
       $(id).classList.add('show');
       const target = typeof focusTarget === 'string' ? $(focusTarget) : focusTarget;
@@ -1194,7 +1273,7 @@
     $('books').addEventListener('click', (event) => { const card = event.target.closest('.book[data-work]'); if (card) openWork(card.dataset.work); });
     $('chapter-tree').addEventListener('click', (event) => { const item = event.target.closest('.tree-item'); if (!item || state.failed) return; if (item.dataset.volume) { const collapsed = item.classList.toggle('collapsed'); document.querySelectorAll(`[data-parent="${item.dataset.volume}"]`).forEach((child) => { child.hidden = collapsed; }); } else activateChapter(item); });
     document.addEventListener('contextmenu', (event) => { const target = event.target.closest('.book[data-work], [data-volume], [data-chapter]'); if (!target || state.failed) return; event.preventDefault(); openContextMenu(target, event); });
-    document.addEventListener('click', (event) => { if (!event.target.closest('#context-menu')) closeContextMenu(); });
+    document.addEventListener('click', (event) => { if (!event.target.closest('#context-menu')) closeContextMenu(); if (!event.target.closest('.association-picker')) closeAssociationPickers(); });
     document.addEventListener('keydown', (event) => {
       const modal = document.querySelector('.dialog-backdrop.show');
       if (modal) {
@@ -1215,7 +1294,7 @@
         }
         return;
       }
-      if (event.key === 'Escape') { closeContextMenu(true); return; }
+      if (event.key === 'Escape') { if (closeAssociationPickers(true)) event.preventDefault(); closeContextMenu(true); return; }
       if ((event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) && !state.failed) {
         const target = event.target.closest?.('.book[data-work], [data-volume], [data-chapter]');
         if (target) { event.preventDefault(); const rect = target.getBoundingClientRect(); openContextMenu(target, { clientX: rect.left, clientY: rect.bottom }); }
@@ -1244,13 +1323,37 @@
     $('outline-summary').addEventListener('input', () => { const node = findOutline(state.outlineId); if (node) { node.summary = $('outline-summary').value; saveVisual(); } });
     $('outline-chapter').addEventListener('change', () => { const node = findOutline(state.outlineId); if (node) { node.chapterId = $('outline-chapter').value; $('outline-open-chapter').disabled = !node.chapterId; saveVisual(); } });
     $('outline-open-chapter').addEventListener('click', () => { const node = findOutline(state.outlineId); if (node?.chapterId) locateChapter(node.chapterId); });
-    $('outline-knowledge-link').addEventListener('change', () => { const node = findOutline(state.outlineId); const id = $('outline-knowledge-link').value; if (node && id && !node.knowledgeIds.includes(id)) { node.knowledgeIds.push(id); renderOutline(); saveVisual(); } });
-    $('outline-foreshadow-link').addEventListener('change', () => { const item = findForeshadow($('outline-foreshadow-link').value); if (item) { item.outlineId = state.outlineId; renderOutline(); saveVisual(); } });
+    document.querySelectorAll('.association-picker').forEach((picker) => {
+      const trigger = picker.querySelector('button'); const panel = picker.querySelector('.association-options');
+      trigger.addEventListener('click', () => openAssociationPicker(trigger));
+      picker.addEventListener('keydown', (event) => {
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        if (event.target === trigger) { openAssociationPicker(trigger, true); return; }
+        const options = Array.from(panel.querySelectorAll('input')); const current = options.indexOf(document.activeElement);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : (current + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+        options[next]?.focus();
+      });
+      picker.addEventListener('focusout', (event) => { if (!picker.contains(event.relatedTarget)) { trigger.setAttribute('aria-expanded', 'false'); panel.hidden = true; } });
+      panel.addEventListener('change', (event) => {
+        const checkbox = event.target; const node = findOutline(state.outlineId); if (!node || checkbox.type !== 'checkbox') return;
+        if (panel.id === 'outline-knowledge-options') {
+          node.knowledgeIds = node.knowledgeIds.filter((id) => id !== checkbox.value);
+          if (checkbox.checked) node.knowledgeIds.push(checkbox.value);
+        } else {
+          const item = findForeshadow(checkbox.value); if (!item) return;
+          item.outlineId = checkbox.checked ? node.id : '';
+        }
+        refreshOutlineAssociations(); saveVisual();
+      });
+    });
+    const repositionAssociations = () => document.querySelectorAll('.association-trigger[aria-expanded="true"]').forEach(positionAssociationPicker);
+    window.addEventListener('resize', repositionAssociations); document.addEventListener('scroll', repositionAssociations, true);
     $('outline-fields').addEventListener('click', (event) => {
       const target = event.target.closest('[data-open-knowledge], [data-remove-knowledge], [data-open-foreshadow], [data-remove-foreshadow]'); if (!target) return;
       const node = findOutline(state.outlineId); if (!node) return;
-      if (target.dataset.removeKnowledge) { node.knowledgeIds = node.knowledgeIds.filter((id) => id !== target.dataset.removeKnowledge); renderOutline(); saveVisual(); }
-      if (target.dataset.removeForeshadow) { const item = findForeshadow(target.dataset.removeForeshadow); if (item) item.outlineId = ''; renderOutline(); saveVisual(); }
+      if (target.dataset.removeKnowledge) { node.knowledgeIds = node.knowledgeIds.filter((id) => id !== target.dataset.removeKnowledge); refreshOutlineAssociations(); saveVisual(); }
+      if (target.dataset.removeForeshadow) { const item = findForeshadow(target.dataset.removeForeshadow); if (item) item.outlineId = ''; refreshOutlineAssociations(); saveVisual(); }
       if (target.dataset.openForeshadow) { state.foreshadowId = target.dataset.openForeshadow; switchWorkTab('foreshadow'); $('foreshadow-name').focus(); }
       if (target.dataset.openKnowledge) {
         const entry = Array.from(document.querySelectorAll('.knowledge-entry')).find((item) => item.dataset.entry === target.dataset.openKnowledge);
