@@ -229,4 +229,22 @@ describe('作品与卷章结构管理', () => {
     fireEvent.click(await screen.findByRole('button', { name: '恢复作品：雨落之后' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: '恢复作品：雨落之后' })).toBeNull());
   });
+
+  it('删除分卷影响清单立即采用未保存的当前章节标题', async () => {
+    const adapter = createAdapter();
+    render(<App api={adapter.api} />);
+    await createWork();
+    await createVolume('受影响的卷');
+    fireEvent.click(screen.getByRole('button', { name: '添加章节' }));
+    await waitFor(() => expect((screen.getByRole('textbox', { name: '章节标题' }) as HTMLInputElement).value).toBe('第2章'));
+    adapter.failSave(true);
+    fireEvent.change(screen.getByRole('textbox', { name: '章节标题' }), { target: { value: '第二份原稿' } });
+    await chooseMenu(screen.getByRole('button', { name: '收起分卷：受影响的卷' }), '删除分卷');
+    const dialog = screen.getByRole('dialog', { name: '删除卷及章节' });
+    expect(dialog.textContent).toContain('第二份原稿');
+    expect(dialog.textContent).not.toContain('第2章');
+    expect(adapter.works.values().next().value!.chapters.find((chapter) => chapter.volumeId !== null)!.title).toBe('第2章');
+    fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
+    expect((screen.getByRole('textbox', { name: '章节标题' }) as HTMLInputElement).value).toBe('第二份原稿');
+  });
 });

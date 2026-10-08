@@ -138,7 +138,7 @@ export default function App({ api }: AppProps) {
     if (!request) return;
     void guarded(async () => { if (request.kind === 'structure') await applyStructure(request.request, pendingPage.current); else await applyAdd(request); }, true);
   }
-  const structure = useStructureMenu(work, manage, addChapter, locked);
+  const structure = useStructureMenu(work, session.draft, manage, addChapter, locked);
   function retrySave() {
     if (operationInProgress.current || session.isClosing()) return;
     operationInProgress.current = true;

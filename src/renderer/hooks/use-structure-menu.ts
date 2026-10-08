@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
-import type { StructureAction, WorkDetail } from '../../shared/contracts';
+import type { Chapter, StructureAction, WorkDetail } from '../../shared/contracts';
 import type { MenuEvent, StructureTarget } from '../components/chapter-tree';
 import type { MenuItem, MenuState } from '../components/context-menu';
 import type { StructureDialogState } from '../components/structure-dialog';
 
-export function useStructureMenu(work: WorkDetail | null, onManage: (workId: string, action: StructureAction) => Promise<boolean>, onAddChapter: (volumeId?: string | null) => void, blocked: boolean) {
+export function useStructureMenu(work: WorkDetail | null, draft: Chapter | null, onManage: (workId: string, action: StructureAction) => Promise<boolean>, onAddChapter: (volumeId?: string | null) => void, blocked: boolean) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [dialog, setDialog] = useState<StructureDialogState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -15,7 +15,9 @@ export function useStructureMenu(work: WorkDetail | null, onManage: (workId: str
   }
   function remove(target: StructureTarget) {
     const chapters = target.kind === 'volume' ? work?.chapters.filter((chapter) => chapter.volumeId === target.id) ?? [] : [];
-    const range = target.kind === 'work' ? '整部作品及其卷、章节和正文' : target.kind === 'volume' ? `本卷及其 ${chapters.length} 个章节${chapters.length ? `（${chapters.map((chapter) => chapter.title).join('、')}）` : ''}` : '本章及其正文';
+    // 删除预览采用作者当前可见草稿；实际删除仍须先保存成功。
+    const chapterNames = chapters.map((chapter) => chapter.id === draft?.id ? draft.title.trim() || '未命名章节' : chapter.title);
+    const range = target.kind === 'work' ? '整部作品及其卷、章节和正文' : target.kind === 'volume' ? `本卷及其 ${chapters.length} 个章节${chapters.length ? `（${chapterNames.join('、')}）` : ''}` : '本章及其正文';
     const heading = { work: '删除作品', volume: '删除卷及章节', chapter: '删除章节' }[target.kind];
     const action: StructureAction = target.kind === 'work' ? { type: 'deleteWork' } : target.kind === 'volume' ? { type: 'deleteVolume', volumeId: target.id } : { type: 'deleteChapter', chapterId: target.id };
     setDialog({ heading, description: `将删除“${target.title}”的${range}。数据仍保留在本机，可在设置中恢复。`, submitLabel: '确认删除', onSubmit: () => onManage(target.kind === 'work' ? target.id : work!.id, action) });
