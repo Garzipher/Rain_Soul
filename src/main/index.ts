@@ -29,7 +29,7 @@ else {
       return net.fetch(pathToFileURL(file).toString());
     });
     window = new BrowserWindow({
-      title: 'RainSoul', width: 1280, height: 840, minWidth: 720, minHeight: 540,
+      title: 'RainSoul', icon: join(__dirname, 'rainsoul.png'), width: 1280, height: 840, minWidth: 720, minHeight: 540,
       show: !testDirectory, backgroundColor: '#ffffff', autoHideMenuBar: true,
       webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true },
     });

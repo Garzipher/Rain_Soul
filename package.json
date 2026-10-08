@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests/unit scripts *.mts",
     "build": "vite build && node scripts/build-desktop.mjs",
+    "generate:icon": "node scripts/generate-app-icon.mjs",
     "start": "npm run build && electron .",
     "pack": "npm run build && node scripts/pack-desktop.mjs",
     "verify": "npm run typecheck && npm run lint && npm test"
@@ -86,7 +87,8 @@
     ],
     "npmRebuild": false,
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/rainsoul.ico"
     },
     "nsis": {
       "oneClick": false,

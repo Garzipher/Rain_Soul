@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 33 33">
+  <!-- 来自 Demo 的 27px 圆角方框、2px 描边、6px 圆点与 -9° 旋转；外留透明边界避免裁切。 -->
+  <g transform="rotate(-9 13.5 13.5)">
+    <rect x="1" y="1" width="25" height="25" rx="6" fill="#eff8ff" stroke="#5aa9f6" stroke-width="2" />
+    <circle cx="13.5" cy="13.5" r="3" fill="#5aa9f6" />
+  </g>
+</svg>
