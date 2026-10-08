@@ -18,7 +18,7 @@
     "lint": "eslint src tests/unit scripts *.mts",
     "build": "vite build && node scripts/build-desktop.mjs",
     "start": "npm run build && electron .",
-    "pack": "npm run build && electron-builder --dir --win --x64 --config.electronDist=node_modules/electron/dist",
+    "pack": "npm run build && node scripts/pack-desktop.mjs",
     "verify": "npm run typecheck && npm run lint && npm test"
   },
   "repository": {
