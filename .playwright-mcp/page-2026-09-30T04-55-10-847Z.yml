@@ -1,0 +1,94 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - generic [ref=f3e3]:
+      - strong [ref=f3e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=f3e5]:
+      - button "作品集" [ref=f3e6] [cursor=pointer]
+      - button "写作页" [ref=f3e7] [cursor=pointer]
+      - button "知识库" [active] [ref=f3e8] [cursor=pointer]
+      - button "需求会话" [ref=f3e9] [cursor=pointer]
+      - button "设置" [ref=f3e10] [cursor=pointer]
+      - button "保存失败态" [ref=f3e11] [cursor=pointer]
+  - generic [ref=f3e12]:
+    - complementary [ref=f3e13]:
+      - button "展开侧栏" [ref=f3e15] [cursor=pointer]
+      - navigation "主导航" [ref=f3e20]:
+        - button "作品集" [ref=f3e21] [cursor=pointer]
+        - button "知识库" [ref=f3e25] [cursor=pointer]
+        - button "需求会话" [ref=f3e28] [cursor=pointer]
+      - button "设置" [ref=f3e33] [cursor=pointer]
+    - main [ref=f3e37]:
+      - generic [ref=f3e39]:
+        - paragraph [ref=f3e40]: RainSoul
+        - heading "知识库" [level=1] [ref=f3e77]
+      - region "知识库" [ref=f3e78]:
+        - generic [ref=f3e79]:
+          - generic [ref=f3e80]:
+            - generic [ref=f3e81]:
+              - heading "知识库" [level=2] [ref=f3e82]
+              - paragraph [ref=f3e83]: 按分类、标签和来源整理作品素材。
+            - generic [ref=f3e84]:
+              - button "拆书工具" [ref=f3e85] [cursor=pointer]
+              - button "新增知识" [ref=f3e92] [cursor=pointer]
+          - generic [ref=f3e94]:
+            - complementary [ref=f3e95]:
+              - generic [ref=f3e96]:
+                - strong [ref=f3e97]: 分类
+                - button "在设置中维护分类" [ref=f3e98] [cursor=pointer]
+              - generic [ref=f3e102]:
+                - button "全部知识 8" [ref=f3e103] [cursor=pointer]:
+                  - text: 全部知识
+                  - generic [ref=f3e104]: "8"
+                - button "人物描写 2" [ref=f3e105] [cursor=pointer]:
+                  - text: 人物描写
+                  - generic [ref=f3e106]: "2"
+                - button "景物描写 2" [ref=f3e107] [cursor=pointer]:
+                  - text: 景物描写
+                  - generic [ref=f3e108]: "2"
+                - button "内心描写 1" [ref=f3e109] [cursor=pointer]:
+                  - text: 内心描写
+                  - generic [ref=f3e110]: "1"
+                - button "经典引用 1" [ref=f3e111] [cursor=pointer]:
+                  - text: 经典引用
+                  - generic [ref=f3e112]: "1"
+                - button "剧情与伏笔 2" [ref=f3e113] [cursor=pointer]:
+                  - text: 剧情与伏笔
+                  - generic [ref=f3e114]: "2"
+            - generic [ref=f3e115]:
+              - searchbox "模糊搜索知识内容、出处和标签" [ref=f3e120]
+              - generic [ref=f3e121]:
+                - generic [ref=f3e122]: 标签
+                - button "全部" [ref=f3e123] [cursor=pointer]
+                - button "人物" [ref=f3e124] [cursor=pointer]
+                - button "景物" [ref=f3e125] [cursor=pointer]
+                - button "内心" [ref=f3e126] [cursor=pointer]
+                - button "引用" [ref=f3e127] [cursor=pointer]
+                - button "伏笔" [ref=f3e128] [cursor=pointer]
+                - button "添加标签" [ref=f3e129] [cursor=pointer]
+              - generic [ref=f3e131]:
+                - button "旧港北侧的灯塔，每逢退潮会露出一段刻痕，是第三章回收的重要线索。 雾港来信 · 第一章" [ref=f3e132] [cursor=pointer]:
+                  - generic [ref=f3e133]: 旧港北侧的灯塔，每逢退潮会露出一段刻痕，是第三章回收的重要线索。
+                  - generic [ref=f3e134]: 雾港来信 · 第一章
+                - button "负责整理旧信的主角，习惯先观察再做决定，面对熟悉笔迹时会短暂失神。 雾港来信 · 人物卡" [ref=f3e136] [cursor=pointer]:
+                  - generic [ref=f3e137]: 负责整理旧信的主角，习惯先观察再做决定，面对熟悉笔迹时会短暂失神。
+                  - generic [ref=f3e138]: 雾港来信 · 人物卡
+                - button "雨水把站台边缘的灯影拉成长线，远处的广播像从水底传来。 长夜列车 · 第二章" [ref=f3e140] [cursor=pointer]:
+                  - generic [ref=f3e141]: 雨水把站台边缘的灯影拉成长线，远处的广播像从水底传来。
+                  - generic [ref=f3e142]: 长夜列车 · 第二章
+                - button "她明知道信里不会有答案，却仍然把折痕一一抚平。 雾港来信 · 第四章" [ref=f3e144] [cursor=pointer]:
+                  - generic [ref=f3e145]: 她明知道信里不会有答案，却仍然把折痕一一抚平。
+                  - generic [ref=f3e146]: 雾港来信 · 第四章
+                - button "“潮声落下之后，留下来的才是岸。” 用于表现人物在选择后的安静时刻。 经典引用 · 手工录入" [ref=f3e148] [cursor=pointer]:
+                  - generic [ref=f3e149]: “潮声落下之后，留下来的才是岸。” 用于表现人物在选择后的安静时刻。
+                  - generic [ref=f3e150]: 经典引用 · 手工录入
+                - button "修船师傅说话直接，习惯把重要物件放在离门最近的抽屉里。 雾港来信 · 人物卡" [ref=f3e152] [cursor=pointer]:
+                  - generic [ref=f3e153]: 修船师傅说话直接，习惯把重要物件放在离门最近的抽屉里。
+                  - generic [ref=f3e154]: 雾港来信 · 人物卡
+                - button "冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜，脚步声显得格外清楚。 雾港来信 · 第六章" [ref=f3e156] [cursor=pointer]:
+                  - generic [ref=f3e157]: 冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜，脚步声显得格外清楚。
+                  - generic [ref=f3e158]: 雾港来信 · 第六章
+                - button "车票的目的地一栏被裁去，只留下日期和一枚褪色的检票印。 长夜列车 · 第三章" [ref=f3e160] [cursor=pointer]:
+                  - generic [ref=f3e161]: 车票的目的地一栏被裁去，只留下日期和一枚褪色的检票印。
+                  - generic [ref=f3e162]: 长夜列车 · 第三章
+  - status

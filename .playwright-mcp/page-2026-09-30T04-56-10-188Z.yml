@@ -1,0 +1,132 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - generic [ref=f3e3]:
+      - strong [ref=f3e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=f3e5]:
+      - button "作品集" [ref=f3e6] [cursor=pointer]
+      - button "写作页" [ref=f3e7] [cursor=pointer]
+      - button "知识库" [ref=f3e8] [cursor=pointer]
+      - button "需求会话" [ref=f3e9] [cursor=pointer]
+      - button "设置" [ref=f3e10] [cursor=pointer]
+      - button "保存失败态" [ref=f3e11] [cursor=pointer]
+  - generic [ref=f3e12]:
+    - complementary [ref=f3e13]:
+      - generic [ref=f3e14]:
+        - button "收起侧栏" [expanded] [active] [ref=f3e309] [cursor=pointer]
+        - generic [ref=f3e311]: RainSoul
+      - generic [ref=f3e312]:
+        - generic [ref=f3e313]: 雨
+        - strong [ref=f3e314]: 山间雨
+      - navigation "主导航" [ref=f3e20]:
+        - button "作品集" [ref=f3e21] [cursor=pointer]
+        - button "知识库" [ref=f3e25] [cursor=pointer]
+        - button "需求会话" [ref=f3e28] [cursor=pointer]
+      - button "设置" [ref=f3e33] [cursor=pointer]
+    - main [ref=f3e37]:
+      - generic [ref=f3e39]:
+        - paragraph [ref=f3e40]: RainSoul
+        - heading "设置" [level=1] [ref=f3e164]
+      - region "设置" [ref=f3e165]:
+        - generic [ref=f3e166]:
+          - generic [ref=f3e168]:
+            - heading "设置" [level=2] [ref=f3e169]
+            - paragraph [ref=f3e170]: 管理个人资料、编辑器样式和本机数据。
+          - generic [ref=f3e171]:
+            - generic [ref=f3e172]:
+              - heading "个人资料" [level=3] [ref=f3e173]
+              - paragraph [ref=f3e174]: 头像和显示名称会出现在侧栏。
+              - generic [ref=f3e175]:
+                - generic [ref=f3e176]: 雨
+                - generic [ref=f3e177]:
+                  - strong [ref=f3e178]: 山间雨
+                  - generic [ref=f3e179]: 本机资料
+              - generic [ref=f3e180]:
+                - generic [ref=f3e181]: 显示名称
+                - textbox "显示名称" [ref=f3e182]: 山间雨
+              - generic [ref=f3e183]:
+                - generic [ref=f3e184]: 本地头像
+                - button "本地头像" [ref=f3e185]
+              - button "保存资料" [ref=f3e187] [cursor=pointer]
+            - generic [ref=f3e188]:
+              - heading "编辑器" [level=3] [ref=f3e189]
+              - paragraph [ref=f3e190]: 首版统一正文样式，后续再开放自定义。
+              - generic [ref=f3e191]:
+                - generic [ref=f3e192]: 正文样式
+                - textbox "正文样式" [ref=f3e193]: 微软雅黑 · 16 px · 1.5 倍行距
+              - generic [ref=f3e194]:
+                - strong: 第一章 潮汐
+                - paragraph: 固定样式预览：段落、标题和字数统计在导出时保持一致。
+            - generic [ref=f3e197]:
+              - heading "知识库维护" [level=3] [ref=f3e198]
+              - paragraph [ref=f3e199]: 分类用于组织条目，标签用于交叉筛选；删除分类前需要先迁移条目。
+              - generic [ref=f3e200]:
+                - generic [ref=f3e201]:
+                  - strong [ref=f3e202]: 分类
+                  - generic [ref=f3e203]: 5 个
+                - generic [ref=f3e204]:
+                  - generic [ref=f3e205]:
+                    - generic [ref=f3e206]: 人物描写
+                    - button "删除人物描写" [ref=f3e207] [cursor=pointer]
+                  - generic [ref=f3e211]:
+                    - generic [ref=f3e212]: 景物描写
+                    - button "删除景物描写" [ref=f3e213] [cursor=pointer]
+                  - generic [ref=f3e217]:
+                    - generic [ref=f3e218]: 内心描写
+                    - button "删除内心描写" [ref=f3e219] [cursor=pointer]
+                  - generic [ref=f3e223]:
+                    - generic [ref=f3e224]: 经典引用
+                    - button "删除经典引用" [ref=f3e225] [cursor=pointer]
+                  - generic [ref=f3e229]:
+                    - generic [ref=f3e230]: 剧情与伏笔
+                    - button "删除剧情与伏笔" [ref=f3e231] [cursor=pointer]
+                - generic [ref=f3e235]:
+                  - textbox "新增分类" [ref=f3e236]
+                  - button "添加" [ref=f3e237] [cursor=pointer]
+              - generic [ref=f3e239]:
+                - generic [ref=f3e240]:
+                  - strong [ref=f3e241]: 标签
+                  - generic [ref=f3e242]: 5 个
+                - generic [ref=f3e243]:
+                  - generic [ref=f3e244]:
+                    - generic [ref=f3e245]: 人物
+                    - button "删除人物" [ref=f3e246] [cursor=pointer]
+                  - generic [ref=f3e250]:
+                    - generic [ref=f3e251]: 景物
+                    - button "删除景物" [ref=f3e252] [cursor=pointer]
+                  - generic [ref=f3e256]:
+                    - generic [ref=f3e257]: 内心
+                    - button "删除内心" [ref=f3e258] [cursor=pointer]
+                  - generic [ref=f3e262]:
+                    - generic [ref=f3e263]: 引用
+                    - button "删除引用" [ref=f3e264] [cursor=pointer]
+                  - generic [ref=f3e268]:
+                    - generic [ref=f3e269]: 伏笔
+                    - button "删除伏笔" [ref=f3e270] [cursor=pointer]
+                - generic [ref=f3e274]:
+                  - textbox "新增标签" [ref=f3e275]
+                  - button "添加" [ref=f3e276] [cursor=pointer]
+            - generic [ref=f3e278]:
+              - heading "本机数据" [level=3] [ref=f3e279]
+              - paragraph [ref=f3e280]: 作品默认保存在 Windows 用户本地应用数据目录。
+              - generic [ref=f3e281]:
+                - generic [ref=f3e282]: 数据目录
+                - textbox "数据目录" [ref=f3e283]: "%LOCALAPPDATA%\\\\RainSoul\\\\Projects"
+              - generic [ref=f3e284]:
+                - generic [ref=f3e285]: 实时自动保存
+                - checkbox "实时自动保存" [checked]
+              - generic [ref=f3e287]:
+                - generic [ref=f3e288]: 单实例锁
+                - checkbox "单实例锁" [checked]
+              - button "选择归档位置" [ref=f3e291] [cursor=pointer]
+            - generic [ref=f3e295]:
+              - heading "云端 AI" [level=3] [ref=f3e296]
+              - paragraph [ref=f3e297]: 写作、保存、搜索和导出保持离线可用；AI 操作逐次确认发送范围。
+              - generic [ref=f3e298]:
+                - generic [ref=f3e299]: 允许云端模型
+                - checkbox "允许云端模型"
+              - generic [ref=f3e301]:
+                - generic [ref=f3e302]: 显示费用提示
+                - checkbox "显示费用提示" [checked]
+              - button "配置服务" [ref=f3e305] [cursor=pointer]
+  - status: 请先将 2 条知识迁移到其他分类或“未分类”，再删除“人物描写”。

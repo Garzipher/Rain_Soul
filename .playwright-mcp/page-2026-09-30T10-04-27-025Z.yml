@@ -1,0 +1,85 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - strong [ref=e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=e5]:
+      - button "作品集" [ref=e6] [cursor=pointer]
+      - button "写作页" [ref=e7] [cursor=pointer]
+      - button "知识库" [ref=e8] [cursor=pointer]
+      - button "需求会话" [ref=e9] [cursor=pointer]
+      - button "设置" [ref=e10] [cursor=pointer]
+      - button "保存失败态" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - button "展开侧栏" [ref=e15] [cursor=pointer]
+      - navigation "主导航" [ref=e20]:
+        - button "作品集" [ref=e21] [cursor=pointer]
+        - button "知识库" [ref=e25] [cursor=pointer]
+        - button "需求会话" [ref=e28] [cursor=pointer]
+      - button "设置" [ref=e33] [cursor=pointer]
+    - main [ref=e37]:
+      - generic [ref=e39]:
+        - paragraph [ref=e40]: 正在写作
+        - heading "雾港来信" [level=1] [ref=e85]
+      - region "章节写作" [ref=e87]:
+        - tablist "作品工作区" [ref=e88]:
+          - tab "正文" [ref=e89] [cursor=pointer]
+          - tab "剧情架构" [ref=e90] [cursor=pointer]
+          - tab "伏笔架构" [active] [selected] [ref=e91] [cursor=pointer]
+          - button "返回作品集" [ref=e92] [cursor=pointer]
+        - tabpanel [ref=e242]:
+          - complementary [ref=e243]:
+            - generic [ref=e244]:
+              - strong [ref=e245]: 伏笔
+              - generic [ref=e246]:
+                - textbox "伏笔名称" [ref=e247]
+                - button "添加伏笔" [ref=e248] [cursor=pointer]
+            - button "灯塔刻痕 已埋设" [ref=e251] [cursor=pointer]:
+              - generic [ref=e254]: 灯塔刻痕
+              - generic [ref=e255]: 已埋设
+          - generic [ref=e257]:
+            - generic [ref=e258]:
+              - heading "伏笔详情" [level=2] [ref=e259]
+              - button "删除伏笔" [ref=e260] [cursor=pointer]
+            - generic [ref=e264]:
+              - generic [ref=e265]:
+                - generic [ref=e266]: 名称
+                - textbox "名称" [ref=e267]: 灯塔刻痕
+              - generic [ref=e268]:
+                - generic [ref=e269]: 状态
+                - combobox "状态" [ref=e270]:
+                  - option "未埋设"
+                  - option "已埋设" [selected]
+                  - option "已触发"
+                  - option "已回收"
+                  - option "废弃"
+              - generic [ref=e271]:
+                - generic [ref=e272]: 剧情节点
+                - combobox "剧情节点" [ref=e273]:
+                  - option "不关联剧情节点"
+                  - option "第一卷 · 归港"
+                  - option "第一章 潮汐"
+                  - option "灯塔刻痕" [selected]
+              - generic [ref=e274]:
+                - generic [ref=e275]: 说明
+                - textbox "说明" [ref=e276]: 刻痕指向第三章的潮汐记录。
+              - generic [ref=e277]:
+                - strong [ref=e278]: 埋设、触发与回收证据
+                - generic [ref=e280]:
+                  - generic [ref=e281]: 埋设 · 第一章 潮汐 · 码头上的人习惯先看一眼灯塔。
+                  - button "定位" [ref=e282] [cursor=pointer]
+                  - button "移除埋设证据" [ref=e283] [cursor=pointer]: 移除
+                - generic [ref=e284]:
+                  - combobox "证据阶段" [ref=e285]:
+                    - option "埋设" [selected]
+                    - option "触发"
+                    - option "回收"
+                  - combobox "证据章节" [ref=e286]:
+                    - option "选择章节" [selected]
+                    - option "第一章 潮汐"
+                    - option "第二章 旧信"
+                    - option "第三章 灯塔"
+                  - textbox "段落摘录或位置" [ref=e287]
+                  - button "添加证据" [ref=e288] [cursor=pointer]
+  - status

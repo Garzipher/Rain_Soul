@@ -1,0 +1,131 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - strong [ref=e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=e5]:
+      - button "作品集" [ref=e6] [cursor=pointer]
+      - button "写作页" [ref=e7] [cursor=pointer]
+      - button "知识库" [ref=e8] [cursor=pointer]
+      - button "需求会话" [ref=e9] [cursor=pointer]
+      - button "设置" [active] [ref=e10] [cursor=pointer]
+      - button "保存失败态" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - button "展开侧栏" [ref=e15] [cursor=pointer]
+      - navigation "主导航" [ref=e20]:
+        - button [ref=e21] [cursor=pointer]
+        - button [ref=e25] [cursor=pointer]
+        - button [ref=e28] [cursor=pointer]
+      - button "设置" [ref=e33] [cursor=pointer]
+    - main [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - paragraph [ref=e40]: RainSoul
+          - heading "设置" [level=1] [ref=e365]
+        - button "新建作品" [ref=e43] [cursor=pointer]
+      - region "设置" [ref=e366]:
+        - generic [ref=e367]:
+          - generic [ref=e369]:
+            - heading "设置" [level=2] [ref=e370]
+            - paragraph [ref=e371]: 管理个人资料、编辑器样式和本机数据。
+          - generic [ref=e372]:
+            - generic [ref=e373]:
+              - heading "个人资料" [level=3] [ref=e374]
+              - paragraph [ref=e375]: 头像和显示名称会出现在侧栏。
+              - generic [ref=e376]:
+                - generic [ref=e377]: 雨
+                - generic [ref=e378]:
+                  - strong [ref=e379]: 山间雨
+                  - generic [ref=e380]: 本机资料
+              - generic [ref=e381]:
+                - generic [ref=e382]: 显示名称
+                - textbox "显示名称" [ref=e383]: 山间雨
+              - generic [ref=e384]:
+                - generic [ref=e385]: 本地头像
+                - button "本地头像" [ref=e386]
+              - button "保存资料" [ref=e388] [cursor=pointer]
+            - generic [ref=e389]:
+              - heading "编辑器" [level=3] [ref=e390]
+              - paragraph [ref=e391]: 首版统一正文样式，后续再开放自定义。
+              - generic [ref=e392]:
+                - generic [ref=e393]: 正文样式
+                - combobox "正文样式" [ref=e394]:
+                  - option "微软雅黑 · 16 px · 1.5 倍行距" [selected]
+                  - option "系统无衬线 · 16 px · 1.5 倍行距"
+              - generic [ref=e395]:
+                - strong [ref=e396]: 第一章 潮汐
+                - paragraph [ref=e397]: 固定样式预览：段落、标题和字数统计在导出时保持一致。
+            - generic [ref=e398]:
+              - heading "知识库维护" [level=3] [ref=e399]
+              - paragraph [ref=e400]: 分类用于组织条目，标签用于交叉筛选；删除分类前需要先迁移条目。
+              - generic [ref=e401]:
+                - generic [ref=e402]:
+                  - strong [ref=e403]: 分类
+                  - generic [ref=e404]: 5 个
+                - generic [ref=e405]:
+                  - generic [ref=e406]:
+                    - generic [ref=e407]: 人物描写
+                    - button "删除人物描写" [ref=e408] [cursor=pointer]
+                  - generic [ref=e412]:
+                    - generic [ref=e413]: 景物描写
+                    - button "删除景物描写" [ref=e414] [cursor=pointer]
+                  - generic [ref=e418]:
+                    - generic [ref=e419]: 内心描写
+                    - button "删除内心描写" [ref=e420] [cursor=pointer]
+                  - generic [ref=e424]:
+                    - generic [ref=e425]: 经典引用
+                    - button "删除经典引用" [ref=e426] [cursor=pointer]
+                  - generic [ref=e430]:
+                    - generic [ref=e431]: 剧情与伏笔
+                    - button "删除剧情与伏笔" [ref=e432] [cursor=pointer]
+                - generic [ref=e436]:
+                  - textbox "新增分类" [ref=e437]
+                  - button "添加" [ref=e438] [cursor=pointer]
+              - generic [ref=e440]:
+                - generic [ref=e441]:
+                  - strong [ref=e442]: 标签
+                  - generic [ref=e443]: 5 个
+                - generic [ref=e444]:
+                  - generic [ref=e445]:
+                    - generic [ref=e446]: 人物
+                    - button "删除人物" [ref=e447] [cursor=pointer]
+                  - generic [ref=e451]:
+                    - generic [ref=e452]: 景物
+                    - button "删除景物" [ref=e453] [cursor=pointer]
+                  - generic [ref=e457]:
+                    - generic [ref=e458]: 内心
+                    - button "删除内心" [ref=e459] [cursor=pointer]
+                  - generic [ref=e463]:
+                    - generic [ref=e464]: 引用
+                    - button "删除引用" [ref=e465] [cursor=pointer]
+                  - generic [ref=e469]:
+                    - generic [ref=e470]: 伏笔
+                    - button "删除伏笔" [ref=e471] [cursor=pointer]
+                - generic [ref=e475]:
+                  - textbox "新增标签" [ref=e476]
+                  - button "添加" [ref=e477] [cursor=pointer]
+            - generic [ref=e479]:
+              - heading "本机数据" [level=3] [ref=e480]
+              - paragraph [ref=e481]: 作品默认保存在 Windows 用户本地应用数据目录。
+              - generic [ref=e482]:
+                - generic [ref=e483]: 数据目录
+                - textbox "数据目录" [ref=e484]: "%LOCALAPPDATA%\\\\RainSoul\\\\Projects"
+              - generic [ref=e485]:
+                - generic [ref=e486]: 实时自动保存
+                - checkbox "实时自动保存" [checked] [ref=e487] [cursor=pointer]
+              - generic [ref=e488]:
+                - generic [ref=e489]: 单实例锁
+                - checkbox "单实例锁" [checked] [ref=e490] [cursor=pointer]
+              - button "选择归档位置" [ref=e492] [cursor=pointer]
+            - generic [ref=e496]:
+              - heading "云端 AI" [level=3] [ref=e497]
+              - paragraph [ref=e498]: 写作、保存、搜索和导出保持离线可用；AI 操作逐次确认发送范围。
+              - generic [ref=e499]:
+                - generic [ref=e500]: 允许云端模型
+                - checkbox "允许云端模型" [ref=e501] [cursor=pointer]
+              - generic [ref=e502]:
+                - generic [ref=e503]: 显示费用提示
+                - checkbox "显示费用提示" [checked] [ref=e504] [cursor=pointer]
+              - button "配置服务" [ref=e506] [cursor=pointer]
+  - status

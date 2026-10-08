@@ -1,0 +1,73 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - strong [ref=e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=e5]:
+      - button "作品集" [ref=e6] [cursor=pointer]
+      - button "写作页" [ref=e7] [cursor=pointer]
+      - button "知识库" [ref=e8] [cursor=pointer]
+      - button "需求会话" [ref=e9] [cursor=pointer]
+      - button "设置" [ref=e10] [cursor=pointer]
+      - button "保存失败态" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - button "展开侧栏" [ref=e15] [cursor=pointer]
+      - navigation "主导航" [ref=e20]:
+        - button "作品集" [ref=e21] [cursor=pointer]
+        - button "知识库" [ref=e25] [cursor=pointer]
+        - button "需求会话" [ref=e28] [cursor=pointer]
+      - button "设置" [ref=e33] [cursor=pointer]
+    - main [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - paragraph [ref=e40]: 正在写作
+          - heading "雾港来信" [level=1] [ref=e85]
+        - status [ref=e86]: 已保存
+      - region "章节写作" [ref=e87]:
+        - tablist "作品工作区" [ref=e88]:
+          - tab "正文" [selected] [ref=e89] [cursor=pointer]
+          - tab "剧情架构" [ref=e90] [cursor=pointer]
+          - tab "伏笔架构" [ref=e91] [cursor=pointer]
+          - button "返回作品集" [ref=e92] [cursor=pointer]
+        - tabpanel [ref=e95]:
+          - complementary [ref=e96]:
+            - generic [ref=e97]:
+              - strong [ref=e98]: 作品结构
+              - button "新建章节" [ref=e99] [cursor=pointer]
+            - generic [ref=e101]:
+              - button "未分卷 1 章" [ref=e102] [cursor=pointer]:
+                - generic [ref=e107]: 未分卷
+                - generic [ref=e108]: 1 章
+              - button "第一章 潮汐 1,284" [ref=e109] [cursor=pointer]:
+                - generic [ref=e113]: 第一章 潮汐
+                - generic [ref=e114]: 1,284
+              - button "第一卷 · 归港 2 章" [ref=e115] [cursor=pointer]:
+                - generic [ref=e120]: 第一卷 · 归港
+                - generic [ref=e121]: 2 章
+              - button "第二章 旧信 2,041" [ref=e122] [cursor=pointer]:
+                - generic [ref=e126]: 第二章 旧信
+                - generic [ref=e127]: 2,041
+              - button "第三章 灯塔 1,966" [ref=e128] [cursor=pointer]:
+                - generic [ref=e132]: 第三章 灯塔
+                - generic [ref=e133]: 1,966
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - generic [ref=e136]: 雾港来信 / 第一章 潮汐
+              - generic [ref=e137]:
+                - button "引用" [disabled] [ref=e138]
+                - button "伏笔" [ref=e139] [cursor=pointer]
+                - button "AI 辅助" [disabled] [ref=e142]
+            - generic [ref=e143]:
+              - generic [ref=e144]: 未分卷 · 第 1 章
+              - textbox "章节标题" [ref=e145]: 第一章 潮汐
+              - textbox "章节正文" [ref=e146]:
+                - paragraph [ref=e147]:
+                  - text: 雾港的雨总在傍晚到来。码头上的人习惯了先收起报纸，再看一眼远处的灯塔。
+                  - button "[伏笔：灯塔刻痕]" [ref=e148] [cursor=pointer]
+                - paragraph [ref=e149]: 她在最后一班渡船靠岸前收到那封信。信封没有署名，只在背面画了一道浅浅的潮线，像有人试图记住水位退去的地方。
+                - paragraph [ref=e150]: 街上的钟敲过六下，她还站在原地。风把纸张吹得微微发响，熟悉的笔迹就在指尖下方。
+            - generic [ref=e151]:
+              - generic [ref=e152]: 本章 116 字
+              - generic [ref=e153]: 固定正文样式 · 微软雅黑 12 pt · 1.5 倍行距
+  - status

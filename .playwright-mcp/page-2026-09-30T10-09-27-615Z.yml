@@ -1,0 +1,48 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - strong [ref=f1e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=f1e5]:
+      - button "作品集" [ref=f1e6] [cursor=pointer]
+      - button "写作页" [ref=f1e7] [cursor=pointer]
+      - button "知识库" [ref=f1e8] [cursor=pointer]
+      - button "需求会话" [ref=f1e9] [cursor=pointer]
+      - button "设置" [ref=f1e10] [cursor=pointer]
+      - button "保存失败态" [ref=f1e11] [cursor=pointer]
+  - generic [ref=f1e12]:
+    - complementary [ref=f1e13]:
+      - button "展开侧栏" [ref=f1e15] [cursor=pointer]
+      - navigation "主导航" [ref=f1e20]:
+        - button "作品集" [ref=f1e21] [cursor=pointer]
+        - button "知识库" [ref=f1e25] [cursor=pointer]
+        - button "需求会话" [ref=f1e28] [cursor=pointer]
+      - button "设置" [ref=f1e33] [cursor=pointer]
+    - main [ref=f1e37]:
+      - generic [ref=f1e39]:
+        - paragraph [ref=f1e40]: 正在写作
+        - heading "书签视觉排查" [level=1] [ref=f1e94]
+      - region "章节写作" [ref=f1e96]:
+        - tablist "作品工作区" [ref=f1e97]:
+          - tab "正文" [ref=f1e98] [cursor=pointer]
+          - tab "剧情架构" [active] [selected] [ref=f1e99] [cursor=pointer]
+          - tab "伏笔架构" [ref=f1e100] [cursor=pointer]
+          - button "返回作品集" [ref=f1e101] [cursor=pointer]
+        - tabpanel [ref=f1e243]:
+          - complementary [ref=f1e244]:
+            - generic [ref=f1e245]:
+              - strong [ref=f1e246]: 剧情节点
+              - generic [ref=f1e247]:
+                - combobox "新增节点类型" [ref=f1e248]:
+                  - option "卷" [selected]
+                  - option "章"
+                  - option "详细节点"
+                - button "添加剧情节点" [ref=f1e249] [cursor=pointer]
+          - generic [ref=f1e253]:
+            - generic [ref=f1e254]:
+              - heading "剧情架构" [level=2] [ref=f1e255]
+              - button "上移节点" [disabled] [ref=f1e256] [cursor=pointer]
+              - button "下移节点" [disabled] [ref=f1e259] [cursor=pointer]
+              - button "删除节点" [disabled] [ref=f1e262] [cursor=pointer]
+            - generic [ref=f1e266]: 暂无剧情节点
+  - status: 目标段落已变化，请重新选择。

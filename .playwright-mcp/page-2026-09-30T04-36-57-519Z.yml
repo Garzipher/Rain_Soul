@@ -1,0 +1,57 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - strong [ref=e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=e5]:
+      - button "作品集" [ref=e6] [cursor=pointer]
+      - button "写作页" [ref=e7] [cursor=pointer]
+      - button "知识库" [ref=e8] [cursor=pointer]
+      - button "需求会话" [active] [ref=e9] [cursor=pointer]
+      - button "设置" [ref=e10] [cursor=pointer]
+      - button "保存失败态" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - button "展开侧栏" [ref=e15] [cursor=pointer]
+      - navigation "主导航" [ref=e20]:
+        - button [ref=e21] [cursor=pointer]
+        - button [ref=e25] [cursor=pointer]
+        - button [ref=e28] [cursor=pointer]
+      - button "设置" [ref=e33] [cursor=pointer]
+    - main [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - paragraph [ref=e40]: RainSoul
+          - heading "需求会话" [level=1] [ref=e510]
+        - button "新建作品" [ref=e43] [cursor=pointer]
+      - region "需求会话" [ref=e322]:
+        - generic [ref=e323]:
+          - generic [ref=e325]:
+            - heading "雾港来信" [level=2] [ref=e326]
+            - paragraph [ref=e327]: 作品会话
+          - generic [ref=e328]:
+            - complementary [ref=e329]:
+              - button "结构讨论 刚刚 · 3 条消息 删除结构讨论" [ref=e330]:
+                - strong [ref=e331]: 结构讨论
+                - generic [ref=e332]: 刚刚 · 3 条消息
+                - button "删除结构讨论" [ref=e333] [cursor=pointer]
+              - button "接口笔记 昨天 · 8 条消息 删除接口笔记" [ref=e337]:
+                - strong [ref=e338]: 接口笔记
+                - generic [ref=e339]: 昨天 · 8 条消息
+                - button "删除接口笔记" [ref=e340] [cursor=pointer]
+              - button "伏笔整理 9 月 28 日 · 5 条消息 删除伏笔整理" [ref=e344]:
+                - strong [ref=e345]: 伏笔整理
+                - generic [ref=e346]: 9 月 28 日 · 5 条消息
+                - button "删除伏笔整理" [ref=e347] [cursor=pointer]
+            - generic [ref=e351]:
+              - generic [ref=e352]:
+                - strong [ref=e353]: 结构讨论
+                - paragraph [ref=e354]: 只在作者确认后发送上下文
+              - generic [ref=e355]:
+                - generic [ref=e356]: 我想确认第一章里的灯塔线索应该在哪一卷回收。
+                - generic [ref=e357]: 先把它标记为伏笔，关联第一章和第三章，暂时不要自动改稿。
+                - generic [ref=e358]: 已记录为待回收伏笔。后续分析会显示证据段落和不确定性。
+              - generic [ref=e359]:
+                - textbox "输入消息" [ref=e360]
+                - button "发送消息" [ref=e361] [cursor=pointer]
+  - status

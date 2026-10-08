@@ -1,0 +1,57 @@
+- generic [active] [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - generic [ref=f3e3]:
+      - strong [ref=f3e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=f3e5]:
+      - button "作品集" [ref=f3e6] [cursor=pointer]
+      - button "写作页" [ref=f3e7] [cursor=pointer]
+      - button "知识库" [ref=f3e8] [cursor=pointer]
+      - button "需求会话" [ref=f3e9] [cursor=pointer]
+      - button "设置" [ref=f3e10] [cursor=pointer]
+      - button "保存失败态" [ref=f3e11] [cursor=pointer]
+  - generic [ref=f3e12]:
+    - complementary [ref=f3e13]:
+      - button "展开侧栏" [ref=f3e15] [cursor=pointer]
+      - navigation "主导航" [ref=f3e20]:
+        - button "作品集" [ref=f3e21] [cursor=pointer]
+        - button "知识库" [ref=f3e25] [cursor=pointer]
+        - button "需求会话" [ref=f3e28] [cursor=pointer]
+      - button "设置" [ref=f3e33] [cursor=pointer]
+    - main [ref=f3e37]:
+      - generic [ref=f3e39]:
+        - paragraph [ref=f3e40]: 知识库
+        - heading "拆书工具" [level=1] [ref=f3e167]
+      - region "拆书工具" [ref=f3e168]:
+        - generic [ref=f3e169]:
+          - generic [ref=f3e170]:
+            - generic [ref=f3e171]:
+              - heading "拆书工具" [level=2] [ref=f3e172]
+              - paragraph [ref=f3e173]: 导入手稿并整理章节，确认后添加为一部新作品。
+            - button "返回知识库" [ref=f3e174] [cursor=pointer]
+          - paragraph [ref=f3e177]: 当前为流程 Demo，不会解析所选文件正文；正式导入保留正文段落和可识别标题，图片、表格等复杂内容不导入。下方章节列表使用固定示例。
+          - generic [ref=f3e178]:
+            - generic [ref=f3e179]:
+              - generic [ref=f3e180]:
+                - generic [ref=f3e181]: "01"
+                - generic [ref=f3e182]:
+                  - strong [ref=f3e183]: 选择手稿
+                  - paragraph [ref=f3e184]: 支持 TXT 和 DOCX，演示仅在当前页面预览。
+              - generic [ref=f3e185] [cursor=pointer]: 选择 TXT / DOCX 文件
+              - generic [ref=f3e190]:
+                - generic [ref=f3e191]: 章节识别规则
+                - combobox "章节识别规则" [ref=f3e192]:
+                  - option "识别常见章节标题，识别不到则作为一章" [selected]
+                  - option "按空行分段，手动调整章节"
+              - generic [ref=f3e193]:
+                - button "清空选择" [ref=f3e194] [cursor=pointer]
+                - button "生成预览" [ref=f3e195] [cursor=pointer]
+            - generic [ref=f3e203]:
+              - generic [ref=f3e204]:
+                - generic [ref=f3e205]: "02"
+                - generic [ref=f3e206]:
+                  - strong [ref=f3e207]: 预览章节
+                  - paragraph [ref=f3e208]: 可在确认前检查章节名称和正文范围。
+              - generic [ref=f3e209]: 选择文件后生成章节预览
+              - button "确认导入为新作品" [disabled] [ref=f3e218] [cursor=pointer]
+  - status

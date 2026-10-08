@@ -1,0 +1,69 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - strong [ref=e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=e5]:
+      - button "作品集" [ref=e6] [cursor=pointer]
+      - button "写作页" [ref=e7] [cursor=pointer]
+      - button "知识库" [ref=e8] [cursor=pointer]
+      - button "需求会话" [ref=e9] [cursor=pointer]
+      - button "设置" [ref=e10] [cursor=pointer]
+      - button "保存失败态" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - button "展开侧栏" [ref=e15] [cursor=pointer]
+      - navigation "主导航" [ref=e20]:
+        - button [ref=e21] [cursor=pointer]
+        - button [ref=e25] [cursor=pointer]
+        - button [ref=e28] [cursor=pointer]
+      - button "设置" [ref=e33] [cursor=pointer]
+    - main [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - paragraph [ref=e40]: 知识库
+          - heading "拆书工具" [level=1] [ref=e260]
+        - button "新建作品" [ref=e43] [cursor=pointer]
+      - region "拆书工具" [ref=e261]:
+        - generic [ref=e262]:
+          - generic [ref=e263]:
+            - generic [ref=e264]:
+              - heading "拆书工具" [level=2] [ref=e265]
+              - paragraph [ref=e266]: 导入手稿并整理章节，确认后再写入知识库。
+            - button "返回知识库" [ref=e267] [cursor=pointer]
+          - generic [ref=e270]:
+            - generic [ref=e271]:
+              - generic [ref=e272]:
+                - generic [ref=e273]: "01"
+                - generic [ref=e274]:
+                  - strong [ref=e275]: 选择手稿
+                  - paragraph [ref=e276]: 支持 TXT 和 DOCX，演示仅在当前页面预览。
+              - generic [ref=e277] [cursor=pointer]: 选择 TXT / DOCX 文件
+              - generic [ref=e282]:
+                - generic [ref=e283]: 章节识别规则
+                - combobox "章节识别规则" [ref=e284]:
+                  - option "识别常见章节标题，识别不到则作为一章" [selected]
+                  - option "按空行分段，手动调整章节"
+              - generic [ref=e285]:
+                - button "清空选择" [ref=e286] [cursor=pointer]
+                - button "生成预览" [ref=e287] [cursor=pointer]
+            - generic [ref=e295]:
+              - generic [ref=e296]:
+                - generic [ref=e297]: "02"
+                - generic [ref=e298]:
+                  - strong [ref=e299]: 预览章节
+                  - paragraph [ref=e300]: 可在确认前检查章节名称和正文范围。
+              - generic [ref=e301]:
+                - generic [ref=e302]: 选择文件后生成章节预览
+                - generic [ref=e309]:
+                  - generic [ref=e310]:
+                    - strong [ref=e311]: 第一章 潮汐
+                    - generic [ref=e312]: 1,284 字 · 正文段落
+                  - generic [ref=e313]:
+                    - strong [ref=e314]: 第二章 旧信
+                    - generic [ref=e315]: 2,041 字 · 正文段落
+                  - generic [ref=e316]:
+                    - strong [ref=e317]: 第三章 灯塔
+                    - generic [ref=e318]: 1,966 字 · 正文段落
+              - button "确认导入为新作品" [disabled] [ref=e320] [cursor=pointer]
+  - status

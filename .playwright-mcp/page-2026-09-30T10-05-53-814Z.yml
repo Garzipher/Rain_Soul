@@ -1,0 +1,90 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - strong [ref=e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=e5]:
+      - button "作品集" [ref=e6] [cursor=pointer]
+      - button "写作页" [ref=e7] [cursor=pointer]
+      - button "知识库" [ref=e8] [cursor=pointer]
+      - button "需求会话" [ref=e9] [cursor=pointer]
+      - button "设置" [ref=e10] [cursor=pointer]
+      - button "保存失败态" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - button "展开侧栏" [ref=e15] [cursor=pointer]
+      - navigation "主导航" [ref=e20]:
+        - button "作品集" [ref=e21] [cursor=pointer]
+        - button "知识库" [ref=e25] [cursor=pointer]
+        - button "需求会话" [ref=e28] [cursor=pointer]
+      - button "设置" [ref=e33] [cursor=pointer]
+    - main [ref=e37]:
+      - generic [ref=e39]:
+        - paragraph [ref=e40]: 正在写作
+        - heading "雾港来信" [level=1] [ref=e85]
+      - region "章节写作" [ref=e87]:
+        - tablist "作品工作区" [ref=e88]:
+          - tab "正文" [ref=e89] [cursor=pointer]
+          - tab "剧情架构" [active] [selected] [ref=e90] [cursor=pointer]
+          - tab "伏笔架构" [ref=e91] [cursor=pointer]
+          - button "返回作品集" [ref=e92] [cursor=pointer]
+        - tabpanel [ref=e167]:
+          - complementary [ref=e168]:
+            - generic [ref=e169]:
+              - strong [ref=e170]: 剧情节点
+              - generic [ref=e171]:
+                - combobox "新增节点类型" [ref=e172]:
+                  - option "卷" [selected]
+                  - option "章"
+                  - option "详细节点"
+                - button "添加剧情节点" [ref=e173] [cursor=pointer]
+            - generic [ref=e175]:
+              - generic [ref=e331]:
+                - button "收起第一卷 · 归港" [expanded] [ref=e332] [cursor=pointer]
+                - button "第一卷 · 归港" [ref=e335] [cursor=pointer]
+              - generic [ref=e339]:
+                - button "收起第一章 潮汐" [expanded] [ref=e340] [cursor=pointer]
+                - button "第一章 潮汐" [ref=e343] [cursor=pointer]
+              - button "灯塔刻痕" [ref=e349] [cursor=pointer]
+          - generic [ref=e200]:
+            - generic [ref=e201]:
+              - heading "详细节点" [level=2] [ref=e354]
+              - button "上移节点" [ref=e203] [cursor=pointer]
+              - button "下移节点" [ref=e206] [cursor=pointer]
+              - button "删除节点" [ref=e209] [cursor=pointer]
+            - generic [ref=e213]:
+              - generic [ref=e214]:
+                - generic [ref=e215]: 节点名称
+                - textbox "节点名称" [ref=e216]: 灯塔刻痕
+              - generic [ref=e217]:
+                - generic [ref=e218]: 剧情内容
+                - textbox "剧情内容" [ref=e219]: 第七级石阶上的刻痕暗示旧日约定。
+              - generic [ref=e220]:
+                - generic [ref=e221]: 关联正文章节
+                - combobox "关联正文章节" [ref=e222]:
+                  - option "不关联章节"
+                  - option "第一章 潮汐" [selected]
+                  - option "第二章 旧信"
+                  - option "第三章 灯塔"
+              - generic [ref=e223]:
+                - generic [ref=e224]: 关联知识
+                - combobox "关联知识" [ref=e225]:
+                  - option "关联知识条目" [selected]
+                  - option "林晚没有立刻拆开那封信。她先把潮汐表移到桌角，又将散开的"
+                  - option "她明知道信里不会有答案，却仍然把折痕一一抚平。每压平一道"
+                  - option "“潮声落下之后，留下来的才是岸。”她把这句话写在信的背面"
+                  - option "陈砚说话前总先看对方的手。林晚递来旧船票时，他没有接，只"
+                  - option "冬晨的窄巷留着昨夜的水汽，窗沿上结了一层薄霜。店铺尚未开"
+                - generic [ref=e363]:
+                  - generic [ref=e364]: 旧港北侧的灯塔从雨幕里浮出来，石阶上还留着退潮后的盐霜。林晚数到第七级时，看见扶手内侧有一
+                  - button "定位" [ref=e365] [cursor=pointer]
+                  - button "取消关联旧港北侧的灯塔从雨幕里浮出来，石阶上还留着退潮后的盐霜。林晚数到第七级时，看见扶手内侧有一" [ref=e366] [cursor=pointer]: 移除
+              - generic [ref=e226]:
+                - generic [ref=e227]: 关联伏笔
+                - combobox "关联伏笔" [ref=e228]:
+                  - option "关联伏笔" [selected]
+                - generic [ref=e368]:
+                  - generic [ref=e369]: 灯塔刻痕
+                  - button "定位" [ref=e370] [cursor=pointer]
+                  - button "取消关联灯塔刻痕" [ref=e371] [cursor=pointer]: 移除
+  - status

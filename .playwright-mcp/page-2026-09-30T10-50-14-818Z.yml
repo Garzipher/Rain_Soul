@@ -1,0 +1,106 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - strong [ref=e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=e5]:
+      - button "作品集" [ref=e6] [cursor=pointer]
+      - button "写作页" [ref=e7] [cursor=pointer]
+      - button "知识库" [ref=e8] [cursor=pointer]
+      - button "需求会话" [ref=e9] [cursor=pointer]
+      - button "设置" [ref=e10] [cursor=pointer]
+      - button "保存失败态" [ref=e11] [cursor=pointer]
+  - generic [ref=e12]:
+    - complementary [ref=e13]:
+      - button "展开侧栏" [ref=e15] [cursor=pointer]
+      - navigation "主导航" [ref=e20]:
+        - button "作品集" [ref=e21] [cursor=pointer]
+        - button "知识库" [ref=e25] [cursor=pointer]
+        - button "需求会话" [ref=e28] [cursor=pointer]
+      - button "设置" [ref=e33] [cursor=pointer]
+    - main [ref=e37]:
+      - generic [ref=e39]:
+        - paragraph [ref=e40]: 正在写作
+        - heading "雾港来信" [level=1] [ref=e85]
+      - region "章节写作" [ref=e87]:
+        - tablist "作品工作区" [ref=e88]:
+          - tab "正文" [ref=e89] [cursor=pointer]
+          - tab "剧情架构" [ref=e90] [cursor=pointer]
+          - tab "伏笔架构" [selected] [ref=e91] [cursor=pointer]
+          - button "返回作品集" [ref=e92] [cursor=pointer]
+        - tabpanel [ref=e159]:
+          - complementary [ref=e160]:
+            - generic [ref=e161]:
+              - strong [ref=e162]: 伏笔
+              - generic [ref=e163]:
+                - textbox "伏笔名称" [ref=e164]
+                - button "添加伏笔" [ref=e165] [cursor=pointer]
+            - button "灯塔刻痕 已埋设" [ref=e224] [cursor=pointer]:
+              - generic [ref=e227]: 灯塔刻痕
+              - generic [ref=e228]: 已埋设
+          - generic [ref=e174]:
+            - generic [ref=e175]:
+              - heading "伏笔详情" [level=2] [ref=e176]
+              - button "删除伏笔" [ref=e177] [cursor=pointer]
+            - generic [ref=e181]:
+              - generic [ref=e182]:
+                - generic [ref=e183]: 名称
+                - textbox "名称" [ref=e184]: 灯塔刻痕
+              - generic [ref=e185]:
+                - generic [ref=e186]: 状态
+                - combobox "状态" [ref=e187]:
+                  - option "未埋设"
+                  - option "已埋设" [selected]
+                  - option "已触发"
+                  - option "已回收"
+                  - option "废弃"
+              - generic [ref=e188]:
+                - generic [ref=e189]: 剧情节点
+                - generic [ref=e190]:
+                  - combobox "剧情节点" [ref=e191]:
+                    - option "不关联剧情节点"
+                    - option "第一卷 · 归港"
+                    - option "第一章 潮汐"
+                    - option "灯塔刻痕" [selected]
+                  - button "定位节点" [ref=e192] [cursor=pointer]
+              - generic [ref=e193]:
+                - generic [ref=e194]: 说明
+                - textbox "说明" [ref=e195]: 刻痕指向第三章的潮汐记录。
+              - generic [ref=e196]:
+                - strong [ref=e197]: 埋设、触发与回收证据
+                - generic [ref=e198]:
+                  - generic [ref=e232]:
+                    - generic [ref=e233]: 埋设 · 第一章 潮汐 · 码头上的人习惯先看一眼灯塔。
+                    - button "定位段落" [ref=e234] [cursor=pointer]
+                    - button "移除埋设证据" [ref=e235] [cursor=pointer]: 移除
+                  - generic [ref=e236]:
+                    - generic [ref=e237]: 触发 · 第一章 潮汐 · 破损来源段落（段落已失效）
+                    - button "定位段落" [disabled] [ref=e238]
+                    - button "移除触发证据" [ref=e239] [cursor=pointer]: 移除
+                    - generic [ref=e240]:
+                      - combobox "重新关联触发证据章节" [ref=e241]:
+                        - option "选择新章节"
+                        - option "第一章 潮汐" [selected]
+                        - option "第二章 旧信"
+                        - option "第三章 灯塔"
+                      - combobox "重新关联触发证据段落" [active] [ref=e242]:
+                        - option "仅关联章节" [selected]
+                        - option "雾港的雨总在傍晚到来。码头上的人习惯了先收起报纸，再看一眼远处的灯塔。"
+                        - option "她在最后一班渡船靠岸前收到那封信。信封没有署名，只在背面画了一道浅浅的潮线，"
+                        - option "街上的钟敲过六下，她还站在原地。风把纸张吹得微微发响，熟悉的笔迹就在指尖下方"
+                      - button "重新关联" [ref=e243] [cursor=pointer]
+                - generic [ref=e203]:
+                  - combobox "证据阶段" [ref=e204]:
+                    - option "埋设" [selected]
+                    - option "触发"
+                    - option "回收"
+                  - combobox "证据章节" [ref=e205]:
+                    - option "选择章节" [selected]
+                    - option "第一章 潮汐"
+                    - option "第二章 旧信"
+                    - option "第三章 灯塔"
+                  - combobox "证据段落" [ref=e206]:
+                    - option "仅关联章节" [selected]
+                  - textbox "段落摘录或位置" [ref=e207]
+                  - button "添加证据" [ref=e208] [cursor=pointer]
+  - status

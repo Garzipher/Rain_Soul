@@ -1,0 +1,57 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - generic [ref=f3e3]:
+      - strong [ref=f3e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=f3e5]:
+      - button "作品集" [ref=f3e6] [cursor=pointer]
+      - button "写作页" [ref=f3e7] [cursor=pointer]
+      - button "知识库" [ref=f3e8] [cursor=pointer]
+      - button "需求会话" [active] [ref=f3e9] [cursor=pointer]
+      - button "设置" [ref=f3e10] [cursor=pointer]
+      - button "保存失败态" [ref=f3e11] [cursor=pointer]
+  - generic [ref=f3e12]:
+    - complementary [ref=f3e13]:
+      - button "展开侧栏" [ref=f3e15] [cursor=pointer]
+      - navigation "主导航" [ref=f3e20]:
+        - button "作品集" [ref=f3e21] [cursor=pointer]
+        - button "知识库" [ref=f3e25] [cursor=pointer]
+        - button "需求会话" [ref=f3e28] [cursor=pointer]
+      - button "设置" [ref=f3e33] [cursor=pointer]
+    - main [ref=f3e37]:
+      - generic [ref=f3e39]:
+        - paragraph [ref=f3e40]: RainSoul
+        - heading "需求会话" [level=1] [ref=f3e220]
+      - region "需求会话" [ref=f3e221]:
+        - generic [ref=f3e222]:
+          - heading "雾港来信" [level=2] [ref=f3e225]
+          - generic [ref=f3e226]:
+            - complementary [ref=f3e227]:
+              - generic [ref=f3e228]:
+                - heading "会话" [level=3] [ref=f3e229]
+                - button "新建会话" [ref=f3e230] [cursor=pointer]
+              - generic [ref=f3e232]:
+                - button "结构讨论 刚刚 · 3 条消息" [ref=f3e233] [cursor=pointer]:
+                  - strong [ref=f3e234]: 结构讨论
+                  - generic [ref=f3e235]: 刚刚 · 3 条消息
+                - button "删除结构讨论" [ref=f3e236] [cursor=pointer]
+              - generic [ref=f3e240]:
+                - button "接口笔记 昨天 · 8 条消息" [ref=f3e241] [cursor=pointer]:
+                  - strong [ref=f3e242]: 接口笔记
+                  - generic [ref=f3e243]: 昨天 · 8 条消息
+                - button "删除接口笔记" [ref=f3e244] [cursor=pointer]
+              - generic [ref=f3e248]:
+                - button "伏笔整理 9 月 28 日 · 5 条消息" [ref=f3e249] [cursor=pointer]:
+                  - strong [ref=f3e250]: 伏笔整理
+                  - generic [ref=f3e251]: 9 月 28 日 · 5 条消息
+                - button "删除伏笔整理" [ref=f3e252] [cursor=pointer]
+            - generic [ref=f3e256]:
+              - strong [ref=f3e258]: 结构讨论
+              - generic [ref=f3e259]:
+                - generic [ref=f3e260]: 我想确认第一章里的灯塔线索应该在哪一卷回收。
+                - generic [ref=f3e261]: 先把它标记为伏笔，关联第一章和第三章，暂时不要自动改稿。
+                - generic [ref=f3e262]: 已记录为待回收伏笔。后续分析会显示证据段落和不确定性。
+              - generic [ref=f3e263]:
+                - textbox "输入消息" [ref=f3e264]
+                - button "发送消息" [ref=f3e265] [cursor=pointer]
+  - status

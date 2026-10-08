@@ -1,0 +1,53 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - generic [ref=f3e3]:
+      - strong [ref=f3e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=f3e5]:
+      - button "作品集" [active] [ref=f3e6] [cursor=pointer]
+      - button "写作页" [ref=f3e7] [cursor=pointer]
+      - button "知识库" [ref=f3e8] [cursor=pointer]
+      - button "需求会话" [ref=f3e9] [cursor=pointer]
+      - button "设置" [ref=f3e10] [cursor=pointer]
+      - button "保存失败态" [ref=f3e11] [cursor=pointer]
+  - generic [ref=f3e12]:
+    - complementary [ref=f3e13]:
+      - button "展开侧栏" [ref=f3e15] [cursor=pointer]
+      - navigation "主导航" [ref=f3e20]:
+        - button "作品集" [ref=f3e21] [cursor=pointer]
+        - button "知识库" [ref=f3e25] [cursor=pointer]
+        - button "需求会话" [ref=f3e28] [cursor=pointer]
+      - button "设置" [ref=f3e33] [cursor=pointer]
+    - main [ref=f3e37]:
+      - generic [ref=f3e38]:
+        - generic [ref=f3e39]:
+          - paragraph [ref=f3e40]: RainSoul
+          - heading "作品集" [level=1] [ref=f3e432]
+        - button "新建作品" [ref=f3e43] [cursor=pointer]
+      - region "作品集" [ref=f3e45]:
+        - generic [ref=f3e46]:
+          - heading "作品集" [level=2] [ref=f3e49]
+          - strong [ref=f3e51]: 作品 3
+          - generic [ref=f3e52]:
+            - button "长篇小说 雾港来信 潮声落下之后，她终于在旧信封里认出了那个名字。 12 章 · 38,420 字 今天 10:24" [ref=f3e53] [cursor=pointer]:
+              - generic [ref=f3e54]: 长篇小说
+              - generic [ref=f3e56]: 雾港来信
+              - generic [ref=f3e57]: 潮声落下之后，她终于在旧信封里认出了那个名字。
+              - generic [ref=f3e58]:
+                - generic [ref=f3e59]: 12 章 · 38,420 字
+                - generic [ref=f3e60]: 今天 10:24
+            - button "悬疑 长夜列车 午夜的第七节车厢，灯光比站台上任何一盏都要明亮。 5 章 · 16,083 字 昨天 21:18" [ref=f3e61] [cursor=pointer]:
+              - generic [ref=f3e62]: 悬疑
+              - generic [ref=f3e64]: 长夜列车
+              - generic [ref=f3e65]: 午夜的第七节车厢，灯光比站台上任何一盏都要明亮。
+              - generic [ref=f3e66]:
+                - generic [ref=f3e67]: 5 章 · 16,083 字
+                - generic [ref=f3e68]: 昨天 21:18
+            - button "项目记录 学习路径 从作品结构到数据流，把每一步开发经验写成可查阅的章节。 3 章 · 4,210 字 9 月 28 日" [ref=f3e69] [cursor=pointer]:
+              - generic [ref=f3e70]: 项目记录
+              - generic [ref=f3e72]: 学习路径
+              - generic [ref=f3e73]: 从作品结构到数据流，把每一步开发经验写成可查阅的章节。
+              - generic [ref=f3e74]:
+                - generic [ref=f3e75]: 3 章 · 4,210 字
+                - generic [ref=f3e76]: 9 月 28 日
+  - status

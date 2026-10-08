@@ -1,0 +1,67 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - generic [ref=f1e3]:
+      - strong [ref=f1e4]: RainSoul · 工作台视觉 Demo
+      - text: 交互预览，输入不会保存到磁盘
+    - generic "Demo 页面切换" [ref=f1e5]:
+      - button "作品集" [ref=f1e6] [cursor=pointer]
+      - button "写作页" [ref=f1e7] [cursor=pointer]
+      - button "知识库" [ref=f1e8] [cursor=pointer]
+      - button "需求会话" [ref=f1e9] [cursor=pointer]
+      - button "设置" [ref=f1e10] [cursor=pointer]
+      - button "保存失败态" [ref=f1e11] [cursor=pointer]
+  - generic [ref=f1e12]:
+    - complementary [ref=f1e13]:
+      - button "展开侧栏" [ref=f1e15] [cursor=pointer]
+      - navigation "主导航" [ref=f1e20]:
+        - button "作品集" [ref=f1e21] [cursor=pointer]
+        - button "知识库" [ref=f1e25] [cursor=pointer]
+        - button "需求会话" [ref=f1e28] [cursor=pointer]
+      - button "设置" [ref=f1e33] [cursor=pointer]
+    - main [ref=f1e37]:
+      - generic [ref=f1e38]:
+        - generic [ref=f1e39]:
+          - paragraph [ref=f1e40]: RainSoul
+          - heading "作品集" [level=1] [ref=f1e322]
+        - button "新建作品" [ref=f1e43] [cursor=pointer]
+      - region "作品集" [ref=f1e45]:
+        - generic [ref=f1e46]:
+          - strong [ref=f1e48]: 作品 5
+          - generic [ref=f1e49]:
+            - button "新作品 空白架构 新建作品，准备开始第一章。 1 章 · 0 字 刚刚" [ref=f1e324] [cursor=pointer]:
+              - generic [ref=f1e325]: 新作品
+              - generic [ref=f1e327]: 空白架构
+              - generic [ref=f1e328]: 新建作品，准备开始第一章。
+              - generic [ref=f1e329]:
+                - generic [ref=f1e330]: 1 章 · 0 字
+                - generic [ref=f1e331]: 刚刚
+            - button "新作品 书签视觉排查 新建作品，准备开始第一章。 1 章 · 0 字 刚刚" [ref=f1e269] [cursor=pointer]:
+              - generic [ref=f1e270]: 新作品
+              - generic [ref=f1e272]: 书签视觉排查
+              - generic [ref=f1e273]: 新建作品，准备开始第一章。
+              - generic [ref=f1e274]:
+                - generic [ref=f1e275]: 1 章 · 0 字
+                - generic [ref=f1e276]: 刚刚
+            - button "长篇小说 雾港来信 潮声落下之后，她终于在旧信封里认出了那个名字。 12 章 · 38,420 字 今天 10:24" [ref=f1e50] [cursor=pointer]:
+              - generic [ref=f1e51]: 长篇小说
+              - generic [ref=f1e53]: 雾港来信
+              - generic [ref=f1e54]: 潮声落下之后，她终于在旧信封里认出了那个名字。
+              - generic [ref=f1e55]:
+                - generic [ref=f1e56]: 12 章 · 38,420 字
+                - generic [ref=f1e57]: 今天 10:24
+            - button "悬疑 长夜列车 午夜的第七节车厢，灯光比站台上任何一盏都要明亮。 5 章 · 16,083 字 昨天 21:18" [ref=f1e58] [cursor=pointer]:
+              - generic [ref=f1e59]: 悬疑
+              - generic [ref=f1e61]: 长夜列车
+              - generic [ref=f1e62]: 午夜的第七节车厢，灯光比站台上任何一盏都要明亮。
+              - generic [ref=f1e63]:
+                - generic [ref=f1e64]: 5 章 · 16,083 字
+                - generic [ref=f1e65]: 昨天 21:18
+            - button "项目记录 学习路径 从作品结构到数据流，把每一步开发经验写成可查阅的章节。 3 章 · 4,210 字 9 月 28 日" [ref=f1e66] [cursor=pointer]:
+              - generic [ref=f1e67]: 项目记录
+              - generic [ref=f1e69]: 学习路径
+              - generic [ref=f1e70]: 从作品结构到数据流，把每一步开发经验写成可查阅的章节。
+              - generic [ref=f1e71]:
+                - generic [ref=f1e72]: 3 章 · 4,210 字
+                - generic [ref=f1e73]: 9 月 28 日
+      - text: 开始写作…
+  - status: 目标段落已变化，请重新选择。
