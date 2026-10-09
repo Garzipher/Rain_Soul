@@ -36,11 +36,11 @@
       { "key": "quality/02", "title": "根因排查、评审与提交", "file": "07-质量与Windows交付/02-根因排查代码评审与提交.md" },
       { "key": "quality/03", "title": "Logo 构建与目录包验收", "file": "07-质量与Windows交付/03-Logo构建与真实目录包验收.md" }
     ] },
-    { "key": "continuation", "title": "第八卷 持续学习与后续 P0", "chapters": [
+    { "key": "continuation", "title": "第八卷 完整 P0 与教材实践", "chapters": [
       { "key": "continuation/01", "title": "把开发过程保存为默认作品", "file": "08-持续学习与后续P0/01-把开发过程保存为默认作品.md" },
-      { "key": "continuation/02", "title": "知识、剧情与版本的下一步", "file": "08-持续学习与后续P0/02-本地知识剧情与版本的下一步.md" },
+      { "key": "continuation/02", "title": "知识、剧情与版本的领域模型", "file": "08-持续学习与后续P0/02-本地知识剧情与版本的下一步.md" },
       { "key": "continuation/03", "title": "AI 与 Python 学习验证路径", "file": "08-持续学习与后续P0/03-AI与Python学习验证路径.md" },
-      { "key": "continuation/04", "title": "教材阅读升级与旧笔记勘误", "file": "08-持续学习与后续P0/04-教材阅读升级与旧笔记勘误.md" },
+      { "key": "continuation/04", "title": "Markdown 阅读原理与旧数据勘误", "file": "08-持续学习与后续P0/04-教材阅读升级与旧笔记勘误.md" },
       { "key": "continuation/05", "title": "本机作者资料实践", "file": "08-持续学习与后续P0/05-本机作者资料实践.md" },
       { "key": "continuation/06", "title": "作品资产与知识库实践", "file": "08-持续学习与后续P0/06-作品资产与知识库实践.md" },
       { "key": "continuation/07", "title": "整部作品快照实践", "file": "08-持续学习与后续P0/07-整部作品快照实践.md" },
