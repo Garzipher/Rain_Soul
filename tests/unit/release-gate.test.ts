@@ -61,6 +61,10 @@ it('真实云每操作均需授权、费用、返回格式、无自动重试与�
   input.cloud[0].serviceUrl = 'http://127.0.0.1:8999'; input.cloud[1].model = ''; input.cloud[2].requestHash = '假哈希';
   expect(validateReleaseEvidence(input).issues.length).toBeGreaterThan(7);
 });
+it.each(['https://127.0.0.1/v1', 'https://10.0.0.1/v1', 'https://192.168.1.1/v1', 'https://[::1]/v1', 'https://mock.invalid/v1', 'https://machine.local/v1', 'https://user:password@provider.org/v1'])('明显本地/私网/保留或带凭据服务不算真实云地址：%s', url => {
+  const input = complete(); input.cloud[0].serviceUrl = url;
+  expect(validateReleaseEvidence(input).issues.some(item => item.path === 'cloud[0].serviceUrl')).toBe(true);
+});
 it('CLI只读证据，blocked返回2；不能把pending模板当成功，损坏JSON返回1', () => {
   const directory = mkdtempSync(join(tmpdir(), 'rainsoul-release-gate-')), path = join(directory, 'evidence.json');
   try {

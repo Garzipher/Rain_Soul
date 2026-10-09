@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL, URL } from 'node:url';
+import { isIP } from 'node:net';
 import process from 'node:process';
 
 export const windowsCases = ['fresh-install', 'upgrade', 'uninstall-keep', 'uninstall-cancel', 'uninstall-delete', 'uninstall-running-refusal', 'uninstall-silent-keep'];
@@ -11,7 +12,19 @@ const sha = value => typeof value === 'string' && /^[a-f\d]{64}$/i.test(value);
 const validDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
   && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
 function cloudUrl(value) {
-  try { const url = new URL(value); return url.protocol === 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) && !url.hostname.endsWith('.test') && !url.username && !url.password; }
+  try {
+    const url = new URL(value), host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return false;
+    if (host === 'localhost' || ['.test', '.invalid', '.local', '.internal', '.localhost'].some(suffix => host.endsWith(suffix))) return false;
+    if (isIP(host) === 4) {
+      const [a, b, c] = host.split('.').map(Number);
+      return !(a === 0 || a === 10 || a === 127 || a >= 224 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 ||
+        a === 192 && (b === 168 || b === 0 && (c === 0 || c === 2)) || a === 100 && b >= 64 && b <= 127 ||
+        a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
+    }
+    if (isIP(host) === 6) return /^[23][a-f\d]{3}:/i.test(host) && !/^2001:(?:db8|0):/i.test(host);
+    return host.includes('.');
+  }
   catch { return false; }
 }
 
