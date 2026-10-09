@@ -36,6 +36,22 @@ describe('会话回答恢复', () => {
     expect(api.retryConversationReply).toHaveBeenCalledWith('hash');
     expect(api.executeConversationAi).toHaveBeenCalledTimes(1);
   });
+  it('核对存在回复时展示对照，Escape关闭；放弃对话Escape不会丢弃', async () => {
+    const { api } = setup();
+    vi.mocked(api.executeConversationAi).mockRejectedValueOnce(new Error('IPC回执丢失'));
+    fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '不要丢失' } });
+    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认发送' }));
+    fireEvent.click(await screen.findByRole('button', { name: '核对此次发送结果' }));
+    const compare = await screen.findByRole('dialog', { name: '待保存回答对照' });
+    fireEvent.keyDown(compare, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '放弃待保存回答' }));
+    fireEvent.keyDown(await screen.findByRole('dialog', { name: '放弃待保存回答' }), { key: 'Escape' });
+    expect(api.discardConversationReply).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '预览发送' })).toBeDisabled();
+  });
   it('已收到回答但落盘失败时阻止离开，重试只保存不再次联网', async () => {
     const { api, dirty } = setup();
     vi.mocked(api.executeConversationAi).mockRejectedValueOnce(operationError('回答尚未保存', 'CONVERSATION_REPLY_PENDING'));
