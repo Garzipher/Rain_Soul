@@ -41,7 +41,16 @@
       { "key": "continuation/02", "title": "知识、剧情与版本的下一步", "file": "08-持续学习与后续P0/02-本地知识剧情与版本的下一步.md" },
       { "key": "continuation/03", "title": "AI 与 Python 学习验证路径", "file": "08-持续学习与后续P0/03-AI与Python学习验证路径.md" },
       { "key": "continuation/04", "title": "教材阅读升级与旧笔记勘误", "file": "08-持续学习与后续P0/04-教材阅读升级与旧笔记勘误.md" },
-      { "key": "continuation/05", "title": "本机作者资料实践", "file": "08-持续学习与后续P0/05-本机作者资料实践.md" }
+      { "key": "continuation/05", "title": "本机作者资料实践", "file": "08-持续学习与后续P0/05-本机作者资料实践.md" },
+      { "key": "continuation/06", "title": "作品资产与知识库实践", "file": "08-持续学习与后续P0/06-作品资产与知识库实践.md" },
+      { "key": "continuation/07", "title": "整部作品快照实践", "file": "08-持续学习与后续P0/07-整部作品快照实践.md" },
+      { "key": "continuation/08", "title": "手稿导入与导出实践", "file": "08-持续学习与后续P0/08-手稿导入与导出实践.md" },
+      { "key": "continuation/09", "title": "项目归档与安全迁移实践", "file": "08-持续学习与后续P0/09-项目归档与安全迁移实践.md" },
+      { "key": "continuation/10", "title": "AI 授权、候选与知识参考实践", "file": "08-持续学习与后续P0/10-AI授权候选与知识参考实践.md" },
+      { "key": "continuation/11", "title": "真实客户端验收与窄窗排错", "file": "08-持续学习与后续P0/11-真实客户端验收与窄窗排错.md" },
+      { "key": "continuation/12", "title": "历史稿导出与手稿整理补充", "file": "08-持续学习与后续P0/12-历史稿导出与手稿整理补充.md" },
+      { "key": "continuation/13", "title": "结构化知识提取与分类审核", "file": "08-持续学习与后续P0/13-结构化知识提取与分类审核.md" },
+      { "key": "continuation/14", "title": "真实搜索性能测量与隐藏窗排错", "file": "08-持续学习与后续P0/14-真实搜索性能测量与隐藏窗排错.md" }
     ] }
   ]
 }
