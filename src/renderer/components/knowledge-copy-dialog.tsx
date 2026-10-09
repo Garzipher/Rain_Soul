@@ -20,6 +20,7 @@ export function categoryPath(id: string, categories: Category[]): string {
 }
 /** 读取来源专属字典，名称匹配仅映射目标已有标签；不将来源 ID 混入目标。 */
 export function prepareKnowledgeCopy(target: WorkDetail, source: KnowledgeScope, owner: KnowledgeOwner): KnowledgeCopyPreview {
+  if (target.id === owner.workId) throw new Error('此知识已属于当前作品，无需跨作品复制。');
   const entry = source.knowledge.find(item => item.id === owner.sourceEntryId && !item.deletedAt);
   if (!entry) throw new Error('来源知识已删除或不存在，请重新查看。');
   const freshOwner = source.entryOwners[entry.id];
@@ -38,15 +39,16 @@ export function prepareKnowledgeCopy(target: WorkDetail, source: KnowledgeScope,
   return { targetWorkId: target.id, targetTitle: target.title, targetRevision: target.revision, owner, entry,
     sourceCategory: categoryPath(entry.categoryId, source.categories), sourceTags, categories, tags, matchedTagIds, unmatchedTags };
 }
-export function KnowledgeCopyDialog({ preview, busy, onConfirm, onClose }: {
+export function KnowledgeCopyDialog({ preview, busy, pending = false, onRetry, onConfirm, onClose }: {
   preview: KnowledgeCopyPreview; busy: boolean;
+  pending?: boolean; onRetry?: () => void;
   onConfirm: (categoryId: string, tagIds: string[]) => Promise<boolean>; onClose: () => void;
 }) {
   const [categoryId, setCategoryId] = useState(preview.categories.find(item => item.systemKey === 'uncategorized')?.id ?? preview.categories[0].id);
   const [tagIds, setTagIds] = useState(preview.matchedTagIds);
   const [working, setWorking] = useState(false), [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
-  const disabled = busy || working;
+  const disabled = busy || working || pending;
   async function confirm() {
     if (disabled || lock.current) return false;
     lock.current = true; setWorking(true); setError(null);
@@ -68,6 +70,7 @@ export function KnowledgeCopyDialog({ preview, busy, onConfirm, onClose }: {
       <fieldset disabled={disabled}><legend>目标作品已有标签</legend>{preview.tags.length ? preview.tags.map(tag => <label key={tag.id}><input type="checkbox" checked={tagIds.includes(tag.id)} onChange={() => setTagIds(previous => previous.includes(tag.id) ? previous.filter(id => id !== tag.id) : [...previous, tag.id])} />{tag.name}</label>) : <p>当前作品尚无标签。</p>}</fieldset>
       {!!preview.unmatchedTags.length && <p>未匹配标签：{preview.unmatchedTags.join('、')}。本次不添加；如需这些标签，请先在设置维护后重新复制。</p>}
       {error && <p role="alert">{error}</p>}
+      {pending && <p role="status">复制结果待确认，选择与原请求已保留。<button type="button" className="secondary" disabled={busy || working} onClick={onRetry}>重试本次复制</button></p>}
     </div>
   </StructureDialog>;
 }

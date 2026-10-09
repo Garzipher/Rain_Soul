@@ -20,6 +20,7 @@ it('全局知识只读，复制保留源作品且目标独立，范围查看不�
   const card = await screen.findByRole('article', { name: /知识：雨光/ });
   expect(within(card).queryByRole('button', { name: '编辑知识' })).not.toBeInTheDocument();
   fireEvent.click(within(card).getByRole('button', { name: '复制到当前作品' }));
+  fireEvent.click(await screen.findByRole('button', { name: '确认复制' }));
   await waitFor(() => expect(adapter.works.get(target.id)!.assets!.knowledge).toHaveLength(1));
   expect(adapter.works.get(target.id)!.assets!.knowledge[0].origin?.workId).toBe(source.id);
   const scope = await screen.findByLabelText('作品范围');

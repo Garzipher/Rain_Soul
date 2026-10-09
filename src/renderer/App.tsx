@@ -18,6 +18,7 @@ import './textbook.css';
 import { useAuthorProfile } from './hooks/use-author-profile';
 import type { Textbook } from '../shared/textbook';
 import { KnowledgeWorkspace } from './components/knowledge-workspace';
+import { KnowledgeCopyDialog, prepareKnowledgeCopy, type KnowledgeCopyPreview } from './components/knowledge-copy-dialog';
 import type { SnapshotCreateRequest, SnapshotRestoreRequest } from '../shared/snapshots';
 import type { KnowledgeCopyRequest } from '../shared/knowledge-scope';
 import type { ManuscriptDraft } from '../shared/manuscript';
@@ -63,11 +64,14 @@ export default function App({ api, textbook }: AppProps) {
   const [assetRecovery, setAssetRecovery] = useState({ workspace: 0, dictionary: 0, style: 0 });
   const [knowledgeScopeId, setKnowledgeScopeId] = useState<string>('');
   const [knowledgeScope, setKnowledgeScope] = useState<KnowledgeScope | null>(null);
+  const [knowledgeCopyPreview, setKnowledgeCopyPreview] = useState<KnowledgeCopyPreview | null>(null);
+  const knowledgeCopyRef = useRef(knowledgeCopyPreview);
+  knowledgeCopyRef.current = knowledgeCopyPreview;
   const [selectedKnowledgeId, setSelectedKnowledgeId] = useState<string | null>(null);
   const notifyAssetDirty = useCallback((dirty: boolean) => { assetDirtyRef.current = dirty; }, []);
   const operationInProgress = useRef(false);
   const activeOperation = useRef<Promise<void>>(Promise.resolve());
-  const session = useWritingSession(api, work, chapterId, setWork, { beforeClose: async () => { await author.waitForPending(); await activeOperation.current; if (pendingRef.current) throw new Error('结构操作结果待确认，请先重试结构操作'); if (pendingAssetRef.current) throw new Error('资产操作结果待确认，请先重试资产操作'); if (assetDirtyRef.current) throw new Error('资产编辑尚未保存，请先保存或放弃当前更改'); }, isBlocked: () => operationInProgress.current || !!pendingRef.current || !!pendingAssetRef.current || assetDirtyRef.current });
+  const session = useWritingSession(api, work, chapterId, setWork, { beforeClose: async () => { await author.waitForPending(); await activeOperation.current; if (pendingRef.current) throw new Error('结构操作结果待确认，请先重试结构操作'); if (pendingAssetRef.current) throw new Error('资产操作结果待确认，请先重试资产操作'); if (knowledgeCopyRef.current) throw new Error('知识复制尚未确认，请先确认或取消'); if (assetDirtyRef.current) throw new Error('资产编辑尚未保存，请先保存或放弃当前更改'); }, isBlocked: () => operationInProgress.current || !!pendingRef.current || !!pendingAssetRef.current || !!knowledgeCopyRef.current || assetDirtyRef.current });
   const locked = busy || session.closing || !!pending || !!pendingAsset;
   const loadWorks = useCallback(async (propagateError = false) => {
     setLoading(true);
@@ -87,7 +91,8 @@ export default function App({ api, textbook }: AppProps) {
   }, [api, page, work?.id, work?.revision, knowledgeScopeId, assetRecovery.workspace]);
 
   async function guarded(action: () => Promise<void>, allowPending = false, allowAssetDirty = false): Promise<boolean> {
-    if (operationInProgress.current || session.isClosing() || ((pendingRef.current || pendingAssetRef.current) && !allowPending) || (assetDirtyRef.current && !allowAssetDirty)) {
+    if (operationInProgress.current || session.isClosing() || ((pendingRef.current || pendingAssetRef.current) && !allowPending) || ((assetDirtyRef.current || knowledgeCopyRef.current) && !allowAssetDirty)) {
+      if (knowledgeCopyRef.current && !allowAssetDirty) setError('请先确认或取消当前知识复制。');
       if (assetDirtyRef.current && !allowAssetDirty) setError('请先保存或放弃当前资产编辑。');
       return false;
     }
@@ -186,8 +191,12 @@ export default function App({ api, textbook }: AppProps) {
       else if (request.kind === 'importManuscript') await applyImport(request.request);
       else if (request.kind === 'importProjectArchive') await applyArchiveImport(request.request);
       else if (request.kind === 'applyAi' || request.kind === 'approveAi') await applyAiOperation(request);
+      else if (request.kind === 'copyKnowledge') {
+        try { await applyVersionOperation(request); }
+        catch (reason) { if (isDefiniteRejection(reason)) { pendingRef.current = null; setPending(null); } throw reason; }
+      }
       else await applyVersionOperation(request);
-    }, true);
+    }, true, request.kind === 'copyKnowledge');
   }
   const structure = useStructureMenu(work, session.draft, manage, addChapter, locked);
   function retrySave() {
@@ -239,11 +248,17 @@ export default function App({ api, textbook }: AppProps) {
     if (!owner || !work) return false;
     return guarded(async () => {
       const target = await api.openWork(work.id);
-      const categoryId = target.assets?.categories.find(item => item.systemKey === 'uncategorized' && !item.deletedAt)?.id;
-      if (!categoryId) throw new Error('当前作品缺少有效的未分类类别，请先修复分类后再复制。');
-      const operation: PendingOperation & { kind: 'copyKnowledge' } = { kind: 'copyKnowledge', request: { workId: target.id, expectedRevision: target.revision, operationId: crypto.randomUUID(), sourceWorkId: owner.workId, sourceEntryId: owner.sourceEntryId, sourceExpectedRevision: owner.sourceRevision, categoryId, tagIds: [] } };
+      const source = await api.readKnowledgeScope(owner.workId);
+      setKnowledgeCopyPreview(prepareKnowledgeCopy(target, source, owner));
+    }, false, true);
+  }
+  async function confirmKnowledgeCopy(categoryId: string, tagIds: string[]): Promise<boolean> {
+    const preview = knowledgeCopyRef.current;
+    if (!preview || !work || preview.targetWorkId !== work.id) return false;
+    return guarded(async () => {
+      const operation: PendingOperation & { kind: 'copyKnowledge' } = { kind: 'copyKnowledge', request: { workId: preview.targetWorkId, expectedRevision: preview.targetRevision, operationId: crypto.randomUUID(), sourceWorkId: preview.owner.workId, sourceEntryId: preview.owner.sourceEntryId, sourceExpectedRevision: preview.owner.sourceRevision, categoryId, tagIds } };
       try { await applyVersionOperation(operation); }
-      catch (reason) { pendingRef.current = operation; setPending(operation); throw reason; }
+      catch (reason) { if (!isDefiniteRejection(reason)) { pendingRef.current = operation; setPending(operation); } throw reason; }
     }, false, true);
   }
 
@@ -256,7 +271,7 @@ export default function App({ api, textbook }: AppProps) {
       setChapterId(previous => updated.chapters.some(chapter => chapter.id === previous) ? previous : updated.chapters[0]?.id ?? null);
       setLocation(null);
     }
-    if (operation.kind === 'copyKnowledge') { setKnowledgeScopeId(updated.id); setKnowledgeScope(null); }
+    if (operation.kind === 'copyKnowledge') { setKnowledgeScopeId(updated.id); setKnowledgeScope(null); setKnowledgeCopyPreview(null); }
   }
   function manageSnapshot(kind: 'createSnapshot' | 'restoreSnapshot', value: string): Promise<boolean> {
     return guarded(async () => {
@@ -343,6 +358,7 @@ export default function App({ api, textbook }: AppProps) {
   }
 
   return <div className={`app ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
+    {knowledgeCopyPreview && <KnowledgeCopyDialog preview={knowledgeCopyPreview} busy={busy || session.closing} pending={pending?.kind === 'copyKnowledge'} onRetry={retryStructure} onConfirm={confirmKnowledgeCopy} onClose={() => setKnowledgeCopyPreview(null)} />}
     <Sidebar author={author} locked={locked} expanded={expanded} page={page} onToggle={() => setExpanded((value) => !value)} onNavigate={navigate} />
     <main className="main">
       {session.closeError && !(page === 'work' && session.status.phase === 'failed') && <div className="page-error" role="alert">{session.closeError}</div>}
