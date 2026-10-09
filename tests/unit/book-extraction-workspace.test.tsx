@@ -93,3 +93,14 @@ it('分页保持审核选择；取消失败保留内容，来源更改带入确�
   fireEvent.click(screen.getByRole('button', { name: '确认入库（1）' }));
   await waitFor(() => expect(api.confirmBookExtraction).toHaveBeenCalledWith(expect.objectContaining({ sourceTitle: '准确作品名', sourceAuthor: '准确作者' })));
 });
+it('文件选择解析尚未返回时同步通知脏保护，取消选择完成后解除', async () => {
+  const { api, onDirtyChange } = setup();
+  let resolve!: (value: null) => void;
+  vi.mocked(api.chooseBookExtraction).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  onDirtyChange.mockClear();
+  fireEvent.click(screen.getByRole('button', { name: '选择 TXT / DOCX' }));
+  expect(onDirtyChange).toHaveBeenCalledWith(true);
+  expect(screen.getByRole('button', { name: '返回知识库' })).toHaveProperty('disabled', true);
+  resolve(null);
+  await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
+});

@@ -16,14 +16,14 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
   const locked = useRef(false), attempt = useRef<{ fingerprint: string; operationId: string } | null>(null);
   const categories = work.assets?.categories.filter(item => !item.deletedAt) ?? [], tags = work.assets?.tags.filter(item => !item.deletedAt) ?? [];
   const chosen = preview?.segments.filter(segment => reviews[segment.id]?.checked) ?? [];
-  useEffect(() => { onDirtyChange?.(preview !== null); }, [onDirtyChange, preview]);
+  useEffect(() => { onDirtyChange?.(preview !== null || busy); }, [onDirtyChange, preview, busy]);
   useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
   function update(id: string, patch: Partial<Review>) {
     setReviews(current => ({ ...current, [id]: { ...current[id], ...patch, checked: patch.checked ?? false } }));
   }
   async function choose() {
     if (locked.current) return;
-    locked.current = true; setBusy(true); setError('');
+    locked.current = true; onDirtyChange?.(true); setBusy(true); setError('');
     try {
       const result = await api.chooseBookExtraction(work.id, encoding); if (!result) return;
       const categoryId = categories.find(item => item.systemKey === 'uncategorized')?.id ?? categories[0]?.id ?? '';
