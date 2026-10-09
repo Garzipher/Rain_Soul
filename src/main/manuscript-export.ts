@@ -28,7 +28,7 @@ function prepare(work: ExportManuscript): OutputBlock[] {
     }
     return map;
   };
-  const chapters = [...work.volumes.flatMap(volume => volume.chapters), ...work.unvolumedChapters];
+  const chapters = [...work.unvolumedChapters, ...work.volumes.flatMap(volume => volume.chapters)];
   const chapterMap = unique(chapters), knowledge = unique(work.knowledge), foreshadows = unique(work.foreshadows);
   unique(work.evidence);
   const paragraphs = new Set<string>(), bookmarks = new Set<string>(), references = new Map<string, number>();
@@ -65,8 +65,8 @@ function prepare(work: ExportManuscript): OutputBlock[] {
       add(text);
     }
   };
-  for (const volume of work.volumes) { add(volume.title, true); volume.chapters.forEach(addChapter); }
   work.unvolumedChapters.forEach(addChapter);
+  for (const volume of work.volumes) { add(volume.title, true); volume.chapters.forEach(addChapter); }
   if (references.size) {
     add('引用清单', true);
     for (const [id, number] of references) {

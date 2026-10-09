@@ -32,7 +32,8 @@ describe('固定版本手稿导出', () => {
     const work = example(), before = structuredClone(work);
     const text = exportTxtManuscript(work).toString('utf8');
     expect(text.indexOf('第一卷 雨')).toBeLessThan(text.indexOf('第一章 雨夜'));
-    expect(text.indexOf('第二章 空章')).toBeLessThan(text.indexOf('第三章 归来'));
+    expect(text.indexOf('第三章 归来')).toBeLessThan(text.indexOf('第一卷 雨'));
+    expect(text.indexOf('第一章 雨夜')).toBeLessThan(text.indexOf('第二章 空章'));
     expect(text).toContain('雨🌧️[1]\r\n之后[伏笔：旧钥匙]');
     expect(text).toContain('[1][2]');
     expect(text.match(/\[1\] 雨像琴弦。/g)).toHaveLength(1);
@@ -46,6 +47,25 @@ describe('固定版本手稿导出', () => {
     expect(text).toContain('已删章节');
     expect(work).toEqual(before);
     expect(text.replace(/\r\n/g, '')).not.toContain('\n');
+  });
+  it.each(['当前版本', '历史冻结版本'])('%s混合卷章TXT/DOCX与正文树一致，首次引用按序章分配', async label => {
+    const work = example(); work.revision = label === '当前版本' ? 10 : 3;
+    const opening = work.unvolumedChapters[0]; opening.title = '序章';
+    opening.document.content[1].content!.reverse();
+    const before = structuredClone(work);
+    const txt = exportTxtManuscript(work).toString('utf8');
+    const files = await readDocxPackage(await exportDocxManuscript(work), { title: '书' });
+    const parsed = parseWordXml(files.get('word/document.xml')!.toString('utf8'), files.get('word/styles.xml')!.toString('utf8'));
+    for (const text of [txt, parsed.blocks.map(block => block.text).join('\n')]) {
+      expect(text.indexOf('序章')).toBeLessThan(text.indexOf('第一卷 雨'));
+      expect(text.indexOf('第一卷 雨')).toBeLessThan(text.indexOf('第一章 雨夜'));
+      expect(text.indexOf('第一章 雨夜')).toBeLessThan(text.indexOf('第二章 空章'));
+      expect(text).toContain('[1][2]');
+      expect(text).toContain('雨🌧️[2]');
+      expect(text).toContain('[1] 已删除条目');
+      expect(text.match(/\[2\] 雨像琴弦。/g)).toHaveLength(1);
+    }
+    expect(work).toEqual(before);
   });
   it('DOCX真实包可解析，正文/卷章标题固定字体字号颜色和1.5行距', async () => {
     const bytes = await exportDocxManuscript(example());
