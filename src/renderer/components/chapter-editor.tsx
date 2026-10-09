@@ -35,7 +35,15 @@ export function ChapterEditor({ document, assets, locked, onChange, onError, onC
         contextmenu: (view, event) => {
           const current = aiEntry.current;
           if (current.locked || !current.onAiRequest) return false;
-          const selected = captureWritingSelection(view.state.doc, view.state.selection.from, view.state.selection.to);
+          // 自定义右键先于文档观察器，读取当前DOM选区以免冻结上一次光标位置。
+          const domSelection = view.dom.ownerDocument.getSelection();
+          if (!domSelection?.anchorNode || !domSelection.focusNode || !view.dom.contains(domSelection.anchorNode) || !view.dom.contains(domSelection.focusNode)) return false;
+          let anchor: number, head: number;
+          try {
+            anchor = view.posAtDOM(domSelection.anchorNode, domSelection.anchorOffset);
+            head = view.posAtDOM(domSelection.focusNode, domSelection.focusOffset);
+          } catch { return false; }
+          const selected = captureWritingSelection(view.state.doc, Math.min(anchor, head), Math.max(anchor, head));
           if (!selected) return false;
           event.preventDefault();
           const choices = [['sentencePolish', 'AI 单句润色'], ['paragraphPolish', 'AI 段落润色'], ['continue', 'AI 续写'], ['correct', 'AI 纠错']] as const;
