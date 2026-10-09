@@ -200,5 +200,5 @@ it.each(['人称', '节奏', '禁用项', '参考作品'])('写作特点的%s草
   await waitFor(() => expect(override).toHaveProperty('disabled', false));
   expect(onAction).toHaveBeenCalledTimes(1);
   expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'publishStyle' }));
-  expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+  await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
 });
