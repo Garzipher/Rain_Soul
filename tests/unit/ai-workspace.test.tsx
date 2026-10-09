@@ -10,6 +10,43 @@ import { emptyDocument } from '../../src/shared/document';
 import type { WorkDetail } from '../../src/shared/contracts';
 import type { AiCandidate, AiPreparedRequest } from '../../src/shared/ai';
 afterEach(cleanup);
+it('正文右键带入重复单句真实选区，预览发送目标偏移且不自动联网', async () => {
+  const { props, view } = setup();
+  props.work.chapters[0].document.content[0].content = [{ type: 'text', text: '雨落。雨落。' }];
+  const paragraphId = props.work.chapters[0].document.content[0].attrs.id;
+  view.rerender(<AiWorkspace {...props} selectionRequest={{ operation: 'sentencePolish', token: 1, paragraphIds: [paragraphId], text: '雨落。', sentenceFrom: 3 }} />);
+  await waitFor(() => expect(screen.getByLabelText('目标单句')).toHaveValue('雨落。'));
+  expect(props.onPrepare).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
+  await screen.findByRole('dialog');
+  expect(props.onPrepare).toHaveBeenCalledWith(expect.objectContaining({ operation: 'sentencePolish', targetParagraphIds: [paragraphId], sentenceText: '雨落。', sentenceFrom: 3 }));
+  expect(props.onExecute).not.toHaveBeenCalled();
+});
+it('切换章节清除旧选区，避免上一章偏移误用于新章', async () => {
+  const { props, view } = setup();
+  view.rerender(<AiWorkspace {...props} selectionRequest={{ operation: 'sentencePolish', token: 1, paragraphIds: [props.work.chapters[0].document.content[0].attrs.id], text: '原文', sentenceFrom: 0 }} />);
+  await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveValue('sentencePolish'));
+  const work = { ...props.work, chapters: [...props.work.chapters, { ...props.work.chapters[0], id: 'second', document: emptyDocument() }] };
+  view.rerender(<AiWorkspace {...props} work={work} chapterId="second" />);
+  await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveValue('paragraphPolish'));
+  expect(screen.queryByLabelText('目标单句')).toBeNull();
+});
+it('同章前插重复句后从右上重开清除旧偏移，候选和原文仍配对保留', async () => {
+  const { props, view } = setup();
+  props.work.chapters[0].document.content[0].content = [{ type: 'text', text: '雨落。雨落。' }];
+  view.rerender(<AiWorkspace {...props} entryToken={1} selectionRequest={{ operation: 'sentencePolish', token: 1, paragraphIds: [props.work.chapters[0].document.content[0].attrs.id], text: '雨落。', sentenceFrom: 3 }} />);
+  fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
+  await screen.findByText('润色候选');
+  const work = structuredClone(props.work); work.revision++;
+  work.chapters[0].document.content[0].content = [{ type: 'text', text: '雨落。雨落。雨落。' }];
+  view.rerender(<AiWorkspace {...props} work={work} entryToken={2} />);
+  await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveValue('paragraphPolish'));
+  expect(screen.queryByLabelText('目标单句')).toBeNull();
+  expect(screen.getByText('润色候选')).toBeVisible();
+  expect(screen.getByLabelText('原文对比')).toHaveTextContent('雨落。');
+  expect(screen.getByText(/结果已过期/)).toBeVisible();
+});
 function setup() {
   const document = emptyDocument(); document.content[0].content = [{ type: 'text', text: '原文雨夜' }];
   const work: WorkDetail = { id: 'work', title: '雨夜', revision: 3, chapters: [{ id: 'chapter', title: '第一章', document, wordCount: 4, volumeId: null }], volumes: [], deletedItems: [] };

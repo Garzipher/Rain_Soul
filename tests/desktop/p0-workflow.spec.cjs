@@ -109,15 +109,15 @@ test('离线知识、剧情、伏笔书签与整部作品恢复通过真实 IPC 
     await editor.getByRole('button', { name: '伏笔书签：旧钥匙', exact: true }).click();
     await expect(page.getByRole('dialog', { name: '旧钥匙', exact: true })).toContainText('钥匙纹样');
     await activate(page.getByRole('button', { name: '关闭书签详情', exact: true }));
-    await activate(page.getByRole('tab', { name: '版本快照', exact: true }));
+    await activate(page.getByRole('button', { name: '版本历史', exact: true }));
     await page.getByRole('textbox', { name: '快照名称', exact: true }).fill('第一稿');
     await activate(page.getByRole('button', { name: '创建快照', exact: true }));
     await expect(page.getByRole('button', { name: '预览并恢复：第一稿', exact: true })).toBeVisible();
     const original = await currentWork(page, '雨落之后');
     expect(original.chapters[0].document.content.flatMap(item => item.content ?? []).filter(item => item.type === 'bookmark')).toHaveLength(2);
-    await activate(page.getByRole('tab', { name: '正文', exact: true }));
+    await activate(page.getByRole('button', { name: '关闭版本历史', exact: true }));
     await writeChapter(page, '修改稿章节', '这是恢复前必须保留的修改稿。');
-    await activate(page.getByRole('tab', { name: '版本快照', exact: true }));
+    await activate(page.getByRole('button', { name: '版本历史', exact: true }));
     const beforeHistoricalExport = await currentWork(page, '雨落之后');
     const beforeHistory = await page.evaluate(id => window.rainSoul.listSnapshots(id), original.id);
     for (const format of ['TXT', 'DOCX']) {
@@ -147,6 +147,7 @@ test('离线知识、剧情、伏笔书签与整部作品恢复通过真实 IPC 
     expect(restored.assets.knowledge).toEqual(original.assets.knowledge);
     expect(restored.assets.foreshadows).toEqual(original.assets.foreshadows);
     expect(restored.assets.evidence[0].paragraphId).toBe(original.chapters[0].document.content[0].attrs.id);
+    await activate(page.getByRole('button', { name: '关闭版本历史', exact: true }));
     const archive = path.join(directory, '完整关系.rainsoul');
     await setDialogFile(application, archive, true);
     await activate(page.getByRole('button', { name: '备份项目', exact: true }));
@@ -256,7 +257,7 @@ test('云端设置与发送范围预览可离线取消且不修改原稿', async
     await sidebar(page, '作品集');
     await activate(page.getByRole('button', { name: '打开作品：AI授权演练', exact: true }));
     const before = await currentWork(page, 'AI授权演练');
-    await activate(page.getByRole('tab', { name: 'AI 助手', exact: true }));
+    await activate(page.getByRole('button', { name: 'AI 工具', exact: true }));
     await page.getByText('知识参考 · 作者选用', { exact: true }).press('Enter');
     await page.getByRole('checkbox', { name: '雨落在旧车站，路灯把人影拉长。', exact: true }).check();
     await activate(page.getByRole('button', { name: '预览 AI 请求', exact: true }));
@@ -272,6 +273,19 @@ test('云端设置与发送范围预览可离线取消且不修改原稿', async
     const after = await currentWork(page, 'AI授权演练');
     expect(after.chapters).toEqual(before.chapters);
     expect(await page.evaluate(id => window.rainSoul.listSnapshots(id), after.id)).toHaveLength(0);
+    await activate(page.getByRole('button', { name: '关闭AI工具', exact: true }));
+    const editor = page.getByRole('textbox', { name: '章节正文', exact: true });
+    await editor.press('Control+Home');
+    for (let index = 0; index < 3; index++) await editor.press('Shift+ArrowRight');
+    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(prose.slice(0, 3));
+    await editor.dispatchEvent('contextmenu', { clientX: 360, clientY: 230 });
+    await activate(page.getByRole('menuitem', { name: 'AI 单句润色', exact: true }));
+    await expect(page.getByRole('textbox', { name: '目标单句', exact: true })).toHaveValue(prose.slice(0, 3));
+    await expect(page.getByRole('combobox', { name: 'AI 操作', exact: true })).toHaveValue('sentencePolish');
+    await activate(page.getByRole('button', { name: '预览 AI 请求', exact: true }));
+    await expect(confirmation).toContainText(prose.slice(0, 3));
+    await activate(confirmation.getByRole('button', { name: '取消', exact: true }));
+    expect((await currentWork(page, 'AI授权演练')).chapters).toEqual(before.chapters);
   } finally { await cleanup(application, directory); }
 });
 
@@ -286,8 +300,8 @@ test('最小窗口的写作入口和AI面板可在侧栏展开与收起时触达
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(720, 540));
     for (const expanded of [false, true]) {
       if (expanded) await activate(page.getByRole('button', { name: '展开侧栏', exact: true }));
-      await activate(page.getByRole('tab', { name: 'AI 助手', exact: true }));
-      await page.evaluate(() => { document.scrollingElement.scrollTop = 0; document.querySelector('#panel-ai').scrollTop = 0; });
+      await activate(page.getByRole('button', { name: 'AI 工具', exact: true }));
+      await page.evaluate(() => { document.scrollingElement.scrollTop = 0; document.querySelector('dialog[aria-label="AI工具"]').scrollTop = 0; });
       await page.screenshot({ path: test.info().outputPath(`small-window-${expanded ? 'expanded' : 'collapsed'}.png`), fullPage: true });
       const geometry = await page.evaluate(() => {
         const items = [...document.querySelectorAll('button')].filter(item => ['备份项目', '导出 TXT', '导出 DOCX', '预览 AI 请求'].includes(item.textContent.trim()));
@@ -308,6 +322,7 @@ test('最小窗口的写作入口和AI面板可在侧栏展开与收起时触达
       }
       await page.getByRole('button', { name: '预览 AI 请求', exact: true }).scrollIntoViewIfNeeded();
       await expect.soft(page.getByRole('button', { name: '预览 AI 请求', exact: true })).toBeInViewport();
+      await activate(page.getByRole('button', { name: '关闭AI工具', exact: true }));
     }
   } finally { await cleanup(application, directory); }
 });

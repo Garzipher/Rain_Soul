@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Document from '@tiptap/extension-document';
 import HardBreak from '@tiptap/extension-hard-break';
 import Paragraph from '@tiptap/extension-paragraph';
@@ -10,11 +10,16 @@ import type { AssetState } from '../../shared/assets';
 import { validateDocument } from '../../shared/document';
 import { stableParagraphIds } from '../lib/paragraph-ids';
 import { BookmarkDetails, bookmarkInfo, inlineBookmark, insertBookmarkAtSelection } from './inline-bookmark';
+import { ContextMenu, type MenuState } from './context-menu';
+import { captureWritingSelection, type WritingAiRequest } from '../lib/writing-ai-selection';
 
-export interface ChapterEditorProps { document: WritingDocument; assets?: AssetState; locked: boolean; onChange: (document: WritingDocument) => void; onError: (error: string) => void; onCompositionChange: (value: boolean) => void; location?: { paragraphId: string; token: number } | null; onLocateAsset?: (kind: BookmarkNode['attrs']['kind'], id: string) => void }
+export interface ChapterEditorProps { document: WritingDocument; assets?: AssetState; locked: boolean; onChange: (document: WritingDocument) => void; onError: (error: string) => void; onCompositionChange: (value: boolean) => void; location?: { paragraphId: string; token: number } | null; onLocateAsset?: (kind: BookmarkNode['attrs']['kind'], id: string) => void; onAiRequest?: (request: WritingAiRequest) => void }
 
 /** 固定样式正文保存段落、文本、换行与书签关联；不导入外部 HTML 样式。 */
-export function ChapterEditor({ document, assets, locked, onChange, onError, onCompositionChange, location, onLocateAsset }: ChapterEditorProps) {
+export function ChapterEditor({ document, assets, locked, onChange, onError, onCompositionChange, location, onLocateAsset, onAiRequest }: ChapterEditorProps) {
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const aiEntry = useRef({ locked, onAiRequest });
+  useEffect(() => { aiEntry.current = { locked, onAiRequest }; }, [locked, onAiRequest]);
   const [kind, setKind] = useState<BookmarkNode['attrs']['kind']>('knowledge');
   const [target, setTarget] = useState('');
   const [detail, setDetail] = useState<BookmarkNode['attrs'] | null>(null);
@@ -27,6 +32,18 @@ export function ChapterEditor({ document, assets, locked, onChange, onError, onC
     editorProps: {
       attributes: { role: 'textbox', 'aria-label': '章节正文', 'aria-multiline': 'true', class: 'writing-body', spellcheck: 'false' },
       handleDOMEvents: {
+        contextmenu: (view, event) => {
+          const current = aiEntry.current;
+          if (current.locked || !current.onAiRequest) return false;
+          const selected = captureWritingSelection(view.state.doc, view.state.selection.from, view.state.selection.to);
+          if (!selected) return false;
+          event.preventDefault();
+          const choices = [['sentencePolish', 'AI 单句润色'], ['paragraphPolish', 'AI 段落润色'], ['continue', 'AI 续写'], ['correct', 'AI 纠错']] as const;
+          setMenu({ x: event.clientX, y: event.clientY, trigger: view.dom, items: choices.map(([operation, label]) => ({ label,
+            disabled: operation === 'sentencePolish' && selected.sentenceFrom === undefined,
+            action: () => { if (!aiEntry.current.locked) aiEntry.current.onAiRequest?.({ ...selected, operation, token: Date.now() }); } })) });
+          return true;
+        },
         keydown: (_view, event) => {
           if (event.key !== 'Enter' && event.key !== ' ') return false;
           const element = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-bookmark-id]') : null;
@@ -96,6 +113,7 @@ export function ChapterEditor({ document, assets, locked, onChange, onError, onC
       <select aria-label="书签目标" value={targetId} disabled={locked || !options?.length} onChange={event => setTarget(event.target.value)}>{!options?.length && <option value="">暂无可关联条目</option>}{options?.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
       <button className="secondary" disabled={locked || !targetId} onMouseDown={event => event.preventDefault()} onClick={insertBookmark}>插入书签</button></div>}
     <EditorContent editor={editor} />
+    {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
     {detail && <BookmarkDetails bookmark={detail} assets={assets} onClose={() => setDetail(null)} onLocateAsset={onLocateAsset} locked={locked} />}
   </>;
 }

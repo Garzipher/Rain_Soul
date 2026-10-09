@@ -7,10 +7,13 @@ import { analyzeAiCandidate } from '../../shared/ai-analysis';
 import { parseAiExtraction, suggestedExtractionCategory, type AiKnowledgeApproval } from '../../shared/ai-extraction';
 import { AiExtractionPanel, type ExtractionReviewItem } from './ai-extraction-panel';
 import './ai-workspace.css';
+import type { WritingAiRequest } from '../lib/writing-ai-selection';
 export interface AiWorkspaceProps {
+  entryToken?: number;
+  selectionRequest?: WritingAiRequest;
   onLocate?: (chapterId: string, paragraphId: string) => void;
   work: WorkDetail; chapterId: string | null; busy: boolean;
-  onPrepare: (request: { operation: AiOperation; scope: 'chapter' | 'previous' | 'volume' | 'custom'; chapterIds?: string[]; instruction?: string; targetParagraphIds?: string[]; sentenceText?: string; referenceKnowledgeIds?: string[] }) => Promise<AiPreparedRequest>;
+  onPrepare: (request: { operation: AiOperation; scope: 'chapter' | 'previous' | 'volume' | 'custom'; chapterIds?: string[]; instruction?: string; targetParagraphIds?: string[]; sentenceText?: string; sentenceFrom?: number; referenceKnowledgeIds?: string[] }) => Promise<AiPreparedRequest>;
   onExecute: (request: AiExecuteRequest) => Promise<AiCandidate>; onCancel: (token: string) => void | Promise<void>;
   onApply: (candidateId: string) => Promise<boolean>; onExtract: (candidateId: string, items: AiKnowledgeApproval[]) => Promise<boolean>;
 }
@@ -22,6 +25,7 @@ export function AiWorkspace(props: AiWorkspaceProps) {
   const [chapterIds, setChapterIds] = useState<string[]>([]), [targetIds, setTargetIds] = useState<string[]>([]);
   const [instruction, setInstruction] = useState(''), [prepared, setPrepared] = useState<AiPreparedRequest | null>(null);
   const [sentenceText, setSentenceText] = useState('');
+  const [sentenceFrom, setSentenceFrom] = useState<number>();
   const [referenceIds, setReferenceIds] = useState<string[]>([]);
   const [candidate, setCandidate] = useState<AiCandidate | null>(null), [original, setOriginal] = useState('');
   const pendingOriginal = useRef('');
@@ -34,6 +38,14 @@ export function AiWorkspace(props: AiWorkspaceProps) {
     : scope === 'volume' && chapter?.volumeId ? props.work.chapters.filter(item => item.volumeId === chapter.volumeId)
     : scope === 'custom' ? props.work.chapters.filter(item => chapterIds.includes(item.id) || item.id === props.chapterId) : chapter ? [chapter] : [];
   const related = relatedAiKnowledge(props.work, referenceChapters.map(item => item.document.content.map(paragraphText).join('\n')).join('\n'));
+  useEffect(() => {
+    setTargetIds([]); setSentenceText(''); setSentenceFrom(undefined); setOperation('paragraphPolish');
+  }, [props.chapterId, props.entryToken]);
+  useEffect(() => {
+    const selection = props.selectionRequest;
+    if (!selection) return;
+    setOperation(selection.operation); setTargetIds(selection.paragraphIds); setSentenceText(selection.text); setSentenceFrom(selection.sentenceFrom); setScope('chapter'); setError('');
+  }, [props.selectionRequest]);
   useEffect(() => { alive.current = true; return () => { alive.current = false; if (token.current) void Promise.resolve(props.onCancel(token.current)).catch(() => undefined); }; }, [props.work.id]);
   async function run(task: () => Promise<void>) {
     if (lock.current || props.busy) return;
@@ -48,7 +60,7 @@ export function AiWorkspace(props: AiWorkspaceProps) {
       if (operation === 'sentencePolish') {
         if (targetIds.length !== 1) throw new Error('单句润色需要明确选择单个段落。');
         const text = paragraphText(chapter.document.content.find(item => item.attrs.id === targetIds[0])!);
-        if (!sentenceText.trim() || text.indexOf(sentenceText) < 0 || text.indexOf(sentenceText) !== text.lastIndexOf(sentenceText)) throw new Error('目标单句必须在所选段落中唯一匹配，请重新选择。');
+        if (!sentenceText.trim() || (sentenceFrom === undefined ? text.indexOf(sentenceText) < 0 || text.indexOf(sentenceText) !== text.lastIndexOf(sentenceText) : text.slice(sentenceFrom, sentenceFrom + sentenceText.length) !== sentenceText)) throw new Error('目标单句已变化或无法唯一匹配，请重新选择。');
       }
       const selected = targetIds.length ? chapter.document.content.filter(item => targetIds.includes(item.attrs.id)) : chapter.document.content;
       if (['paragraphPolish', 'continue', 'correct'].includes(operation)) {
@@ -56,7 +68,7 @@ export function AiWorkspace(props: AiWorkspaceProps) {
         if (positions.some((position, index) => position !== positions[0] + index)) throw new Error('正文候选请选择连续的目标段落，未发送请求。');
       }
       const baseline = operation === 'sentencePolish' ? sentenceText : selected.map(paragraphText).join('\n');
-      const value = await props.onPrepare({ operation, scope, chapterIds: scope === 'custom' ? chapterIds : undefined, instruction: instruction || undefined, targetParagraphIds: selected.map(item => item.attrs.id), referenceKnowledgeIds: referenceIds.filter(id => related.some(item => item.entry.id === id)), ...(operation === 'sentencePolish' ? { sentenceText } : {}) });
+      const value = await props.onPrepare({ operation, scope, chapterIds: scope === 'custom' ? chapterIds : undefined, instruction: instruction || undefined, targetParagraphIds: selected.map(item => item.attrs.id), referenceKnowledgeIds: referenceIds.filter(id => related.some(item => item.entry.id === id)), ...(operation === 'sentencePolish' ? { sentenceText, ...(sentenceFrom !== undefined ? { sentenceFrom } : {}) } : {}) });
       if (!alive.current) { await props.onCancel(value.confirmationToken); return; }
       token.current = value.confirmationToken; pendingOriginal.current = baseline; setPrepared(value);
     });
@@ -90,7 +102,8 @@ export function AiWorkspace(props: AiWorkspaceProps) {
   return <section className="ai-workspace" aria-label="AI 写作助手"><div className="ai-request-form">
     <h2>AI 写作助手</h2><p className="ai-muted">每次操作先确认发送范围，候选由作者决定是否采用。</p>
     <label>AI 操作<select aria-label="AI 操作" value={operation} disabled={disabled} onChange={event => setOperation(event.target.value as AiOperation)}>{operations.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-    {operation === 'sentencePolish' && <label>目标单句<input aria-label="目标单句" value={sentenceText} disabled={disabled} onChange={event => setSentenceText(event.target.value)} placeholder="从一个已选段落中复制需要润色的单句" /></label>}
+    {props.selectionRequest && <p className="ai-muted">已选定 {props.selectionRequest.paragraphIds.length} 个段落。单句润色只替换选中原文；段落润色和纠错处理选区涉及的完整段落，续写追加在目标段落之后。</p>}
+    {operation === 'sentencePolish' && <label>目标单句<input aria-label="目标单句" value={sentenceText} disabled={disabled} onChange={event => { setSentenceText(event.target.value); setSentenceFrom(undefined); }} placeholder="从一个已选段落中复制需要润色的单句" /></label>}
     <label>上下文范围<select aria-label="上下文范围" value={scope} disabled={disabled} onChange={event => setScope(event.target.value as typeof scope)}><option value="chapter">当前章节</option><option value="previous">前章衔接</option><option value="volume" disabled={!chapter?.volumeId}>全卷</option><option value="custom">自定义范围</option></select></label>
     {scope === 'previous' && chapterIndex === 0 && <p className="ai-muted">当前是首章，没有前章，仅发送当前章节。</p>}
     {scope === 'custom' && <fieldset disabled={disabled}><legend>自定义章节</legend>{props.work.chapters.map(item => <label key={item.id}><input type="checkbox" checked={chapterIds.includes(item.id)} onChange={event => setChapterIds(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} />{item.title}</label>)}</fieldset>}
@@ -101,6 +114,7 @@ export function AiWorkspace(props: AiWorkspaceProps) {
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}{pending && <p role="status">{sending ? '等待云端候选…' : '正在处理…'}</p>}
   </div>
   {candidate && <div className="ai-candidate"><h2>{isAnalysis ? 'AI 建议' : '待审核候选'}</h2><p className="ai-muted">基线版本 {candidate.baselineRevision} · 结果可能有误，请结合原文证据判断。</p>
+    <p className="ai-muted">来源章节：{props.work.chapters.filter(item => item.document.content.some(paragraph => candidate.paragraphIds.includes(paragraph.attrs.id))).map(item => item.title).join('、') || '原来源章节已删除'}。关闭工具后候选仍保留，切换章节不会把候选改为新章正文。</p>
     {stale && <p role="status">结果已过期：原文或作品资料已经变化，请重新生成后再使用。</p>}
     {movedBookmarks > 0 && <p role="status">应用后 {movedBookmarks} 个书签会完整保留到替换首段末尾，原来的句内位置将变化，请确认后重新核对位置。</p>}
     {isAnalysis ? <p>这是 AI 建议，证据与不确定性请逐项核对。</p> : <div aria-label="原文对比" className="ai-original"><h3>原文</h3><pre>{original}</pre></div>}
