@@ -57,7 +57,7 @@ async function publicHttpsFetch(url: string, options: RequestInit, addresses: st
 }
 
 /** 仅发送已冻结的公开端点请求；失败不重发，完整响应才返回。 */
-export async function sendAiCompletion(request: AiTransportRequest, dependencies: AiTransportDependencies, signal: AbortSignal): Promise<string> {
+export async function sendAiCompletion(request: AiTransportRequest, dependencies: AiTransportDependencies, signal: AbortSignal, beforeSend?: () => Promise<void>): Promise<string> {
   let addresses: string[];
   try { addresses = isIP(request.hostname) ? [request.hostname] : await (dependencies.resolveHost ?? (async hostname => (await lookup(hostname, { all: true })).map(item => item.address)))(request.hostname); }
   catch { throw new Error('无法确认云端服务公开地址，请检查配置后手动重试。'); }
@@ -67,6 +67,7 @@ export async function sendAiCompletion(request: AiTransportRequest, dependencies
   try { key = await dependencies.credentials.read(request.provider.id, request.provider); } catch { throw new Error('无法读取云端服务凭据，请重新配置。'); }
   if (!key || /[\r\n]/.test(key)) throw new Error('尚未配置有效的云端服务凭据。');
   signal.throwIfAborted();
+  await beforeSend?.(); signal.throwIfAborted();
   let response: Response;
   try {
     const init: RequestInit = { method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: request.body, signal };
