@@ -30,6 +30,10 @@ export function buildAiContext(work: WorkDetail, value: AiContextRequest): AiCon
     selection = { paragraphId: paragraphIds[0], from, to: from + request.sentenceText.length, text: request.sentenceText };
   }
   const labels = { chapter: '当前章节', previous: '前章衔接', volume: '全卷', custom: '自定义范围' };
-  return { workId: work.id, baselineRevision: work.revision, paragraphIds, referenceChapterIds: selected.map(chapter => chapter.id), scopeLabel: `${labels[request.scope]}${request.scope === 'previous' && index === 0 ? '（无前章）' : ''}：${selected.map(chapter => chapter.title).join('、')}`,
+  const scopeName = `${labels[request.scope]}${request.scope === 'previous' && index === 0 ? '（无前章）' : ''}`;
+  const fullLabel = `${scopeName}：${selected.map(chapter => chapter.title).join('、')}`;
+  // 标签为主进程追加作品参考说明保留空间；完整章节清单仍在发送正文中，不截断材料。
+  const scopeLabel = fullLabel.length <= 200 ? fullLabel : `${scopeName}：共 ${selected.length} 章（章节清单见完整发送内容）`;
+  return { workId: work.id, baselineRevision: work.revision, paragraphIds, referenceChapterIds: selected.map(chapter => chapter.id), scopeLabel,
     text: `目标正文（候选只修改这部分）：\n${selection?.text ?? targets}\n\n已授权上下文：\n${plain}`, ...(selection ? { selection } : {}) };
 }
