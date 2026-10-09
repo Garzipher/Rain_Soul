@@ -1,6 +1,6 @@
 {
   "name": "soulrain",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "本地优先的中文写作工作台",
   "main": "dist/desktop/main.cjs",
   "scripts": {
@@ -87,11 +87,14 @@
     "appId": "com.rainsoul.desktop",
     "productName": "RainSoul",
     "directories": {
-      "output": "release"
+      "output": "release/current"
     },
     "files": [
       "dist/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      { "from": "dist/desktop/THIRD_PARTY_NOTICES.txt", "to": "THIRD_PARTY_NOTICES.txt" }
     ],
     "asar": true,
     "asarUnpack": [
@@ -103,6 +106,7 @@
       "icon": "assets/rainsoul.ico"
     },
     "nsis": {
+      "include": "assets/installer.nsh",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,

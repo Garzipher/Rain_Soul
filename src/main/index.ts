@@ -14,18 +14,34 @@ import { AiCommands } from './ai-commands';
 import { AiSettingsStore } from './ai-settings';
 import { AiService } from './ai-service';
 import { errorCode } from '../shared/operation-errors';
+import { cleanupLocalData } from './uninstall-cleanup';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'rainsoul', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const testDirectory = !app.isPackaged ? process.env.RAINSOUL_TEST_DIRECTORY : undefined;
 if (testDirectory) app.setPath('userData', resolve(testDirectory));
-const hasLock = app.requestSingleInstanceLock();
+const cleanupMode = process.argv.includes('--rainsoul-uninstall-cleanup');
+const hasLock = app.requestSingleInstanceLock({ cleanupMode });
 let window: BrowserWindow | null = null;
 let database: DatabaseClient | null = null;
 let allowClose = false;
 let closeToken: string | null = null;
-if (!hasLock) app.quit();
+if (!hasLock) { if (cleanupMode) app.exit(2); else app.quit(); }
+else if (cleanupMode) {
+  // 卸载模式不初始化数据库、窗口或教材；授权标志只允许清理当前用户固定本机目录。
+  if (!process.argv.includes('--confirm-delete-local-data')) app.exit(3);
+  else void app.whenReady().then(() => {
+    try { cleanupLocalData({ localAppData: process.env.LOCALAPPDATA, confirmed: true }); app.exit(0); }
+    catch (error) {
+      dialog.showErrorBox('本机数据未完成清理', error instanceof Error ? error.message : '清理失败，安装程序已保留。');
+      app.exit(4);
+    }
+  });
+}
 else {
-  app.on('second-instance', () => { if (window?.isMinimized()) window.restore(); window?.show(); window?.focus(); });
+  app.on('second-instance', (_event, _argv, _directory, additionalData) => {
+    if (additionalData && typeof additionalData === 'object' && 'cleanupMode' in additionalData && additionalData.cleanupMode === true) return;
+    if (window?.isMinimized()) window.restore(); window?.show(); window?.focus();
+  });
   void app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
     const directory = testDirectory ?? join(process.env.LOCALAPPDATA ?? app.getPath('userData'), 'RainSoul');
