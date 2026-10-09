@@ -20,6 +20,7 @@ interface Frozen { request: ConversationAiPrepareRequest; draft: string; provide
 export class ConversationAiCommands {
   private readonly confirmations = new Map<string, Frozen>();
   private readonly active = new Map<string, AbortController>();
+  private readonly activeHashes = new Set<string>();
   private readonly running = new Set<Promise<unknown>>();
   private readonly replies = new Map<string, { request: ConversationTurnRequest; committed: boolean }>();
   constructor(private readonly store: { execute: (command: string, payload: unknown) => Promise<unknown> }, private readonly settings: { get: () => AiSettings }, private readonly service: ConversationAiService) {}
@@ -46,11 +47,13 @@ export class ConversationAiCommands {
     if (!this.accepts(command)) throw new Error('未知会话 AI 命令。');
     if (command === 'retryConversationReply') {
       const { requestHash } = schemas.retryConversationReply.parse(payload);
+      this.assertCompleted(requestHash);
       if (!this.replies.has(requestHash)) throw operationError('未收到可恢复的完整回答，或本次运行的回答记录已失效；请先重新读取会话核对已保存消息。', 'NOT_FOUND');
       return this.persistReply(requestHash);
     }
     if (command === 'readPendingConversationReply' || command === 'discardConversationReply') {
       const { requestHash } = replyRequestSchema.parse(payload), entry = this.replies.get(requestHash);
+      this.assertCompleted(requestHash);
       if (!entry) throw operationError('未收到可恢复的完整回答，或本次运行的回答记录已失效。', 'NOT_FOUND');
       const detail = await this.store.execute('readConversation', { workId: entry.request.workId, conversationId: entry.request.conversationId }) as ConversationDetail;
       if (command === 'discardConversationReply') { this.replies.delete(requestHash); return; }
@@ -75,19 +78,23 @@ export class ConversationAiCommands {
     const request = schemas.executeConversationAi.parse(payload), frozen = this.confirmations.get(request.confirmationToken);
     if (!frozen || frozen.requestHash !== request.requestHash) throw new Error('会话确认已失效，请重新预览。');
     if (request.confirmed !== true) throw new Error('请先明确确认服务、会话范围和计费提示。');
+    this.assertCompleted(request.requestHash);
     this.assertReplyCapacity(frozen.request);
     this.confirmations.delete(request.confirmationToken);
+    this.activeHashes.add(request.requestHash);
     const controller = new AbortController(); this.active.set(request.confirmationToken, controller);
     try {
       await this.validate(frozen, controller.signal);
       const reply = await this.service.execute(request, { signal: controller.signal, beforeSend: () => this.validate(frozen, controller.signal) });
-      await this.validate(frozen, controller.signal);
       this.replies.set(reply.requestHash, { committed: false, request: { workId: frozen.request.workId, conversationId: frozen.request.conversationId,
         expectedRevision: frozen.request.expectedRevision, operationId: frozen.operationId, userMessageId: frozen.userMessageId, assistantMessageId: frozen.assistantMessageId,
         userContent: frozen.draft, assistantContent: reply.text, requestHash: reply.requestHash } });
+      try { await this.validate(frozen, controller.signal); }
+      catch { throw operationError('完整回答已收到，但会话或配置变化、保存检查未完成；请核对待保存回答，不会自动重新联网。', 'CONVERSATION_REPLY_PENDING'); }
       return await this.persistReply(reply.requestHash);
-    } finally { this.service.cancel(request.confirmationToken); this.active.delete(request.confirmationToken); }
+    } finally { this.service.cancel(request.confirmationToken); this.active.delete(request.confirmationToken); this.activeHashes.delete(request.requestHash); }
   }
+  private assertCompleted(requestHash: string) { if (this.activeHashes.has(requestHash)) throw operationError('本次会话请求仍在进行，请稍后核对，不能判定没有回答或再次发送。', 'CONVERSATION_IN_PROGRESS'); }
   private assertReplyCapacity(request: ConversationAiPrepareRequest) {
     for (const entry of this.replies.values()) if (!entry.committed && entry.request.workId === request.workId && entry.request.conversationId === request.conversationId) throw operationError('此会话已有完整回答等待确认保存，请先重试保存回答；不会自动重新联网。', 'CONVERSATION_REPLY_PENDING');
     for (const [hash, entry] of this.replies) {

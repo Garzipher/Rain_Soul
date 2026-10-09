@@ -135,4 +135,37 @@ describe('会话主进程冻结与原子双消息写入', () => {
     store.execute.mockImplementation(original);
     await commands.execute('discardConversationReply', { requestHash: preview.requestHash }); expect(getDetail().messageCount).toBe(3);
   });
+  it('完整云回复到达后会话或配置变化也先保留回答，不能因后验失败丢掉付费结果', async () => {
+    for (const change of ['conversation', 'provider', 'readFailure']) {
+      const { commands, store, request, fetcher, changeDetail, changeProvider, getDetail } = setup(), original = store.execute.getMockImplementation()!;
+      let denyRead = false;
+      store.execute.mockImplementation(async (command, payload) => { if (command === 'readConversation' && denyRead) throw new Error('数据库暂时不可读'); return original(command, payload); });
+      fetcher.mockImplementationOnce(async () => {
+        if (change === 'conversation') changeDetail(); else if (change === 'provider') changeProvider(); else denyRead = true;
+        return new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: '已经完成的模型回答' } }] }));
+      });
+      const preview = await commands.execute('prepareConversationAi', request) as AiPreparedRequest;
+      await expect(commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: true })).rejects.toMatchObject({ code: 'CONVERSATION_REPLY_PENDING' });
+      denyRead = false;
+      await expect(commands.execute('readPendingConversationReply', { requestHash: preview.requestHash })).resolves.toMatchObject({ userContent: '当前需求草稿', assistantContent: '已经完成的模型回答', expectedRevision: 4 });
+      expect(getDetail().messages).toHaveLength(1); expect(fetcher).toHaveBeenCalledTimes(1);
+    }
+  });
+  it('发送仍在进行时核对或放弃不得误报无回答，失败结束后可明确核对为不存在', async () => {
+    const { commands, request, fetcher } = setup(); fetcher.mockImplementationOnce(async () => new Promise(() => undefined));
+    const preview = await commands.execute('prepareConversationAi', request) as AiPreparedRequest;
+    const pending = expect(commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: true })).rejects.toThrow(/取消/);
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    try {
+      for (const command of ['readPendingConversationReply', 'discardConversationReply', 'retryConversationReply']) await expect(commands.execute(command, { requestHash: preview.requestHash })).rejects.toMatchObject({ code: 'CONVERSATION_IN_PROGRESS' });
+    } finally { await commands.execute('cancelConversationAi', { confirmationToken: preview.confirmationToken }); await pending; }
+    await expect(commands.execute('readPendingConversationReply', { requestHash: preview.requestHash })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+  it('主进程已保存而外层执行回执丢失，可核对原回复与当前保存稿，绝不重发', async () => {
+    const { commands, request, fetcher } = setup(), preview = await commands.execute('prepareConversationAi', request) as AiPreparedRequest;
+    await commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: true });
+    // 模拟渲染层没有接收到成功回执，主进程的完成记录仍可供核对。
+    await expect(commands.execute('readPendingConversationReply', { requestHash: preview.requestHash })).resolves.toMatchObject({ assistantContent: '创作讨论回答', currentDraft: '', currentRevision: 5 });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
 });
