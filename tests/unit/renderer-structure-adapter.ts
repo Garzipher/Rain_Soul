@@ -15,6 +15,9 @@ export function createStructureAdapter() {
   const store = new StoreService(async (command, payload) => {
     const input = payload as Record<string, unknown>;
     if (command === 'listWorks') return repository.listWorks();
+    if (command === 'listConversations') return repository.listConversations(input.workId as string);
+    if (command === 'readConversation') return repository.readConversation(input.workId as string, input.conversationId as string, input.beforeMessageId as string | undefined);
+    if (command === 'manageConversation') return repository.manageConversation(input as unknown as Parameters<WorkRepository['manageConversation']>[0]);
     if (command === 'listDeletedWorks') return repository.listDeletedWorks();
     if (command === 'listSnapshots') return repository.listSnapshots(input.workId as string);
     if (command === 'previewSnapshot') return repository.previewSnapshot(input.workId as string, input.snapshotId as string);
@@ -38,6 +41,18 @@ export function createStructureAdapter() {
   });
   function remember(detail: WorkDetail) { works.set(detail.id, structuredClone(detail)); return detail; }
   const api: DesktopApi = {
+    async listConversations(workId) { return await store.execute('listConversations', { workId }) as Awaited<ReturnType<DesktopApi['listConversations']>>; },
+    async readConversation(workId, conversationId, beforeMessageId) { return await store.execute('readConversation', { workId, conversationId, ...(beforeMessageId ? { beforeMessageId } : {}) }) as Awaited<ReturnType<DesktopApi['readConversation']>>; },
+    async manageConversation(request) { return await store.execute('manageConversation', request) as Awaited<ReturnType<DesktopApi['manageConversation']>>; },
+    async prepareConversationAi() { throw new Error('此测试未启用会话云服务'); },
+    async executeConversationAi() { throw new Error('此测试未启用会话云服务'); },
+    async cancelConversationAi() {},
+    async retryConversationReply() { throw new Error('此测试未启用回复恢复'); },
+    async readPendingConversationReply() { throw new Error('此测试未启用回复恢复'); },
+    async discardConversationReply() {},
+    async chooseBookExtraction() { return null; },
+    async confirmBookExtraction() { throw new Error('此测试未启用拆书'); },
+    async cancelBookExtraction() {},
     async getAiSettings() { return { provider: null, hasCredential: false }; },
     async saveAiSettings(provider) { return { provider, hasCredential: true }; },
     async clearAiSettings() { return { provider: null, hasCredential: false }; },

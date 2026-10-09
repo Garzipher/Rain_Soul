@@ -40,6 +40,18 @@ export interface StructureRequest { workId: string; expectedRevision: number; op
 export interface SaveResult { revision: number; wordCount: number; assets?: AssetState }
 export interface RuntimeInfo { version: string; dataDirectory: string }
 export interface DesktopApi {
+  listConversations(workId: string): Promise<ConversationSummary[]>;
+  readConversation(workId: string, conversationId: string, beforeMessageId?: string): Promise<ConversationDetail>;
+  manageConversation(request: ConversationRequest): Promise<ConversationDetail | null>;
+  prepareConversationAi(request: ConversationAiPrepareRequest): Promise<AiPreparedRequest>;
+  executeConversationAi(request: AiExecuteRequest): Promise<ConversationDetail>;
+  cancelConversationAi(confirmationToken: string): Promise<void>;
+  retryConversationReply(requestHash: string): Promise<ConversationDetail>;
+  readPendingConversationReply(requestHash: string): Promise<PendingConversationReply>;
+  discardConversationReply(requestHash: string): Promise<void>;
+  chooseBookExtraction(workId: string, encoding: 'utf-8' | 'gb18030'): Promise<BookExtractionPreview | null>;
+  confirmBookExtraction(request: BookExtractionConfirmation): Promise<WorkDetail>;
+  cancelBookExtraction(token: string): Promise<void>;
   getAiSettings(): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
   saveAiSettings(provider: AiProvider, key?: string): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
   clearAiSettings(): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
@@ -83,3 +95,6 @@ import type { AiProvider, AiOperation, AiPreparedRequest, AiExecuteRequest, AiCa
 import type { AssetRequest, AssetState, AssetQuery, SearchResult } from './assets';
 import type { KnowledgeScope, KnowledgeScopeResult, KnowledgeCopyRequest } from './knowledge-scope';
 import type { SnapshotSummary, SnapshotPreview, SnapshotCreateRequest, SnapshotRestoreRequest } from './snapshots';
+import type { ConversationSummary, ConversationDetail, ConversationRequest } from './conversations';
+import type { ConversationAiPrepareRequest, PendingConversationReply } from './conversation-ai';
+import type { BookExtractionPreview, BookExtractionConfirmation } from './book-extraction';

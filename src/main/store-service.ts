@@ -7,12 +7,19 @@ import { knowledgeCopyRequestSchema } from '../shared/knowledge-scope';
 import { manuscriptImportRequestSchema } from '../shared/manuscript-schema';
 import { archiveManifestSchema } from '../shared/archive';
 import { snapshotCreateRequestSchema, snapshotRestoreRequestSchema } from '../shared/snapshots';
+import { conversationRequestSchema, conversationTurnSchema } from '../shared/conversations';
+import { bookExtractionCommitSchema } from '../shared/book-extraction';
 
 type Transport = (command: string, payload: unknown) => Promise<unknown>;
 const id = z.uuid();
 const title = z.string().refine(value => value.trim().length > 0, '名称不能为空');
 const mutation = { workId: id, expectedRevision: z.number().int().positive(), operationId: id };
 const schemas = {
+  listConversations: z.object({ workId: id }).strict(),
+  readConversation: z.object({ workId: id, conversationId: id, beforeMessageId: id.optional() }).strict(),
+  manageConversation: conversationRequestSchema,
+  appendConversationTurn: conversationTurnSchema,
+  importBookExtraction: bookExtractionCommitSchema,
   listWorks: z.object({}).strict(),
   listDeletedWorks: z.object({}).strict(),
   createWork: z.object({ title }).strict(),

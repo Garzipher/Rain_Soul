@@ -15,6 +15,10 @@ import { AiSettingsStore } from './ai-settings';
 import { AiService } from './ai-service';
 import { errorCode } from '../shared/operation-errors';
 import { cleanupLocalData } from './uninstall-cleanup';
+import { assertPublicP1Command } from './p1-command-policy';
+import { BookExtractionCommands } from './book-extraction-commands';
+import { ConversationAiCommands } from './conversation-ai-commands';
+import { ConversationAiService } from './conversation-ai-service';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'rainsoul', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const testDirectory = !app.isPackaged ? process.env.RAINSOUL_TEST_DIRECTORY : undefined;
@@ -59,6 +63,8 @@ else {
     const aiSettings = new AiSettingsStore(directory, safeStorage);
     const aiService = new AiService({ credentials: aiSettings });
     const ai = new AiCommands(store, aiSettings, aiService);
+    const conversationAi = new ConversationAiCommands(store, aiSettings, new ConversationAiService({ credentials: aiSettings }));
+    const books = new BookExtractionCommands(store, { choose: () => chooseLocalManuscript(() => dialog.showOpenDialog(window!, { title: '选择拆书素材', properties: ['openFile'], filters: [{ name: 'TXT / DOCX 素材', extensions: ['txt', 'docx'] }] })) });
     const profiles = new ProfileCommands(authorService, () => selectAuthorAvatar(authorService,
       () => dialog.showOpenDialog(window!, { title: '选择本地头像', properties: ['openFile'], filters: [{ name: 'PNG / JPEG 图片', extensions: ['png', 'jpg', 'jpeg'] }] }),
       bytes => nativeImage.createFromBuffer(bytes)));
@@ -80,16 +86,19 @@ else {
       try {
         if (command === 'runtimeInfo') return { ok: true, data: { version: app.getVersion(), dataDirectory: join(directory, 'Projects') } };
         if (typeof command !== 'string') throw new Error('存储命令无效');
+        assertPublicP1Command(command, payload);
         if (profiles.accepts(command)) return { ok: true, data: await profiles.execute(command, payload) };
         if (manuscripts.accepts(command)) return { ok: true, data: await manuscripts.execute(command, payload) };
         if (archives.accepts(command)) return { ok: true, data: await archives.execute(command, payload) };
         if (ai.accepts(command)) return { ok: true, data: await ai.execute(command, payload) };
+        if (conversationAi.accepts(command)) return { ok: true, data: await conversationAi.execute(command, payload) };
+        if (books.accepts(command)) return { ok: true, data: await books.execute(command, payload) };
         return { ok: true, data: await store.execute(command, payload) };
       } catch (error) { return { ok: false, code: errorCode(error), message: error instanceof Error ? error.message : '本机操作失败' }; }
     });
     ipcMain.on('rainsoul:close-confirm', (event, token: unknown) => {
       if (!trusted(event) || typeof token !== 'string' || token !== closeToken) return;
-      void Promise.all([store.drain(), profiles.drain(), manuscripts.drain(), archives.drain(), ai.drain()]).then(() => { if (token === closeToken) { allowClose = true; window?.close(); } });
+      void Promise.all([store.drain(), profiles.drain(), manuscripts.drain(), archives.drain(), ai.drain(), conversationAi.drain(), books.drain()]).then(() => { if (token === closeToken) { allowClose = true; window?.close(); } });
     });
     window.on('close', event => {
       if (allowClose) return;

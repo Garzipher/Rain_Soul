@@ -6,6 +6,18 @@ export function createAdapter() {
   let closeHandler: (() => Promise<void>) | null = null;
   const emptyDocument = (): WritingDocument => ({ type: 'doc', content: [{ type: 'paragraph', attrs: { id: crypto.randomUUID() } }] });
   const api: DesktopApi = {
+    async listConversations() { return []; },
+    async readConversation() { throw new Error('此测试未启用会话'); },
+    async manageConversation() { throw new Error('此测试未启用会话'); },
+    async prepareConversationAi() { throw new Error('此测试未启用会话云服务'); },
+    async executeConversationAi() { throw new Error('此测试未启用会话云服务'); },
+    async cancelConversationAi() {},
+    async retryConversationReply() { throw new Error('此测试未启用回复恢复'); },
+    async readPendingConversationReply() { throw new Error('此测试未启用回复恢复'); },
+    async discardConversationReply() {},
+    async chooseBookExtraction() { return null; },
+    async confirmBookExtraction() { throw new Error('此测试未启用拆书'); },
+    async cancelBookExtraction() {},
     async getAiSettings() { return { provider: null, hasCredential: false }; },
     async saveAiSettings(provider) { return { provider, hasCredential: true }; },
     async clearAiSettings() { return { provider: null, hasCredential: false }; },

@@ -8,6 +8,18 @@ const invoke = async <T>(command: string, payload: unknown): Promise<T> => {
   return reply.data;
 };
 const api: DesktopApi = {
+  listConversations: workId => invoke('listConversations', { workId }),
+  readConversation: (workId, conversationId, beforeMessageId) => invoke('readConversation', { workId, conversationId, ...(beforeMessageId ? { beforeMessageId } : {}) }),
+  manageConversation: request => invoke('manageConversation', request),
+  prepareConversationAi: request => invoke('prepareConversationAi', request),
+  executeConversationAi: request => invoke('executeConversationAi', request),
+  cancelConversationAi: confirmationToken => invoke('cancelConversationAi', { confirmationToken }),
+  retryConversationReply: requestHash => invoke('retryConversationReply', { requestHash }),
+  readPendingConversationReply: requestHash => invoke('readPendingConversationReply', { requestHash }),
+  discardConversationReply: requestHash => invoke('discardConversationReply', { requestHash }),
+  chooseBookExtraction: (workId, encoding) => invoke('chooseBookExtraction', { workId, encoding }),
+  confirmBookExtraction: request => invoke('confirmBookExtraction', request),
+  cancelBookExtraction: token => invoke('cancelBookExtraction', { token }),
   getAiSettings: () => invoke('getAiSettings', {}),
   saveAiSettings: (provider, key) => invoke('saveAiSettings', { provider, ...(key !== undefined ? { key } : {}) }),
   clearAiSettings: () => invoke('clearAiSettings', {}),
