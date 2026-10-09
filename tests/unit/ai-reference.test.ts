@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { buildAiReferences } from '../../src/shared/ai-reference';
 import type { WorkDetail } from '../../src/shared/contracts';
+import type { OutlineNode } from '../../src/shared/assets';
 it('本作品关键词参考保留出处，软删知识不进入AI，采用章节覆盖的写作特点', () => {
     const work: WorkDetail = { id: 'work', title: '雨', revision: 1, chapters: [], volumes: [], deletedItems: [], assets: { outlines: [], foreshadows: [], evidence: [], categories: [], tags: [], chapterStyles: [{ chapterId: 'chapter', profileId: 'old' }], defaultStyleId: 'new', styleProfiles: [
       { id: 'old', version: 1, payload: { narrativePerson: '第一人称', pace: '舒缓', prohibited: [], referenceWorks: [] }, createdAt: '' },
@@ -25,4 +26,27 @@ it('全卷参考包含全部选定章节的特点与大纲，不发送范围外�
   const result = buildAiReferences(work, 'one', '雨中', ['one', 'two']);
   expect(result).toContain('转折'); expect(result).toContain('第一章'); expect(result).toContain('第二章');
   expect(result).not.toContain('外卷秘密');
+});
+it('章节参考包含所属卷概要和未绑定正文的详细节点，包含计划伏笔但不泄露同卷其他章节', () => {
+  const node = (id: string, type: OutlineNode['type'], parentId: string | null, chapterId: string | null, summary: string): OutlineNode => ({ id, type, parentId, chapterId, title: id, summary, knowledgeIds: [], sortOrder: 0, deletedAt: null });
+  const outlines = [
+    node('卷计划', 'volume', null, null, '调查与成长主线'),
+    node('当前章纲', 'chapter', '卷计划', 'one', '进入旧车站'),
+    node('详细场景', 'detail', '当前章纲', null, '午夜交出钥匙'),
+    node('其他章纲', 'chapter', '卷计划', 'other', '范围外反转'),
+    node('其他详细场景', 'detail', '其他章纲', null, '另一章秘密'),
+    node('跨章详细场景', 'detail', '当前章纲', 'other', '明确属于另一章'),
+    node('跨章子节点', 'detail', '跨章详细场景', null, '不能越过异章节点纳入'),
+    { ...node('已删场景', 'detail', '当前章纲', null, '已删除计划'), deletedAt: 'deleted' },
+    node('独立场景', 'detail', null, null, '未关联计划'),
+  ];
+  const work = { chapters: [{ id: 'one', title: '第一章' }, { id: 'other', title: '第二章' }], assets: {
+    outlines, foreshadows: [
+      { id: 'hint', name: '钥匙暗线', status: '未埋设', description: '后续回收', outlineId: '详细场景', deletedAt: null },
+      { id: 'outside', name: '异章伏笔', status: '未埋设', description: '不可发送', outlineId: '其他详细场景', deletedAt: null },
+    ], evidence: [], knowledge: [], chapterStyles: [], styleProfiles: [], defaultStyleId: null,
+  } } as unknown as WorkDetail;
+  const result = buildAiReferences(work, 'one', '旧车站', ['one'], []);
+  for (const text of ['调查与成长主线', '进入旧车站', '午夜交出钥匙', '钥匙暗线']) expect(result).toContain(text);
+  for (const text of ['范围外反转', '另一章秘密', '明确属于另一章', '不能越过异章节点纳入', '已删除计划', '未关联计划', '异章伏笔']) expect(result).not.toContain(text);
 });
