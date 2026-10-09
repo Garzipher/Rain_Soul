@@ -17,7 +17,7 @@ export function buildAiContext(work: WorkDetail, value: AiContextRequest): AiCon
   if (new Set(paragraphIds).size !== paragraphIds.length || paragraphIds.some(id => !current.document.content.some(paragraph => paragraph.attrs.id === id))) throw new Error('目标段落不属于当前章节。');
   const plain = selected.map(chapter => `${chapter.title} [章节 ${chapter.id}]\n${chapter.document.content.map(paragraph => `[段落 ${paragraph.attrs.id}] ${(paragraph.content ?? []).map(node => node.type === 'text' ? node.text : node.type === 'hardBreak' ? '\n' : '').join('')}`).join('\n')}`).join('\n\n');
   if (!selected.some(chapter => chapter.document.content.some(paragraph => (paragraph.content ?? []).some(node => node.type === 'text' && node.text.trim())))) throw new Error('所选范围没有正文。');
-  const targets = current.document.content.filter(paragraph => paragraphIds.includes(paragraph.attrs.id)).map(paragraph => (paragraph.content ?? []).filter(node => node.type === 'text').map(node => node.text).join('')).join('\n');
+  const targets = current.document.content.filter(paragraph => paragraphIds.includes(paragraph.attrs.id)).map(paragraph => (paragraph.content ?? []).map(node => node.type === 'text' ? node.text : node.type === 'hardBreak' ? '\n' : '').join('')).join('\n');
   let selection: AiContext['selection'];
   if (request.sentenceFrom !== undefined && request.sentenceText === undefined) throw new Error('精确选区偏移必须与目标单句一起提供。');
   if (request.sentenceText !== undefined) {

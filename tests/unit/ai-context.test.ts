@@ -6,6 +6,16 @@ const volumeId = randomUUID();
 function work(): WorkDetail {
   return { id: randomUUID(), title: '雨', revision: 4, volumes: [{ id: volumeId, title: '卷一' }], deletedItems: [], chapters: ['前章', '当前', '第三章'].map(title => ({ id: randomUUID(), title, wordCount: 2, volumeId, document: { type: 'doc', content: [{ type: 'paragraph', attrs: { id: randomUUID() }, content: [{ type: 'text', text: `${title}正文` }] }] } })) };
 }
+it('段落目标保留硬换行且忽略行内书签，发送内容与作者原文一致', () => {
+  const current = work(), chapter = current.chapters[1], paragraph = chapter.document.content[0];
+  paragraph.content = [
+    { type: 'text', text: '第一行。' }, { type: 'hardBreak' },
+    { type: 'bookmark', attrs: { id: randomUUID(), kind: 'knowledge', targetId: randomUUID() } },
+    { type: 'text', text: '第二行。' },
+  ];
+  const context = buildAiContext(current, { chapterId: chapter.id, scope: 'chapter', targetParagraphIds: [paragraph.attrs.id] });
+  expect(context.text.split('\n\n已授权上下文：')[0]).toBe('目标正文（候选只修改这部分）：\n第一行。\n第二行。');
+});
 it('四种范围冻结指定章节，前章衔接只含前章与本章，不含未授权章节', () => {
   const current = work(), chapterId = current.chapters[1].id;
   expect(buildAiContext(current, { chapterId, scope: 'chapter' }).text).not.toContain('前章正文');
