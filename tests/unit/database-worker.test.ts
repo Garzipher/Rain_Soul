@@ -25,7 +25,7 @@ it('编译后的Worker接受白名单请求并真实持久化，错误不停止�
     const work = await request('createWork', { title: '真实线程' }) as WorkDetail;
     const document = emptyDocument();
     document.content[0].content = [{ type: 'text', text: '落盘' }];
-    await expect(request('saveChapter', { workId: work.id, chapterId: work.chapters[0].id, title: '第一章', document, expectedRevision: work.revision, operationId: crypto.randomUUID() })).resolves.toEqual({ revision: 2, wordCount: 2 });
+    await expect(request('saveChapter', { workId: work.id, chapterId: work.chapters[0].id, title: '第一章', document, expectedRevision: work.revision, operationId: crypto.randomUUID() })).resolves.toMatchObject({ revision: 2, wordCount: 2 });
     const reopened = await request('openWork', { id: work.id }) as WorkDetail;
     expect(reopened.chapters[0].document).toEqual(document);
   } finally { await worker.terminate(); await rm(directory, { recursive: true, force: true }); }

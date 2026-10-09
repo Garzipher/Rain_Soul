@@ -1,6 +1,7 @@
 import { Worker } from 'node:worker_threads';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { operationError } from '../shared/operation-errors';
 
 export class DatabaseClient {
   private readonly worker: Worker;
@@ -8,11 +9,11 @@ export class DatabaseClient {
   private failure: Error | null = null;
   constructor(directory: string) {
     this.worker = new Worker(join(__dirname, 'database-worker.cjs'), { workerData: { directory } });
-    this.worker.on('message', (reply: { requestId: string; ok: boolean; data?: unknown; message?: string }) => {
+    this.worker.on('message', (reply: { requestId: string; ok: boolean; data?: unknown; message?: string; code?: string }) => {
       const request = this.pending.get(reply.requestId);
       if (!request) return;
       this.pending.delete(reply.requestId);
-      if (reply.ok) request.resolve(reply.data); else request.reject(new Error(reply.message ?? '保存失败'));
+      if (reply.ok) request.resolve(reply.data); else request.reject(operationError(reply.message ?? '保存失败', reply.code));
     });
     this.worker.on('error', error => this.fail(error instanceof Error ? error : new Error('存储服务启动失败')));
     this.worker.on('exit', () => this.fail(new Error('存储服务已停止，请保留草稿并重新启动应用')));

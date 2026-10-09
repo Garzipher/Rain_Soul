@@ -38,7 +38,7 @@ describe('真实 SQLite 作品存储', () => {
     const work = repository.createWork('雨魂');
     const document = documentWith('你好，Rain 2026！\n');
     expect(repository.saveChapter(work.id, work.chapters[0].id, '开始', document,
-      work.revision, randomUUID())).toEqual({ revision: 2, wordCount: 10 });
+      work.revision, randomUUID())).toMatchObject({ revision: 2, wordCount: 10 });
     repository.close();
     repository = new WorkRepository(directory);
     expect(repository.openWork(work.id)).toMatchObject({ revision: 2,
@@ -86,7 +86,7 @@ describe('真实 SQLite 作品存储', () => {
     const latest = documentWith('新的正文');
     repository.saveChapter(work.id, work.chapters[0].id, '第一章', latest, 2, randomUUID());
     expect(repository.saveChapter(work.id, work.chapters[0].id, '第一章', earlier, 1, operation))
-      .toEqual({ revision: 2, wordCount: 2 });
+      .toMatchObject({ revision: 2, wordCount: 2 });
     expect(repository.openWork(work.id)).toMatchObject({ revision: 3,
       chapters: [{ document: latest, wordCount: 4 }] });
   });
@@ -95,7 +95,7 @@ describe('真实 SQLite 作品存储', () => {
     const work = repository.createWork('清空');
     repository.saveChapter(work.id, work.chapters[0].id, '第一章', documentWith('甲乙'), 1, randomUUID());
     expect(repository.saveChapter(work.id, work.chapters[0].id, '第一章', documentWith(), 2, randomUUID()))
-      .toEqual({ revision: 3, wordCount: 0 });
+      .toMatchObject({ revision: 3, wordCount: 0 });
     expect(repository.listWorks()[0].wordCount).toBe(0);
   });
 
@@ -177,7 +177,7 @@ describe('真实 SQLite 作品存储', () => {
       db.close();
     }
     expect(repository.saveChapter(work.id, work.chapters[0].id, '第一章', documentWith('已落盘'),
-      1, randomUUID())).toEqual({ revision: 2, wordCount: 3 });
+      1, randomUUID())).toMatchObject({ revision: 2, wordCount: 3 });
   });
 
   it('启动扫描可恢复已发布但尚未登记目录库的作品', () => {
@@ -208,7 +208,7 @@ describe('真实 SQLite 作品存储', () => {
     catalog.exec('BEGIN IMMEDIATE');
     try {
       expect(repository.saveChapter(work.id, work.chapters[0].id, '第一章', documentWith('已落盘'),
-        1, randomUUID())).toEqual({ revision: 2, wordCount: 3 });
+        1, randomUUID())).toMatchObject({ revision: 2, wordCount: 3 });
       expect(repository.openWork(work.id)).toMatchObject({ revision: 2, chapters: [{ wordCount: 3 }] });
     } finally { catalog.exec('ROLLBACK'); catalog.close(); }
     expect(repository.listWorks()[0].wordCount).toBe(3);

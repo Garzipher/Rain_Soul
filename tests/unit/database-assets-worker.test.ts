@@ -36,5 +36,14 @@ it('实际Worker接受受控资产命令，保存正文后搜索可定位，非�
     expect(results).toEqual([expect.objectContaining({ kind: 'paragraph', chapterId: chapter.id, paragraphId: document.content[0].attrs.id })]);
     const reopened = await store.execute('openWork', { id: work.id }) as WorkDetail;
     expect(reopened.assets!.tags.map(tag => tag.name)).toEqual(['雨夜']);
+    work = await store.execute('manageAssets', { workId: work.id, expectedRevision: reopened.revision, operationId: crypto.randomUUID(), action: { type: 'createKnowledge', body: '灯塔旁的雨夜描写', source: '原作第二章', categoryId: work.assets!.categories[1].id, tagIds: [] } }) as WorkDetail;
+    const target = await store.execute('createWork', { title: '复用知识的作品' }) as WorkDetail;
+    const scope = await store.execute('readKnowledgeScope', { scopeId: null }) as Awaited<ReturnType<WorkRepositoryScope['readKnowledgeScope']>>;
+    expect(scope.knowledge).toHaveLength(1);
+    const owner = scope.entryOwners[scope.knowledge[0].id];
+    const copied = await store.execute('copyKnowledge', { workId: target.id, expectedRevision: target.revision, operationId: crypto.randomUUID(), sourceWorkId: owner.workId, sourceEntryId: owner.sourceEntryId, sourceExpectedRevision: owner.sourceRevision, categoryId: target.assets!.categories[0].id, tagIds: [] }) as WorkDetail;
+    expect(copied.assets!.knowledge[0].origin).toMatchObject({ workId: work.id, entryId: work.assets!.knowledge[0].id });
+    await expect(store.execute('manageAssets', { workId: target.id, expectedRevision: copied.revision, operationId: crypto.randomUUID(), action: { type: 'createTag', name: '风雨' } })).resolves.toMatchObject({ id: target.id });
   } finally { await worker.terminate(); await rm(directory, { recursive: true, force: true }); }
 });
+type WorkRepositoryScope = import('../../src/shared/contracts').DesktopApi;

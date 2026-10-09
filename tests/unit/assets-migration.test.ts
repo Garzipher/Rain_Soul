@@ -22,7 +22,7 @@ describe('作品库 schema 3 资产迁移', () => {
   }
   it('v2备份包含WAL最新正文，一次升级全部资产和索引且不重复备份', () => {
     const document = legacyV2(); initializeSchema(db, 'project');
-    expect(db.pragma('user_version', { simple: true })).toBe(3);
+    expect(db.pragma('user_version', { simple: true })).toBe(4);
     expect(searchAssets(db, { text: '灯塔旁', mode: 'all' })).toHaveLength(1);
     const backups = readdirSync(directory).filter(name => name.includes('v2-backup')); expect(backups).toHaveLength(1);
     const backup = new Database(join(directory, backups[0]), { readonly: true });

@@ -1,3 +1,4 @@
+import type { AiKnowledgeApproval } from '../../shared/ai-extraction';
 import Database from 'better-sqlite3';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
@@ -11,6 +12,17 @@ import { applyAsset, readAssets } from './assets';
 import { searchAssets, refreshChapterSearch } from './assets-search';
 import { assetRequestSchema, assetQuerySchema } from '../../shared/assets-schema';
 import type { AssetRequest, AssetQuery } from '../../shared/assets';
+import { knowledgeCopyRequestSchema, type KnowledgeCopyRequest } from '../../shared/knowledge-scope';
+import { knowledgeScope, assertGlobalKnowledgeQuery, scopeEntryId } from './knowledge-scope';
+import { copyKnowledge as insertKnowledgeCopy } from './assets-knowledge';
+import { createImportedProject } from './manuscript-import';
+import type { ManuscriptImportRequest } from '../../shared/manuscript-schema';
+import { exportProjectDatabase, importArchivedProject } from './archive-project';
+import type { ParsedProjectArchive } from '../../shared/archive';
+import type { AiCandidate } from '../../shared/ai';
+import { applyAiCandidate, approveAiKnowledge } from './ai-apply';
+import { snapshotCreateRequestSchema, snapshotRestoreRequestSchema, type SnapshotCreateRequest, type SnapshotRestoreRequest } from '../../shared/snapshots';
+import { listSnapshots as readSnapshots, createSnapshot as captureSnapshot, restoreSnapshot as applySnapshot, previewSnapshot as readSnapshotPreview, freezeSnapshotExport } from './snapshots';
 export { RepositoryError } from './schema';
 
 interface Meta { id: string; title: string; revision: number; updated_at: string; deleted_at: string | null }
@@ -63,7 +75,7 @@ export class WorkRepository {
     const db = new Database(file, { fileMustExist: true });
     try {
       const version = db.pragma('user_version', { simple: true });
-      if (version === 1 || version === 2 || version === 3) this.checkMetadata(db, id);
+      if (version === 1 || version === 2 || version === 3 || version === 4) this.checkMetadata(db, id);
       initializeSchema(db, 'project');
       this.checkMetadata(db, id);
     } catch (error) { db.close(); throw error; }
@@ -167,6 +179,31 @@ export class WorkRepository {
     return this.openWork(id);
   }
 
+  importManuscript(request: ManuscriptImportRequest): WorkDetail {
+    this.assertOpen();
+    const id = createImportedProject(this.projects, request);
+    this.refreshCache(id);
+    return this.openWork(id);
+  }
+  async exportProject(workId: string, expectedRevision: number): Promise<Buffer> {
+    const db = this.projectDb(workId);
+    if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
+    return exportProjectDatabase(this.projects, workId, expectedRevision);
+  }
+  importProject(input: ParsedProjectArchive, operationId: string): WorkDetail {
+    this.assertOpen();
+    const id = importArchivedProject(this.projects, input, operationId);
+    this.refreshCache(id); return this.openWork(id);
+  }
+  applyAi(candidate: AiCandidate, operationId: string): WorkDetail {
+    applyAiCandidate(this.projectDb(candidate.workId), candidate, operationId);
+    this.refreshCache(candidate.workId); return this.openWork(candidate.workId);
+  }
+  approveKnowledge(candidate: AiCandidate, items: AiKnowledgeApproval[], operationId: string): WorkDetail {
+    approveAiKnowledge(this.projectDb(candidate.workId), candidate, items, operationId);
+    this.refreshCache(candidate.workId); return this.openWork(candidate.workId);
+  }
+
   private refreshCache(id: string) {
     // 正文已提交；目录缓存失败只标记待刷新，禁止把成功落盘伪装成保存失败。
     try { this.updateCatalog(id); } catch { this.pending.add(id); }
@@ -205,6 +242,114 @@ export class WorkRepository {
     const db = this.projectDb(workId);
     if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除，可从设置的本机数据恢复。');
     return searchAssets(db, parsed.data);
+  }
+
+  readKnowledgeScope(scopeId: string | null) {
+    const ids = scopeId === null ? this.listWorks().map(work => work.id) : [scopeId];
+    const works = ids.map(id => {
+      const db = this.projectDb(id); const meta = this.meta(db);
+      if (meta.deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
+      return { id: meta.id, title: meta.title, revision: meta.revision, assets: readAssets(db) };
+    });
+    return knowledgeScope(works, scopeId === null);
+  }
+
+  searchKnowledgeScope(scopeId: string | null, value: AssetQuery) {
+    const parsed = assetQuerySchema.safeParse(value);
+    if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '知识搜索参数无效。');
+    const query = parsed.data;
+    if (scopeId === null) assertGlobalKnowledgeQuery(query);
+    const works = scopeId === null ? this.listWorks() : [this.meta(this.projectDb(scopeId))];
+    const offset = query.offset ?? 0; const limit = query.limit ?? 100;
+    const results = [];
+    for (const work of works) {
+      // 按作品分批读取，最后统一分页，避免每部作品都跳过同一 offset。
+      let page = 0;
+      while (true) {
+        const rows = this.searchWork(work.id, { ...query, offset: page, limit: 200 });
+        results.push(...rows.map(row => ({ ...row, id: scopeId === null ? scopeEntryId(work.id, row.id) : row.id, workId: work.id, workTitle: work.title })));
+        if (rows.length < 200 || results.length >= offset + limit) break;
+        page += 200;
+      }
+      if (results.length >= offset + limit) break;
+    }
+    return results.slice(offset, offset + limit);
+  }
+
+  copyKnowledge(value: KnowledgeCopyRequest): WorkDetail {
+    const parsed = knowledgeCopyRequestSchema.safeParse(value);
+    if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '知识复制参数无效。');
+    const request = parsed.data;
+    if (request.workId === request.sourceWorkId) throw new RepositoryError('INVALID_INPUT', '跨作品复用需选择其他作品。');
+    this.commit(request.workId, request.expectedRevision, request.operationId, ['copyKnowledge', request], (target, revision) => {
+      const file = join(this.projects, request.sourceWorkId, 'project.sqlite');
+      if (!existsSync(file) || lstatSync(file).isSymbolicLink() || lstatSync(join(this.projects, request.sourceWorkId)).isSymbolicLink()) {
+        throw new RepositoryError('NOT_FOUND', '来源作品不存在或路径无效。');
+      }
+      const source = new Database(file, { readonly: true, fileMustExist: true });
+      try {
+        this.checkMetadata(source, request.sourceWorkId); const meta = this.meta(source);
+        if (meta.deleted_at) throw new RepositoryError('NOT_FOUND', '来源作品已删除。');
+        if (meta.revision !== request.sourceExpectedRevision) throw new RepositoryError('REVISION_CONFLICT', '来源作品已变化，请重新查看后确认复制。');
+        const entry = readAssets(source).knowledge.find(item => item.id === request.sourceEntryId && !item.deletedAt);
+        if (!entry) throw new RepositoryError('NOT_FOUND', '来源知识已删除或不存在。');
+        insertKnowledgeCopy(target, { workId: meta.id, workTitle: meta.title, revision: meta.revision, entry }, request.categoryId, request.tagIds, revision);
+        return { revision };
+      } finally { source.close(); }
+    });
+    return this.openWork(request.workId);
+  }
+
+  listSnapshots(workId: string) {
+    const db = this.projectDb(workId);
+    if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
+    return readSnapshots(db);
+  }
+
+  previewSnapshot(workId: string, snapshotId: string) {
+    validId(snapshotId); const db = this.projectDb(workId);
+    if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
+    return readSnapshotPreview(db, snapshotId);
+  }
+
+  freezeSnapshot(workId: string, snapshotId: string) {
+    validId(snapshotId); const db = this.projectDb(workId);
+    if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
+    return freezeSnapshotExport(db, snapshotId);
+  }
+
+  createSnapshot(value: SnapshotCreateRequest): WorkDetail {
+    const parsed = snapshotCreateRequestSchema.safeParse(value);
+    if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '快照创建参数无效。');
+    return this.commitSnapshot('create', parsed.data);
+  }
+
+  restoreSnapshot(value: SnapshotRestoreRequest): WorkDetail {
+    const parsed = snapshotRestoreRequestSchema.safeParse(value);
+    if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '快照恢复参数无效。');
+    return this.commitSnapshot('restore', parsed.data);
+  }
+
+  private commitSnapshot(kind: 'create' | 'restore', request: SnapshotCreateRequest | SnapshotRestoreRequest): WorkDetail {
+    const db = this.projectDb(request.workId);
+    const hash = createHash('sha256').update(JSON.stringify(['snapshot', kind, request])).digest('hex');
+    db.transaction(() => {
+      if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
+      const prior = db.prepare('SELECT request_hash FROM operation_log WHERE operation_id=?').get(request.operationId) as { request_hash: string } | undefined;
+      if (prior) {
+        if (prior.request_hash !== hash) throw new RepositoryError('INVALID_INPUT', '操作标识已用于不同内容。');
+        return;
+      }
+      if (this.meta(db).revision !== request.expectedRevision) throw new RepositoryError('REVISION_CONFLICT', '作品版本已变化，请重新读取后操作快照。');
+      // 快照先捕获输入版本；恢复助手内部递增一次，避免通用commit预先递增后再恢复。
+      if ('title' in request) {
+        captureSnapshot(db, request.title);
+        db.prepare('UPDATE work_meta SET revision=revision+1,updated_at=? WHERE revision=?').run(new Date().toISOString(), request.expectedRevision);
+      } else applySnapshot(db, request.snapshotId, request.expectedRevision);
+      db.prepare('INSERT INTO operation_log VALUES(?,?,?)').run(request.operationId, hash, JSON.stringify({ revision: request.expectedRevision + 1 }));
+    }).immediate();
+    this.refreshCache(request.workId);
+    return this.openWork(request.workId);
   }
 
   private commit<T>(workId: string, expectedRevision: number, operationId: string,
@@ -277,7 +422,7 @@ export class WorkRepository {
       throw new RepositoryError('INVALID_INPUT', '正文结构无效，请保留草稿并检查内容。');
     }
     const words = countDocumentWords(document);
-    return this.commit(workId, expectedRevision, operationId,
+    const receipt = this.commit(workId, expectedRevision, operationId,
       ['saveChapter', chapterId, title, document, expectedRevision], (db, revision) => {
         const changed = db.prepare('UPDATE chapter SET title = ?, document_json = ?, word_count = ? WHERE id = ? AND deleted_at IS NULL')
           .run(title, JSON.stringify(document), words, chapterId);
@@ -285,6 +430,8 @@ export class WorkRepository {
         refreshChapterSearch(db, chapterId);
         return { revision, wordCount: words };
       });
+    // 回执只存版本与字数；资产按当前库读取，避免自动保存重复复制及重放旧资产。
+    return { ...receipt, assets: readAssets(this.projectDb(workId)) };
   }
 
   close() {

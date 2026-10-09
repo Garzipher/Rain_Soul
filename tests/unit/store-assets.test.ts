@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { StoreService } from '../../src/main/store-service';
 
 describe('主进程资产命令边界', () => {
+  it('全局汇总和查询不改变写权限，复制只能写当前作品且不接受正文伪造', async () => {
+    const workId = crypto.randomUUID(); const sourceWorkId = crypto.randomUUID(); const calls: string[] = [];
+    const service = new StoreService(async (command) => { calls.push(command); return command === 'openWork' ? { id: workId } : []; });
+    await expect(service.execute('readKnowledgeScope', { scopeId: null })).resolves.toEqual([]);
+    await service.execute('openWork', { id: workId });
+    await expect(service.execute('searchKnowledgeScope', { scopeId: sourceWorkId, query: { text: '雨', mode: 'knowledge' } })).resolves.toEqual([]);
+    const request = { workId, expectedRevision: 1, operationId: crypto.randomUUID(), sourceWorkId, sourceEntryId: crypto.randomUUID(), sourceExpectedRevision: 2, categoryId: crypto.randomUUID(), tagIds: [] };
+    await expect(service.execute('copyKnowledge', { ...request, workId: sourceWorkId })).rejects.toThrow('当前作品');
+    await expect(service.execute('copyKnowledge', { ...request, body: '伪造正文' })).rejects.toThrow();
+    await expect(service.execute('copyKnowledge', request)).resolves.toEqual([]);
+    await expect(service.execute('manageAssets', { workId, expectedRevision: 1, operationId: crypto.randomUUID(), action: { type: 'createTag', name: '雨' } })).resolves.toEqual([]);
+    expect(calls).toEqual(['readKnowledgeScope', 'openWork', 'searchKnowledgeScope', 'copyKnowledge', 'manageAssets']);
+  });
   it('资产写入和搜索只允许当前作品，查询不能偷偷切换当前写权限', async () => {
     const first = crypto.randomUUID(); const second = crypto.randomUUID(); const calls: string[] = [];
     const service = new StoreService(async (command, payload) => {
