@@ -11,10 +11,13 @@ async function setup() {
   const dialog = screen.getByRole('dialog');
   fireEvent.change(within(dialog).getByLabelText('作品名称'), { target: { value: '雨落之后' } });
   fireEvent.click(within(dialog).getByRole('button', { name: '创建作品' }));
-  await screen.findByLabelText('章节标题'); return adapter;
+  await screen.findByLabelText('章节标题');
+  await waitFor(() => expect(screen.getByLabelText('章节正文')).toHaveAttribute('contenteditable', 'true'));
+  return adapter;
 }
 afterEach(() => { cleanup(); adapters.splice(0).forEach(adapter => adapter.dispose()); });
 
+// 多次导航包含真实 SQLite 与编辑器挂载，单独给总流程预算；搜索性能另有真实窗口门禁。
 it('剧情脏草稿阻止标签、页面和关闭，保存后持久化且正文可继续保存', async () => {
   const adapter = await setup();
   fireEvent.click(screen.getByRole('tab', { name: '剧情架构' }));
@@ -34,7 +37,7 @@ it('剧情脏草稿阻止标签、页面和关闭，保存后持久化且正文�
   expect(await screen.findByLabelText('章节标题')).toHaveValue('第一封信');
   fireEvent.click(screen.getByRole('tab', { name: '剧情架构' }));
   expect(await screen.findByRole('button', { name: '选择剧情：开篇来信' })).toBeInTheDocument();
-});
+}, 20000);
 
 it('知识页从真实 SQLite 搜索、保存失败保留草稿，取消后才能导航', async () => {
   const adapter = await setup();
@@ -57,6 +60,7 @@ it('知识页从真实 SQLite 搜索、保存失败保留草稿，取消后才�
 it('搜索命中稳定段落后打开正文，段落 ID 在实际编辑器节点中可定位', async () => {
   await setup();
   fireEvent.paste(screen.getByLabelText('章节正文'), { clipboardData: { getData: () => '第一段\n灯光下的第二段', types: ['text/plain'], files: [] } });
+  await waitFor(() => expect(screen.getByLabelText('章节正文')).toHaveTextContent('灯光下的第二段'));
   fireEvent.click(screen.getByRole('button', { name: '知识库' }));
   await screen.findByRole('searchbox');
   fireEvent.change(screen.getByLabelText('搜索范围'), { target: { value: 'all' } });
