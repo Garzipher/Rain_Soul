@@ -1,0 +1,10 @@
+.snapshot-panel { max-width: 1000px; margin: 0 auto; padding: 32px; }
+.snapshot-panel h2, .snapshot-panel h3 { margin: 0 0 10px; }
+.snapshot-panel p { color: #5a626b; font-size: 13px; line-height: 1.7; }
+.snapshot-create { display: flex; align-items: center; gap: 12px; padding: 22px 0; }
+.snapshot-create input { flex: 1; border: 1px solid #dce1e6; border-radius: 10px; padding: 10px 12px; }
+.snapshot-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; border-bottom: 1px solid #edf0f3; }
+.snapshot-row p { margin: 5px 0 0; }
+.snapshot-preview { margin-top: 28px; padding: 24px; border: 1px solid #e1e7ec; border-radius: 16px; background: #fcfdff; }
+.snapshot-preview li { line-height: 1.9; }
+@media (max-width: 800px) { .snapshot-panel { padding: 20px; } .snapshot-create { flex-wrap: wrap; } .snapshot-create label { width: 100%; } .snapshot-row { align-items: flex-start; } }

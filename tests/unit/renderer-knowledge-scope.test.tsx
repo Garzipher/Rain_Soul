@@ -1,0 +1,37 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, expect, it } from 'vitest';
+import App from '../../src/renderer/App';
+import { createStructureAdapter } from './renderer-structure-adapter';
+const adapters: ReturnType<typeof createStructureAdapter>[] = [];
+afterEach(() => { cleanup(); adapters.splice(0).forEach(adapter => adapter.dispose()); });
+it('全局知识只读，复制保留源作品且目标独立，范围查看不改变当前作品', async () => {
+  const adapter = createStructureAdapter(); adapters.push(adapter);
+  const source = await adapter.api.createWork('参考作品');
+  const categoryId = source.assets!.categories[0].id;
+  await adapter.api.manageAssets({ workId: source.id, expectedRevision: source.revision, operationId: crypto.randomUUID(), action: { type: 'createKnowledge', body: '雨光落在窗边。', source: '原创参考', categoryId, tagIds: [] } });
+  const target = await adapter.api.createWork('正在写的作品');
+  render(<App api={adapter.api} />);
+  fireEvent.click(await screen.findByRole('button', { name: '打开作品：正在写的作品' }));
+  await screen.findByLabelText('章节标题');
+  fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  fireEvent.change(await screen.findByLabelText('作品范围'), { target: { value: 'all' } });
+  const card = await screen.findByRole('article', { name: /知识：雨光/ });
+  expect(within(card).queryByRole('button', { name: '编辑知识' })).not.toBeInTheDocument();
+  fireEvent.click(within(card).getByRole('button', { name: '复制到当前作品' }));
+  await waitFor(() => expect(adapter.works.get(target.id)!.assets!.knowledge).toHaveLength(1));
+  expect(adapter.works.get(target.id)!.assets!.knowledge[0].origin?.workId).toBe(source.id);
+  const scope = await screen.findByLabelText('作品范围');
+  await waitFor(() => expect(scope).not.toBeDisabled());
+  fireEvent.change(scope, { target: { value: target.id } });
+  const copied = await screen.findByRole('article', { name: /知识：雨光/ });
+  expect(within(copied).getByRole('button', { name: '编辑知识' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '新增知识' }));
+  fireEvent.change(screen.getByLabelText('知识内容'), { target: { value: '新知识应立即显示。' } });
+  fireEvent.click(screen.getByRole('button', { name: '保存知识' }));
+  expect(await screen.findByRole('article', { name: /知识：新知识应立即/ })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '作品集' }));
+  fireEvent.click(await screen.findByRole('button', { name: '打开作品：正在写的作品' }));
+  expect(await screen.findByRole('heading', { name: '正在写的作品' })).toBeInTheDocument();
+});

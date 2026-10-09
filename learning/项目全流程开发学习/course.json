@@ -1,0 +1,56 @@
+{
+  "title": "项目全流程开发学习",
+  "volumes": [
+    { "key": "requirements", "title": "第一卷 需求与原型", "chapters": [
+      { "key": "requirements/01", "title": "从写作问题开始", "file": "01-需求与原型/01-项目起点.md" },
+      { "key": "requirements/02", "title": "原型与范围演变", "file": "01-需求与原型/02-原型与范围演变.md" },
+      { "key": "requirements/03", "title": "从立项到验收", "file": "01-需求与原型/03-从立项到验收.md" }
+    ] },
+    { "key": "engineering", "title": "第二卷 技术路线与工程", "chapters": [
+      { "key": "engineering/01", "title": "客户端与 AI 学习路线", "file": "02-技术路线与工程/01-客户端与AI学习路线.md" },
+      { "key": "engineering/02", "title": "TypeScript 与构建", "file": "02-技术路线与工程/02-TypeScript与构建.md" },
+      { "key": "engineering/03", "title": "架构与数据流地图", "file": "02-技术路线与工程/03-架构与数据流地图.md" }
+    ] },
+    { "key": "desktop", "title": "第三卷 桌面进程与安全", "chapters": [
+      { "key": "desktop/01", "title": "窗口与本地协议", "file": "03-桌面进程与安全/01-窗口与本地协议.md" },
+      { "key": "desktop/02", "title": "IPC 与权限", "file": "03-桌面进程与安全/02-IPC与权限.md" },
+      { "key": "desktop/03", "title": "Worker 与异步回执", "file": "03-桌面进程与安全/03-Worker与异步回执.md" }
+    ] },
+    { "key": "document", "title": "第四卷 正文编辑模型", "chapters": [
+      { "key": "document/01", "title": "受限文档", "file": "04-正文编辑模型/01-受限文档.md" },
+      { "key": "document/02", "title": "稳定段落标识", "file": "04-正文编辑模型/02-稳定段落标识.md" },
+      { "key": "document/03", "title": "字数与固定样式", "file": "04-正文编辑模型/03-字数与固定样式.md" }
+    ] },
+    { "key": "saving", "title": "第五卷 自动保存与失败保护", "chapters": [
+      { "key": "saving/01", "title": "停顿与持续输入保存", "file": "05-自动保存与失败保护/01-停顿与持续输入保存.md" },
+      { "key": "saving/02", "title": "未知回执与幂等重试", "file": "05-自动保存与失败保护/02-未知回执与幂等重试.md" },
+      { "key": "saving/03", "title": "切换关闭与输入法门禁", "file": "05-自动保存与失败保护/03-切换关闭与输入法门禁.md" }
+    ] },
+    { "key": "storage", "title": "第六卷 SQLite 与卷章管理", "chapters": [
+      { "key": "storage/01", "title": "作品隔离与数据库迁移", "file": "06-SQLite与卷章管理/01-作品隔离与数据库迁移.md" },
+      { "key": "storage/02", "title": "卷章排序与结构事务", "file": "06-SQLite与卷章管理/02-卷章排序与结构事务.md" },
+      { "key": "storage/03", "title": "软删除与精确恢复", "file": "06-SQLite与卷章管理/03-软删除与精确恢复.md" }
+    ] },
+    { "key": "quality", "title": "第七卷 质量与 Windows 交付", "chapters": [
+      { "key": "quality/01", "title": "测试先行与分层验证", "file": "07-质量与Windows交付/01-测试先行与分层验证.md" },
+      { "key": "quality/02", "title": "根因排查、评审与提交", "file": "07-质量与Windows交付/02-根因排查代码评审与提交.md" },
+      { "key": "quality/03", "title": "Logo 构建与目录包验收", "file": "07-质量与Windows交付/03-Logo构建与真实目录包验收.md" }
+    ] },
+    { "key": "continuation", "title": "第八卷 持续学习与后续 P0", "chapters": [
+      { "key": "continuation/01", "title": "把开发过程保存为默认作品", "file": "08-持续学习与后续P0/01-把开发过程保存为默认作品.md" },
+      { "key": "continuation/02", "title": "知识、剧情与版本的下一步", "file": "08-持续学习与后续P0/02-本地知识剧情与版本的下一步.md" },
+      { "key": "continuation/03", "title": "AI 与 Python 学习验证路径", "file": "08-持续学习与后续P0/03-AI与Python学习验证路径.md" },
+      { "key": "continuation/04", "title": "教材阅读升级与旧笔记勘误", "file": "08-持续学习与后续P0/04-教材阅读升级与旧笔记勘误.md" },
+      { "key": "continuation/05", "title": "本机作者资料实践", "file": "08-持续学习与后续P0/05-本机作者资料实践.md" },
+      { "key": "continuation/06", "title": "作品资产与知识库实践", "file": "08-持续学习与后续P0/06-作品资产与知识库实践.md" },
+      { "key": "continuation/07", "title": "整部作品快照实践", "file": "08-持续学习与后续P0/07-整部作品快照实践.md" },
+      { "key": "continuation/08", "title": "手稿导入与导出实践", "file": "08-持续学习与后续P0/08-手稿导入与导出实践.md" },
+      { "key": "continuation/09", "title": "项目归档与安全迁移实践", "file": "08-持续学习与后续P0/09-项目归档与安全迁移实践.md" },
+      { "key": "continuation/10", "title": "AI 授权、候选与知识参考实践", "file": "08-持续学习与后续P0/10-AI授权候选与知识参考实践.md" },
+      { "key": "continuation/11", "title": "真实客户端验收与窄窗排错", "file": "08-持续学习与后续P0/11-真实客户端验收与窄窗排错.md" },
+      { "key": "continuation/12", "title": "历史稿导出与手稿整理补充", "file": "08-持续学习与后续P0/12-历史稿导出与手稿整理补充.md" },
+      { "key": "continuation/13", "title": "结构化知识提取与分类审核", "file": "08-持续学习与后续P0/13-结构化知识提取与分类审核.md" },
+      { "key": "continuation/14", "title": "真实搜索性能测量与隐藏窗排错", "file": "08-持续学习与后续P0/14-真实搜索性能测量与隐藏窗排错.md" }
+    ] }
+  ]
+}

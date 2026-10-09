@@ -1,26 +1,112 @@
 {
   "name": "soulrain",
   "version": "1.0.0",
-  "description": "",
-  "main": "playwright.config.js",
+  "description": "本地优先的中文写作工作台",
+  "main": "dist/desktop/main.cjs",
   "scripts": {
-    "test": "playwright test --project=chrome-headless",
+    "test": "npm run test:coverage && npm run test:desktop && npm run test:demo",
     "test:headed": "playwright test --project=chrome",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "test:demo": "playwright test --project=chrome-headless",
+    "pretest:unit": "node scripts/build-desktop.mjs",
+    "test:unit": "vitest run --pool=threads --maxWorkers=1",
+    "pretest:coverage": "node scripts/build-desktop.mjs",
+    "test:coverage": "vitest run --coverage --pool=threads --maxWorkers=1",
+    "pretest:desktop": "npm run build",
+    "test:desktop": "playwright test --config playwright.desktop.config.cjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src tests/unit tests/desktop tests/fixtures scripts *.mts",
+    "build": "vite build && node scripts/build-desktop.mjs",
+    "generate:icon": "node scripts/generate-app-icon.mjs",
+    "start": "npm run build && electron .",
+    "pack": "npm run build && node scripts/pack-desktop.mjs",
+    "pack:installer": "npm run build && node scripts/pack-desktop.mjs --installer",
+    "verify": "npm run typecheck && npm run lint && npm test"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Garzipher/Rain_Soul.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "RainSoul",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/Garzipher/Rain_Soul/issues"
   },
   "homepage": "https://github.com/Garzipher/Rain_Soul#readme",
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "^1.63.0",
-    "playwright": "^1.63.0"
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/yauzl": "3.4.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "@vitest/coverage-v8": "5.0.3",
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "jsdom": "30.1.2",
+    "playwright": "^1.63.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
+    "vite": "8.3.3",
+    "vitest": "5.0.3"
+  },
+  "dependencies": {
+    "@tiptap/core": "3.31.4",
+    "@tiptap/extension-document": "3.31.4",
+    "@tiptap/extension-hard-break": "3.31.4",
+    "@tiptap/extension-paragraph": "3.31.4",
+    "@tiptap/extension-text": "3.31.4",
+    "@tiptap/extensions": "3.31.4",
+    "@tiptap/pm": "3.31.4",
+    "@tiptap/react": "3.31.4",
+    "better-sqlite3": "13.0.3",
+    "docx": "9.9.0",
+    "highlight.js": "11.12.0",
+    "jszip": "3.10.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-markdown": "10.1.0",
+    "rehype-highlight": "7.0.2",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "saxes": "6.0.0",
+    "unified": "11.0.5",
+    "yauzl": "3.4.0",
+    "zod": "4.6.5"
+  },
+  "build": {
+    "appId": "com.rainsoul.desktop",
+    "productName": "RainSoul",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/prebuilds/*.node"
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": "nsis",
+      "icon": "assets/rainsoul.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

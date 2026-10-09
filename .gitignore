@@ -25,5 +25,14 @@ __pycache__/
 
 # Playwright
 test-results/
+test-results-desktop/
+test-results-desktop-pack/
 playwright-report/
 playwright/.cache/
+
+# 桌面构建与覆盖率产物
+dist/
+release/
+coverage/
+/.ai-analysis-coverage/
+/.p0-*.log
