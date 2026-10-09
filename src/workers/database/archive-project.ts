@@ -12,6 +12,7 @@ import { readAssets } from './assets';
 import { rebuildAssetSearch } from './assets-search';
 
 const tables = ['work_meta', 'volume', 'chapter', 'category', 'tag', 'knowledge_entry', 'knowledge_tag', 'knowledge_history', 'outline_node', 'outline_knowledge', 'foreshadow', 'evidence', 'style_profile', 'style_default', 'chapter_style', 'asset_history'] as const;
+const conversationTables = ['conversation', 'conversation_message'] as const;
 type Row = Record<string, string | number | null>;
 type Payload = Record<string, Row[]>;
 interface SchemaRow { type: string; name: string; sql: string | null }
@@ -26,11 +27,14 @@ function safePath(path: string) {
   let current = resolve(path);
   while (true) { if (lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('归档路径不允许符号链接。'); const parent = dirname(current); if (parent === current) break; current = parent; }
 }
-function trustedDb(path = ':memory:', portable = false): Database.Database {
+function trustedDb(path = ':memory:', portable = false, schemaVersion = 5): Database.Database {
   const db = new Database(path);
   try {
     initializeSchema(db, 'project');
-    if (portable) db.exec('DROP TRIGGER search_insert; DROP TRIGGER search_delete; DROP TRIGGER search_update; DROP TABLE search_fts; DROP TABLE search_document; DROP TABLE operation_log;');
+    if (portable) db.exec('DROP TRIGGER search_insert; DROP TRIGGER search_delete; DROP TRIGGER search_update; DROP TABLE search_fts; DROP TABLE search_document; DROP TABLE operation_log; DROP TABLE conversation_operation;');
+    if (schemaVersion === 4) {
+      db.exec('DROP TABLE conversation_message; DROP TABLE conversation;'); db.pragma('user_version=4');
+    }
     return db;
   } catch (error) { db.close(); throw error; }
 }
@@ -38,7 +42,7 @@ function checkSchema(source: Database.Database, reference: Database.Database, po
   const expected = new Map(schema(reference).map(row => [row.name, row]));
   const rows = schema(source);
   if (portable && rows.some(row => !expected.has(row.name) || row.type !== expected.get(row.name)!.type || normalize(row.sql) !== normalize(expected.get(row.name)!.sql))) throw new Error('归档 schema 包含未知结构、触发器或视图。');
-  for (const table of [...tables, 'snapshot']) {
+  for (const table of [...tables, 'snapshot', ...conversationTables.filter(table => expected.has(table))]) {
     const row = rows.find(item => item.name === table);
     if (!row || row.type !== 'table' || /CREATE\s+VIRTUAL/i.test(row.sql ?? '')) throw new Error('归档业务表结构缺失或不安全。');
     const wanted = columns(reference, table), actual = columns(source, table);
@@ -141,6 +145,27 @@ function copySnapshots(source: Database.Database, target: Database.Database, old
   }
 }
 
+/** 会话随归档复制，但独立于正文快照；操作回执不进入便携数据。 */
+function copyConversations(source: Database.Database, target: Database.Database, schemaVersion: number) {
+  if (schemaVersion === 4) return;
+  const date = z.iso.datetime();
+  for (const table of conversationTables) {
+    const fields = columns(target, table).map(column => column.name);
+    const insert = target.prepare(`INSERT INTO ${table} (${fields.join(',')}) VALUES (${fields.map(() => '?').join(',')})`);
+    for (const row of source.prepare(`SELECT * FROM ${table}`).all() as Row[]) {
+      checkRow(target, table, row); date.parse(row.created_at);
+      if (table === 'conversation') {
+        z.string().max(200).parse(row.title); z.string().max(200000).parse(row.draft);
+        date.parse(row.updated_at); if (row.deleted_at !== null) date.parse(row.deleted_at);
+      } else {
+        z.enum(['user', 'assistant']).parse(row.role); z.string().min(1).max(200000).refine(value => !!value.trim()).parse(row.content);
+        if (row.request_hash !== null) z.string().regex(/^[a-f0-9]{64}$/).parse(row.request_hash);
+      }
+      insert.run(...fields.map(field => row[field]));
+    }
+  }
+}
+
 /** VACUUM INTO 读取已提交 WAL；再重建纯作品库，避免空闲页残留旧凭据。 */
 export async function exportProjectDatabase(projects: string, workId: string, expectedRevision: number): Promise<Buffer> {
   uuid(workId); if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) throw new Error('作品版本无效。');
@@ -152,12 +177,12 @@ export async function exportProjectDatabase(projects: string, workId: string, ex
     source = new Database(file, { readonly: true, fileMustExist: true }); source.pragma('trusted_schema=OFF');
     source.prepare('VACUUM INTO ?').run(join(temporary, 'source.sqlite'));
     copy = new Database(join(temporary, 'source.sqlite'), { readonly: true }); copy.pragma('trusted_schema=OFF');
-    if (copy.pragma('user_version', { simple: true }) !== 4) throw new Error('归档 schema 版本不支持。');
+    if (copy.pragma('user_version', { simple: true }) !== 5) throw new Error('归档 schema 版本不支持。');
     clean = trustedDb(join(temporary, 'portable.sqlite'), true); checkSchema(copy, clean, false);
     const payload = readRows(copy);
     if (payload.work_meta.length !== 1 || payload.work_meta[0].revision !== expectedRevision) throw new Error('作品版本已变化。');
     const destination = clean;
-    destination.transaction(() => { insertRows(destination, payload); checkGraph(destination, workId); copySnapshots(copy!, destination, workId, workId); })();
+    destination.transaction(() => { insertRows(destination, payload); checkGraph(destination, workId); copySnapshots(copy!, destination, workId, workId); copyConversations(copy!, destination, 5); assertIntegrity(destination); })();
     destination.pragma('wal_checkpoint(TRUNCATE)'); destination.close(); clean = undefined;
     return readFileSync(join(temporary, 'portable.sqlite'));
   } finally { clean?.close(); copy?.close(); source?.close(); rmSync(temporary, { recursive: true, force: true }); }
@@ -166,7 +191,7 @@ export async function exportProjectDatabase(projects: string, workId: string, ex
 /** 校验后写全新暂存库，原作品不覆盖；operationId兼任新作品ID和重放键。 */
 export function importArchivedProject(projects: string, input: ParsedProjectArchive, operationId: string): string {
   const id = uuid(operationId), manifest = archiveManifestSchema.parse(input.manifest);
-  if (manifest.schemaVersion !== 4 || input.database.length > 256 * 1024 * 1024 || hash(input.database) !== manifest.databaseSha256) throw new Error('归档 hash 或 schema 版本无效。');
+  if (![4, 5].includes(manifest.schemaVersion) || input.database.length > 256 * 1024 * 1024 || hash(input.database) !== manifest.databaseSha256) throw new Error('归档 hash 或 schema 版本无效。');
   const receiptHash = hash(JSON.stringify(manifest));
   const destination = join(projects, id); safePath(destination);
   if (existsSync(destination)) {
@@ -186,7 +211,7 @@ export function importArchivedProject(projects: string, input: ParsedProjectArch
     writeFileSync(join(staging, 'incoming.sqlite'), input.database, { flag: 'wx' });
     source = new Database(join(staging, 'incoming.sqlite'), { readonly: true, fileMustExist: true }); source.pragma('trusted_schema=OFF'); source.pragma('query_only=ON');
     if (source.pragma('user_version', { simple: true }) !== manifest.schemaVersion) throw new Error('归档 schema 与清单不一致。');
-    reference = trustedDb(':memory:', true); checkSchema(source, reference, true); assertIntegrity(source);
+    reference = trustedDb(':memory:', true, manifest.schemaVersion); checkSchema(source, reference, true); assertIntegrity(source);
     target = trustedDb(join(staging, 'project.sqlite'));
     const payload = readRows(source);
     const db = target;
@@ -194,6 +219,7 @@ export function importArchivedProject(projects: string, input: ParsedProjectArch
       insertRows(db, payload); checkGraph(db, manifest.projectId);
       db.prepare('UPDATE work_meta SET id=?').run(id);
       copySnapshots(source!, db, manifest.projectId, id);
+      copyConversations(source!, db, manifest.schemaVersion);
       db.exec('CREATE TABLE import_receipt(request_hash TEXT NOT NULL)'); db.prepare('INSERT INTO import_receipt VALUES(?)').run(receiptHash);
       rebuildAssetSearch(db); assertIntegrity(db);
     })();

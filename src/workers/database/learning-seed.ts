@@ -98,7 +98,7 @@ function updateCourse(directory: string, course: LearningCourse) {
   const db = new Database(file, { fileMustExist: true });
   try {
     const version = db.pragma('user_version', { simple: true });
-    if (version !== 1 && version !== 2 && version !== 3 && version !== 4) throw new RepositoryError('UNSUPPORTED_SCHEMA', '学习作品数据库版本不受此客户端支持。');
+    if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5) throw new RepositoryError('UNSUPPORTED_SCHEMA', '学习作品数据库版本不受此客户端支持。');
     assertIdentity(db, course);
     initializeSchema(db, 'project');
     db.transaction(() => {

@@ -75,7 +75,7 @@ export class WorkRepository {
     const db = new Database(file, { fileMustExist: true });
     try {
       const version = db.pragma('user_version', { simple: true });
-      if (version === 1 || version === 2 || version === 3 || version === 4) this.checkMetadata(db, id);
+      if (version === 1 || version === 2 || version === 3 || version === 4 || version === 5) this.checkMetadata(db, id);
       initializeSchema(db, 'project');
       this.checkMetadata(db, id);
     } catch (error) { db.close(); throw error; }
