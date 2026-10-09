@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -9,10 +9,14 @@ describe('项目学习课程编译', () => {
   let directory = '';
   afterEach(() => { if (directory) rmSync(directory, { recursive: true, force: true }); });
 
-  it('项目教学源覆盖全部 8 卷 24 章，每章为可编辑的有效正文', () => {
+  it('项目教学源覆盖清单全部卷章和增量补充，每章为可编辑的有效正文', () => {
+    const manifest = JSON.parse(readFileSync('learning/项目全流程开发学习/course.json', 'utf8')) as {
+      volumes: { key: string; chapters: { key: string }[] }[];
+    };
     const course = compileLearningCourse('learning/项目全流程开发学习');
-    expect(course.volumes).toHaveLength(8);
-    expect(course.volumes.flatMap((volume) => volume.chapters)).toHaveLength(24);
+    expect(course.volumes).toHaveLength(manifest.volumes.length);
+    expect(course.volumes.flatMap((volume) => volume.chapters)).toHaveLength(manifest.volumes.reduce((count, volume) => count + volume.chapters.length, 0));
+    expect(course.volumes.flatMap(volume => volume.chapters.map(chapter => chapter.key))).toEqual(expect.arrayContaining(['continuation/04', 'continuation/05']));
     for (const volume of course.volumes) for (const chapter of volume.chapters) {
       expect(validateDocument(chapter.document)).toEqual(chapter.document);
       expect(JSON.stringify(chapter.document).length).toBeGreaterThan(1000);
