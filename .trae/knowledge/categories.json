@@ -14,7 +14,7 @@
     "bug-patterns": {
       "name": "Bug 模式",
       "description": "已知缺陷模式、集成问题、常见陷阱及其修复方案",
-      "entryCount": 4
+      "entryCount": 5
     },
     "design-patterns": {
       "name": "设计模式",
