@@ -7,8 +7,35 @@ import HardBreak from '@tiptap/extension-hard-break';
 import { describe, expect, it } from 'vitest';
 import { stableParagraphIds } from '../../src/renderer/lib/paragraph-ids';
 import { emptyDocument, validateDocument } from '../../src/shared/document';
+import { inlineBookmark, insertBookmarkAtSelection } from '../../src/renderer/components/inline-bookmark';
 
 describe('稳定段落标识', () => {
+  it('选择正文时在选择末尾插入书签，不覆盖原文；锁定后拒绝插入', () => {
+    const doc = emptyDocument(); doc.content[0].content = [{ type: 'text', text: '春雨落城' }];
+    const editor = new Editor({ extensions: [Document, Paragraph, Text, HardBreak, inlineBookmark, stableParagraphIds], content: doc });
+    editor.commands.setTextSelection({ from: 2, to: 4 });
+    const targetId = crypto.randomUUID();
+    expect(insertBookmarkAtSelection(editor, 'knowledge', targetId)).toBe(true);
+    expect(validateDocument(editor.getJSON()).content[0].content).toMatchObject([
+      { type: 'text', text: '春雨落' }, { type: 'bookmark', attrs: { targetId } }, { type: 'text', text: '城' },
+    ]);
+    editor.setEditable(false);
+    expect(insertBookmarkAtSelection(editor, 'knowledge', targetId)).toBe(false);
+    editor.destroy();
+  });
+  it('复制书签获得新 ID，但知识关联目标保持一致', () => {
+    const doc = emptyDocument();
+    const bookmark = { type: 'bookmark' as const, attrs: { id: crypto.randomUUID(), kind: 'knowledge' as const, targetId: crypto.randomUUID() } };
+    doc.content[0].content = [bookmark];
+    const editor = new Editor({ extensions: [Document, Paragraph, Text, HardBreak, inlineBookmark, stableParagraphIds], content: doc });
+    editor.commands.insertContentAt(2, bookmark);
+    const copied = validateDocument(editor.getJSON()).content[0].content!;
+    expect(copied).toHaveLength(2);
+    expect(copied[0]).toEqual(bookmark);
+    expect(copied[1]).toMatchObject({ type: 'bookmark', attrs: { targetId: bookmark.attrs.targetId } });
+    expect(copied[1]).not.toEqual(bookmark);
+    editor.destroy();
+  });
   it('拆段保留左段标识，右段获得新标识，合并后不复用右段', () => {
     const doc = emptyDocument();
     doc.content[0].content = [{ type: 'text', text: '春雨' }];

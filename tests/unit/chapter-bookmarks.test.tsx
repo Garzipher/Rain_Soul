@@ -1,0 +1,72 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { ChapterEditor } from '../../src/renderer/components/chapter-editor';
+import { emptyDocument, countDocumentWords, validateDocument } from '../../src/shared/document';
+import type { AssetState } from '../../src/shared/assets';
+afterEach(cleanup);
+it.each(['knowledge', 'foreshadow'] as const)('正文 %s 书签可直接定位真实关联，已删除对象禁止定位', async kind => {
+  const state = assets(), doc = emptyDocument(), onLocateAsset = vi.fn();
+  const targetId = kind === 'knowledge' ? state.knowledge[0].id : state.foreshadows[0].id;
+  doc.content[0].content = [{ type: 'bookmark', attrs: { id: crypto.randomUUID(), kind, targetId } }];
+  const props = { document: doc, assets: state, locked: false, onChange: vi.fn(), onError: vi.fn(), onCompositionChange: vi.fn(), onLocateAsset };
+  const view = render(<ChapterEditor {...props} />);
+  fireEvent.click(await screen.findByRole('button', { name: kind === 'knowledge' ? '知识书签：雨打旧站台。' : '伏笔书签：未寄出的信' }));
+  const name = kind === 'knowledge' ? '定位知识条目' : '定位伏笔架构';
+  fireEvent.click(screen.getByRole('button', { name }));
+  expect(onLocateAsset).toHaveBeenCalledWith(kind, targetId);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  if (kind === 'knowledge') state.knowledge[0].deletedAt = '2026-10-09'; else state.foreshadows[0].deletedAt = '2026-10-09';
+  view.rerender(<ChapterEditor {...props} assets={structuredClone(state)} />);
+  fireEvent.click(await screen.findByRole('button', { name: kind === 'knowledge' ? '知识书签：已删除条目' : '伏笔书签：已删除伏笔' }));
+  expect(screen.getByRole('button', { name })).toBeDisabled();
+});
+it.each(['Enter', ' '])('书签通过键盘 %s 打开详情且不修改正文', async key => {
+  const state = assets(), doc = emptyDocument();
+  doc.content[0].content = [{ type: 'bookmark', attrs: { id: crypto.randomUUID(), kind: 'knowledge', targetId: state.knowledge[0].id } }];
+  const onChange = vi.fn();
+  render(<ChapterEditor document={doc} assets={state} locked={false} onChange={onChange} onError={vi.fn()} onCompositionChange={vi.fn()} />);
+  const marker = await screen.findByRole('button', { name: '知识书签：雨打旧站台。' }); marker.focus();
+  fireEvent.keyDown(marker, { key });
+  expect(screen.getByRole('dialog')).toHaveTextContent('写作练习'); expect(onChange).not.toHaveBeenCalled();
+});
+function assets(): AssetState { return { outlines: [], foreshadows: [{ id: crypto.randomUUID(), name: '未寄出的信', description: '回收旧信', status: '未埋设', outlineId: null, deletedAt: null }], evidence: [], categories: [], tags: [], knowledge: [{ id: crypto.randomUUID(), body: '雨打旧站台。', source: '写作练习', categoryId: crypto.randomUUID(), tagIds: [], origin: null, revision: 1, deletedAt: null }], styleProfiles: [], chapterStyles: [], defaultStyleId: null }; }
+it('光标处插入可点击知识书签，持久化关联不计字数；详情实时跟随编辑及删除', async () => {
+  const state = assets(), doc = emptyDocument();
+  doc.content[0].content = [{ type: 'text', text: '雨夜ABC' }];
+  const onChange = vi.fn(), onError = vi.fn();
+  const props = { document: doc, assets: state, locked: false, onChange, onError, onCompositionChange: vi.fn() };
+  const view = render(<ChapterEditor {...props} />);
+  fireEvent.click(screen.getByRole('button', { name: '插入书签' }));
+  await waitFor(() => expect(onChange).toHaveBeenCalled());
+  const saved = validateDocument(onChange.mock.calls.at(-1)![0]);
+  expect(countDocumentWords(saved)).toBe(5);
+  const node = saved.content[0].content?.find(item => item.type === 'bookmark');
+  expect(node).toMatchObject({ type: 'bookmark', attrs: { kind: 'knowledge', targetId: state.knowledge[0].id } });
+  fireEvent.click(screen.getByRole('button', { name: '知识书签：雨打旧站台。' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent('写作练习');
+  const updated = structuredClone(state); updated.knowledge[0].body = '更新后的知识全文。';
+  view.rerender(<ChapterEditor {...props} assets={updated} />);
+  expect(screen.getByRole('dialog')).toHaveTextContent('更新后的知识全文。');
+  updated.knowledge[0].deletedAt = new Date().toISOString();
+  view.rerender(<ChapterEditor {...props} assets={structuredClone(updated)} />);
+  expect(screen.getByRole('dialog')).toHaveTextContent('已删除条目');
+  expect(screen.getByRole('dialog')).toHaveTextContent(state.knowledge[0].id);
+  fireEvent.click(screen.getByRole('button', { name: '关闭书签详情' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(onError).not.toHaveBeenCalled();
+});
+it('伏笔书签只关联目标，不制造埋设或回收证据；锁定时禁止插入', async () => {
+  const state = assets(), onChange = vi.fn();
+  const props = { document: emptyDocument(), assets: state, locked: false, onChange, onError: vi.fn(), onCompositionChange: vi.fn() };
+  const view = render(<ChapterEditor {...props} />);
+  fireEvent.change(screen.getByLabelText('书签类型'), { target: { value: 'foreshadow' } });
+  fireEvent.click(screen.getByRole('button', { name: '插入书签' }));
+  fireEvent.click(await screen.findByRole('button', { name: '伏笔书签：未寄出的信' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent('未埋设');
+  expect(state.evidence).toEqual([]);
+  expect(validateDocument(onChange.mock.calls.at(-1)![0]).content[0].content).toMatchObject([{ type: 'bookmark', attrs: { kind: 'foreshadow', targetId: state.foreshadows[0].id } }]);
+  view.rerender(<ChapterEditor {...props} locked />);
+  expect(screen.getByRole('button', { name: '插入书签' })).toBeDisabled();
+});
