@@ -22,10 +22,10 @@
 .knowledge-snippet.is-collapsed { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .knowledge-entry-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .knowledge-entry-tags span { font-size: 11px; padding: 3px 7px; color: #57778f; background: #f1f7fc; border-radius: 4px; }
-.knowledge-entry-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 16px; }
-.knowledge-entry-bottom > div:first-child { display: flex; flex-wrap: wrap; gap: 8px; }
-.knowledge-entry-bottom button { padding: 4px 0; color: #4c7da1; border: 0; background: transparent; font-size: 11px; }
-.knowledge-source { display: grid; gap: 5px; text-align: right; color: #7d8e9b; font-size: 11px; overflow-wrap: anywhere; min-width: 0; }
+.knowledge-entry-bottom { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.knowledge-entry-bottom > div:first-child { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+.knowledge-entry-bottom button { padding: 4px 0; color: #4c7da1; border: 0; background: transparent; font-size: 11px; white-space: nowrap; }
+.knowledge-source { display: grid; flex: 1 1 180px; gap: 5px; text-align: right; color: #7d8e9b; font-size: 11px; overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
 .knowledge-source small { font-size: 10px; }
 .knowledge-form { margin: 18px 0; padding: 22px; border: 1px solid #d9e7f2; border-radius: 10px; background: #fbfdff; }
 .knowledge-copy-preview { display: grid; gap: 12px; max-height: 58vh; overflow: auto; color: #536a7c; font-size: 13px; }

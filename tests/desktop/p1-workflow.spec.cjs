@@ -126,7 +126,21 @@ test('P1本地拆书默认零选择，取消不写库，两段审核真实入库
     expect(await page.evaluate(id => window.rainSoul.listSnapshots(id), id)).toEqual(expect.arrayContaining([expect.objectContaining({ title: '拆书入库前安全快照' })]));
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(720, 540));
     const collapse = page.getByRole('button', { name: '收起侧栏', exact: true }); if (await collapse.isVisible()) await activate(collapse);
-    await assertNarrowControls(page, ['拆书工具', '新增知识']); await capture(page, 'p1-book-knowledge-narrow');
+    await assertNarrowControls(page, ['拆书工具', '新增知识']);
+    await activate(page.getByRole('button', { name: '收起分类', exact: true }));
+    await first.scrollIntoViewIfNeeded();
+    const cardGeometry = await first.evaluate(card => {
+      const outer = card.getBoundingClientRect();
+      const buttons = [...card.querySelectorAll('.knowledge-entry-bottom button')].map(button => {
+        const box = button.getBoundingClientRect(); return { width: box.width, height: box.height, left: box.left, right: box.right };
+      });
+      return { width: innerWidth, cardLeft: outer.left, cardRight: outer.right, cardWidth: card.clientWidth, cardScrollWidth: card.scrollWidth, buttons };
+    });
+    expect(cardGeometry.cardScrollWidth).toBeLessThanOrEqual(cardGeometry.cardWidth + 1);
+    expect(cardGeometry.cardLeft).toBeGreaterThanOrEqual(0); expect(cardGeometry.cardRight).toBeLessThanOrEqual(cardGeometry.width);
+    expect(cardGeometry.buttons).toHaveLength(2);
+    for (const button of cardGeometry.buttons) { expect(button.width).toBeGreaterThan(35); expect(button.height).toBeLessThan(35); expect(button.right).toBeLessThanOrEqual(cardGeometry.cardRight); }
+    await capture(page, 'p1-book-knowledge-narrow');
     await closeNormally(application); application = await launch(directory); page = await offlineWindow(application);
     await activate(page.getByRole('button', { name: '打开作品：P1拆书练习', exact: true })); await sidebar(page, '知识库');
     await expect(page.getByRole('article', { name: /^知识：/ })).toHaveCount(2);
