@@ -144,9 +144,9 @@ export class WorkRepository {
     const db = this.projectDb(workId); if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
     return listConversations(db);
   }
-  readConversation(workId: string, conversationId: string) {
+  readConversation(workId: string, conversationId: string, beforeMessageId?: string) {
     const db = this.projectDb(workId); if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
-    return readConversation(db, conversationId);
+    return readConversation(db, conversationId, beforeMessageId);
   }
   manageConversation(request: ConversationRequest) { return manageConversation(this.projectDb(request.workId), request); }
   appendConversationTurn(request: ConversationTurnRequest) { return appendConversationTurn(this.projectDb(request.workId), request); }

@@ -33,12 +33,22 @@ export function listConversations(db: Database.Database): ConversationSummary[] 
     FROM conversation WHERE deleted_at IS NULL ORDER BY updated_at DESC,id`).all() as (ConversationRow & { message_count: number })[])
     .map(value => summary(value, value.message_count));
 }
-export function readConversation(db: Database.Database, id: string): ConversationDetail {
+export function readConversation(db: Database.Database, id: string, beforeMessageId?: string): ConversationDetail {
   if (!z.uuid().safeParse(id).success) throw new RepositoryError('INVALID_INPUT', '会话标识无效。');
   const value = row(db, id);
-  const messages = (db.prepare('SELECT * FROM conversation_message WHERE conversation_id=? ORDER BY sort_order').all(id) as { id: string; role: 'user' | 'assistant'; content: string; created_at: string; request_hash: string | null }[])
+  let boundary = Number.MAX_SAFE_INTEGER;
+  if (beforeMessageId !== undefined) {
+    if (!z.uuid().safeParse(beforeMessageId).success) throw new RepositoryError('INVALID_INPUT', '消息分页游标无效。');
+    const cursor = db.prepare('SELECT sort_order FROM conversation_message WHERE conversation_id=? AND id=?').get(id, beforeMessageId) as { sort_order: number } | undefined;
+    if (!cursor) throw new RepositoryError('INVALID_INPUT', '消息分页游标不属于当前会话。'); boundary = cursor.sort_order;
+  }
+  // 多读取一条判断是否还有更早历史，既不复制整条会话，也不静默丢弃历史。
+  const page = db.prepare('SELECT * FROM conversation_message WHERE conversation_id=? AND sort_order<? ORDER BY sort_order DESC LIMIT 101').all(id, boundary) as { id: string; role: 'user' | 'assistant'; content: string; created_at: string; request_hash: string | null }[];
+  const hasMore = page.length > 100;
+  const messages = page.slice(0, 100).reverse()
     .map(message => ({ id: message.id, role: message.role, content: message.content, createdAt: message.created_at, ...(message.request_hash ? { requestHash: message.request_hash } : {}) }));
-  return { ...summary(value, messages.length), draft: value.draft, messages };
+  const count = (db.prepare('SELECT COUNT(*) AS count FROM conversation_message WHERE conversation_id=?').get(id) as { count: number }).count;
+  return { ...summary(value, count), draft: value.draft, messages, hasMore, ...(hasMore ? { nextBeforeMessageId: messages[0].id } : {}) };
 }
 function assertWork(db: Database.Database, workId: string) {
   const meta = db.prepare('SELECT id,deleted_at FROM work_meta').get() as { id: string; deleted_at: string | null } | undefined;

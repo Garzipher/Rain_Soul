@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export interface ConversationMessage { id: string; role: 'user' | 'assistant'; content: string; createdAt: string; requestHash?: string }
 export interface ConversationSummary { id: string; title: string; revision: number; createdAt: string; updatedAt: string; messageCount: number }
-export interface ConversationDetail extends ConversationSummary { draft: string; messages: ConversationMessage[] }
+export interface ConversationDetail extends ConversationSummary { draft: string; messages: ConversationMessage[]; hasMore: boolean; nextBeforeMessageId?: string }
 const id = z.uuid(), revision = z.number().int().positive();
 const title = z.string().max(200).refine(value => !!value.trim(), '会话名称不能为空');
 const content = z.string().min(1).max(200000).refine(value => !!value.trim(), '消息不能为空');
