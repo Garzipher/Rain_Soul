@@ -34,7 +34,7 @@ GSD Core 分配 AI 响应、草稿与跨章来源独立任务；root 实现知�
 
 - 首次完整verify类型/Lint通过，81组中80组、624项中623项通过；搜索跳转测试未找到正文结果，退出1，未作为交付证据。独立复跑搜索跳转通过，但多页面真实SQLite流程耗尽10秒总预算。补编辑器可输入与粘贴完成检查；仅该多步流程总预算调整为20秒，产品搜索P95门槛不变。专项2组9项通过，来源解析器行、语句、函数、分支均100%；纳入日常覆盖率门禁后再次全套验证。
 - Microsoft Word 2007（应用版本12.0）实际打开当前源码导出函数生成的隔离样稿：8个段落、1页；中文正文、硬换行、知识引用、伏笔标记与两类清单均可读取，标题16磅；审计材料未进入手稿。Word生成PDF，经渲染检查无乱码或裁切。关闭自动化先释放文档导致RPC断连，调整为先Quit再释放对象后退出0。只操作新建的隔离文档与独立Word实例。
-- Word证据为 `.p0-ai-word-final.log`、`test-results-word/RainSoul-Word验收.docx`、`test-results-word/RainSoul-Word验收.pdf`及`test-results-word/Word-渲染.png`；这是一个兼容性样稿，不冒充所有Word版本、长篇排版或干净系统矩阵。
+- Word证据为 `test-results-logs/2026-10-09/.p0-ai-word-final.log`、`test-results-word/RainSoul-Word验收.docx`、`test-results-word/RainSoul-Word验收.pdf`及`test-results-word/Word-渲染.png`；这是一个兼容性样稿，不冒充所有Word版本、长篇排版或干净系统矩阵。
 - 第二次verify单元/组件624项、类型、Lint与生产构建通过，行96.72%、分支86.81%；真实桌面17项通过、1项右键AI入口失败，Demo阶段未执行，整体退出1。200样本搜索P95为177.50ms。读取轨迹及ProseMirror事件顺序后定位自定义右键先于内部选区同步；单独复跑内部选区已同步时通过，不将偶然重跑成功当作修复。
 - 新增回归设置DOM选区而不派发selectionchange，正反选区两项真实失败；修复在正文边界内用公开posAtDOM映射当前位置，区外或无法映射保持原生菜单，不修改正文或扩大授权。与书签和选区合计13项通过，类型/Lint/构建通过并提交`efd6dac`；教材`17413ef`补原理与实验。最终交付以修复后的完整verify与实际包验收为准。
 - 第三次verify在覆盖率组件阶段发现旧快照导出测试缓存了列表刷新前已断开的按钮，点击未触发导出；正文定位另触发jsdom缺少Range几何方法的未处理异常。626项通过、1项失败，整体退出1。测试改为点击时重新查找当前按钮，并按既有renderer-ai-protection模式局部补齐/恢复Range几何接口；覆盖率环境专项2组8项通过且无未处理异常。该诊断仅执行组件用例，不作为核心逻辑覆盖率成绩；正式全套门禁与原80%阈值保持不变。
@@ -42,12 +42,12 @@ GSD Core 分配 AI 响应、草稿与跨章来源独立任务；root 实现知�
 
 ## 最终交付门禁
 
-- `npm run verify`最终退出0（`.p0-ai-final-acceptance.log`）：82组627项单元/组件、18项真实Electron、69项Demo全部通过；类型检查、ESLint及生产构建通过，无未处理异常。覆盖率行96.72%、语句91.27%、函数93.79%、分支86.81%，原80%阈值保持。真实窗口200样本搜索P95为206.50ms。
+- `npm run verify`最终退出0（`test-results-logs/2026-10-09/.p0-ai-final-acceptance.log`）：82组627项单元/组件、18项真实Electron、69项Demo全部通过；类型检查、ESLint及生产构建通过，无未处理异常。覆盖率行96.72%、语句91.27%、函数93.79%、分支86.81%，原80%阈值保持。真实窗口200样本搜索P95为206.50ms。
 - 独立review最终无阻断；额外复审`efd6dac`选区边界与`17413ef`教材一致性、`f4300fc`局部jsdom适配和快照节点重查询，确认未扩大授权、未削弱业务断言。写作特点`fb212da`仅等待useEffect回调。
 - 教材仍为八卷35章13张离线图片，生产构建校验通过；本轮来源、事务与快速右键推理已写入教材，Compound Engineering耐久性检查无需重复沉淀。Claude Mem本地DB不存在且无可调用接口，没有虚构记忆写入。
-- `npm run pack:installer`首次在写入EXE资源时遇到`UNKNOWN/open`，未生成可交付包；完整重试后退出0（`.p0-ai-completion-pack-final.log`），未跳过资源或ASAR完整性写入。重复依赖引用为打包工具的依赖分析信息，32个构建文件已逐一与包内SHA-256匹配。
-- 1.0.3安装器为`release/current/RainSoul Setup 1.0.3.exe`，129,662,582字节；SHA-256为`b21ea7bead589758ed37af6f36f32d98040151460f1bbc5d87323e432d77c6de`。核验6,537个包内文件，Electron/Chromium/第三方许可齐备，未混入作者数据库、项目归档、AI配置或个人资料（`.p0-ai-package-integrity.log`）。安装器与目录包EXE均为NotSigned。
-- 设置`RAINSOUL_TEST_EXECUTABLE`指向`release/current/win-unpacked/RainSoul.exe`，使用隔离作者目录执行完整桌面验收；18项全部通过、退出0（`.p0-ai-completion-exe.log`），200样本搜索P95为149.30ms。验证的是实际打包EXE，没有使用开发入口替代，也没有执行NSIS安装矩阵或真实云请求。
+- `npm run pack:installer`首次在写入EXE资源时遇到`UNKNOWN/open`，未生成可交付包；完整重试后退出0（`test-results-logs/2026-10-09/.p0-ai-completion-pack-final.log`），未跳过资源或ASAR完整性写入。重复依赖引用为打包工具的依赖分析信息，32个构建文件已逐一与包内SHA-256匹配。
+- 1.0.3安装器为`release/current/RainSoul Setup 1.0.3.exe`，129,662,582字节；SHA-256为`b21ea7bead589758ed37af6f36f32d98040151460f1bbc5d87323e432d77c6de`。核验6,537个包内文件，Electron/Chromium/第三方许可齐备，未混入作者数据库、项目归档、AI配置或个人资料（`test-results-logs/2026-10-09/.p0-ai-package-integrity.log`）。安装器与目录包EXE均为NotSigned。
+- 设置`RAINSOUL_TEST_EXECUTABLE`指向`release/current/win-unpacked/RainSoul.exe`，使用隔离作者目录执行完整桌面验收；18项全部通过、退出0（`test-results-logs/2026-10-09/.p0-ai-completion-exe.log`），200样本搜索P95为149.30ms。验证的是实际打包EXE，没有使用开发入口替代，也没有执行NSIS安装矩阵或真实云请求。
 - 最终文档按review清单复核版本、日志、安装器路径、清理边界与外部验收限制，未发现阻断项。代码和教材已分步提交本地main；本轮验收记录与三份开发基线统一提交，未推送远端。文档变更不新增测试，以既有完整门禁、实际包验收和`git diff --check`为验证依据。
 
 ## 手动清理旧产物

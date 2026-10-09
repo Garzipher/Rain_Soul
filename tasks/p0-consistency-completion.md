@@ -31,7 +31,7 @@ GSD Core 第一波并行处理知识复制、AI 数据准备；root 处理字典
 - 实际 `release/current/win-unpacked/RainSoul.exe` 17项全套验收退出0，P95为154.10ms；临时目录验证知识复制、教材、恢复、导出、头像与卸载数据保护，没有操作作者数据。目录包测试不等于干净系统安装验收。
 - 安装器与EXE均NotSigned；安装器SHA-256：`646DEA0BDDA9C8CDB68AB2AE0E26F24F35FCFD6185F90CBFA14853DD83F7EAFA`。
 - 独立native review已追踪调用者、授权边界、失败重试、测试和教材，发现自我复制入口与普通操作危险色并修复，最终无未解决阻断问题。gstack启动脚本及外部运行器本机不可用，按可用技能清单执行本机与独立Agent审查，没有冒充跨模型外部审查。
-- 验证日志为 `.p0-consistency-verify.log`、`.p0-consistency-pack.log`、`.p0-consistency-exe.log`，生成物按现有规则忽略，不进入Git。
+- 验证日志为 `test-results-logs/2026-10-09/.p0-consistency-verify.log`、`test-results-logs/2026-10-09/.p0-consistency-pack.log`、`test-results-logs/2026-10-09/.p0-consistency-exe.log`，生成物按现有规则忽略，不进入Git。
 - Compound Engineering耐久性检查：本轮映射、草稿、顺序及授权树推理已经充分写入三章教材和回归，避免在知识库重复保存同一内容。
 
 ## 旧安装器清理的实际状态
