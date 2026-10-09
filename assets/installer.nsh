@@ -2,7 +2,7 @@
 !macro customUnInstall
   ${IfNot} ${isUpdated}
   ${AndIfNot} ${Silent}
-    MessageBox MB_YESNOCANCEL|MB_ICONQUESTION|MB_DEFBUTTON2 "默认会保留全部作品。是否同时删除当前用户的本机 RainSoul 数据？$\r$\n$\r$\n会删除全部作品、知识、伏笔、大纲、版本快照、头像、设置和云端凭据。已导出的手稿和备份包不受影响。$\r$\n$\r$\n“否”：保留数据并继续卸载。$\r$\n“取消”：中止卸载，先在程序中备份全部需要保留的作品。" IDYES rainsoul_confirm_delete IDNO rainsoul_keep_data
+    MessageBox MB_YESNOCANCEL|MB_ICONQUESTION|MB_DEFBUTTON2 "默认会保留全部作品。是否同时删除当前用户的本机 RainSoul 数据？$\r$\n$\r$\n会删除全部作品、知识、伏笔、大纲、版本快照、头像、设置和云端凭据。仅保存到本机 RainSoul 数据目录之外的手稿和备份包不受影响；该目录内的导出文件也会删除。$\r$\n$\r$\n“否”：保留数据并继续卸载。$\r$\n“取消”：中止卸载，先把需要保留的作品备份到本机 RainSoul 数据目录之外。" IDYES rainsoul_confirm_delete IDNO rainsoul_keep_data
     Goto rainsoul_cancel_uninstall
     rainsoul_confirm_delete:
       MessageBox MB_YESNO|MB_ICONEXCLAMATION|MB_DEFBUTTON2 "请再次确认：已完成需要的备份，并永久删除当前用户全部本机 RainSoul 数据？$\r$\n$\r$\n默认选择“否”只卸载程序并保留数据。" IDYES rainsoul_delete_data IDNO rainsoul_keep_data
