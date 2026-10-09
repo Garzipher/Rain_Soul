@@ -61,6 +61,7 @@ it('预览完整发送范围与计费后明确确认才执行，候选必须再�
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   const dialog = await screen.findByRole('dialog');
   expect(dialog).toHaveTextContent('完整发送内容'); expect(dialog).toHaveTextContent('本次按服务计费');
+  expect(within(dialog).getByRole('button', { name: '确认发送' })).toHaveClass('primary');
   expect(props.onExecute).not.toHaveBeenCalled();
   fireEvent.click(within(dialog).getByRole('button', { name: '确认发送' }));
   expect(await screen.findByText('润色候选')).toBeInTheDocument();
@@ -174,6 +175,48 @@ it('知识提取逐项可编辑且未审核不可入库，分析结果不显示�
   fireEvent.click(screen.getByRole('checkbox', { name: '审核通过条目 1' }));
   fireEvent.click(screen.getByRole('button', { name: '确认入库已审核条目' }));
   await waitFor(() => expect(props.onExtract).toHaveBeenCalledWith('candidate', [{ body: '作者修订第一条', source: '雨夜 / 第一章' }]));
+});
+it('知识更新必须显式选目标并对比旧内容，改变目标撤销审核；失败保留候选和选择', async () => {
+  const { props, candidate, view } = setup();
+  const entry = { id: 'existing', body: '原有角色资料', source: '旧出处', categoryId: 'category', tagIds: ['tag'], origin: null, revision: 1, deletedAt: null };
+  view.rerender(<AiWorkspace {...props} work={{ ...props.work, assets: { outlines: [], foreshadows: [], evidence: [], knowledge: [entry, { ...entry, id: 'deleted', deletedAt: '已删除' }], styleProfiles: [], chapterStyles: [], defaultStyleId: null,
+    categories: [{ id: 'category', name: '人物', parentId: null, sortOrder: 0, systemKey: null, deletedAt: null }], tags: [{ id: 'tag', name: '角色', deletedAt: null }] } }} />);
+  candidate.operation = 'extractKnowledge'; candidate.text = JSON.stringify({ items: [{ body: '修订角色资料' }] });
+  fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
+  expect(await screen.findByLabelText('知识入库方式 1')).toHaveValue('create');
+  fireEvent.click(screen.getByRole('checkbox', { name: '审核通过条目 1' }));
+  fireEvent.change(screen.getByLabelText('知识入库方式 1'), { target: { value: 'update' } });
+  expect(screen.getByRole('checkbox', { name: '审核通过条目 1' })).not.toBeChecked();
+  expect(screen.getByRole('checkbox', { name: '审核通过条目 1' })).toBeDisabled();
+  expect(within(screen.getByLabelText('更新知识目标 1')).queryByRole('option', { name: /已删除/ })).toBeNull();
+  fireEvent.change(screen.getByLabelText('更新知识目标 1'), { target: { value: 'existing' } });
+  expect(screen.getByLabelText('更新前知识 1')).toHaveTextContent('原有角色资料');
+  expect(screen.getByLabelText('更新前知识 1')).toHaveTextContent('旧出处');
+  expect(screen.getByLabelText('知识候选 1')).toHaveValue('修订角色资料');
+  expect(screen.getByLabelText('知识分类 1')).toHaveValue('category');
+  fireEvent.click(screen.getByRole('checkbox', { name: '审核通过条目 1' }));
+  props.onExtract.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByRole('button', { name: '确认入库已审核条目' }));
+  await screen.findByRole('alert');
+  expect(props.onExtract).toHaveBeenCalledWith('candidate', [{ body: '修订角色资料', source: '雨夜 / 第一章', categoryId: 'category', tagIds: ['tag'], mode: 'update', targetId: 'existing' }]);
+  expect(screen.getByLabelText('更新知识目标 1')).toHaveValue('existing');
+  expect(screen.getByLabelText('知识候选 1')).toHaveValue('修订角色资料');
+  fireEvent.click(screen.getByRole('checkbox', { name: /^角色$/ }));
+  expect(screen.getByRole('checkbox', { name: '审核通过条目 1' })).not.toBeChecked();
+  fireEvent.click(screen.getByRole('checkbox', { name: '审核通过条目 1' }));
+  fireEvent.click(screen.getByRole('button', { name: '确认入库已审核条目' }));
+  await waitFor(() => expect(props.onExtract).toHaveBeenLastCalledWith('candidate', [expect.objectContaining({ mode: 'update', tagIds: [] })]));
+});
+it('更新模式切回新建撤销审核并移除旧目标', async () => {
+  const { candidate } = setup(); candidate.operation = 'extractKnowledge'; candidate.text = JSON.stringify({ items: [{ body: '新资料' }] });
+  fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
+  await screen.findByLabelText('知识入库方式 1');
+  fireEvent.change(screen.getByLabelText('知识入库方式 1'), { target: { value: 'update' } });
+  fireEvent.change(screen.getByLabelText('知识入库方式 1'), { target: { value: 'create' } });
+  expect(screen.getByRole('checkbox', { name: '审核通过条目 1' })).not.toBeChecked();
+  expect(screen.queryByLabelText('更新知识目标 1')).toBeNull();
 });
 it('模型分类标签建议必须显式审核，改分类会撤销审核且仅提交所选作品内字典', async () => {
   const { props, candidate, view } = setup();

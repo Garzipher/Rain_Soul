@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import type { Category } from './assets';
 
-export interface AiKnowledgeApproval { body: string; source: string; categoryId?: string; tagIds?: string[] }
+const approvalFields = { body: z.string().trim().min(1).max(200000), source: z.string().max(5000), categoryId: z.uuid().optional(), tagIds: z.array(z.uuid()).max(100).refine(ids => new Set(ids).size === ids.length).optional() };
+export const aiKnowledgeApprovalSchema = z.union([
+  z.object({ ...approvalFields, mode: z.literal('create').optional() }).strict(),
+  z.object({ ...approvalFields, mode: z.literal('update'), targetId: z.uuid() }).strict(),
+]);
+export type AiKnowledgeApproval = z.infer<typeof aiKnowledgeApprovalSchema>;
 export interface AiExtractionDraft { body: string; type: string; source: string; suggestedCategory: string; suggestedTags: string[] }
 export function extractionCategoryPath(categories: Category[], id: string): string {
   const path: string[] = [], seen = new Set<string>();

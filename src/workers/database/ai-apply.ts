@@ -8,7 +8,8 @@ import { applyAsset } from './assets';
 import { refreshChapterSearch } from './assets-search';
 import { createSnapshot } from './snapshots';
 import { RepositoryError } from './errors';
-import type { AiKnowledgeApproval } from '../../shared/ai-extraction';
+import { aiKnowledgeApprovalSchema, type AiKnowledgeApproval } from '../../shared/ai-extraction';
+import { assetRow } from './assets-common';
 
 const candidateSchema = z.object({ id: z.uuid(), operation: z.enum(aiOperations), workId: z.uuid(), baselineRevision: z.number().int().positive(),
   paragraphIds: z.array(z.uuid()).min(1).max(50000).refine(ids => new Set(ids).size === ids.length),
@@ -16,7 +17,10 @@ const candidateSchema = z.object({ id: z.uuid(), operation: z.enum(aiOperations)
   selection: z.object({ paragraphId: z.uuid(), from: z.number().int().nonnegative(), to: z.number().int().positive(), text: z.string().min(1).max(200000) }).strict().optional(),
   referenceChapterIds: z.array(z.uuid()).min(1).max(50000).refine(ids => new Set(ids).size === ids.length).optional(),
 }).strict();
-const itemsSchema = z.array(z.object({ body: z.string().min(1).max(200000).refine(value => !!value.trim()), source: z.string().max(10000), categoryId: z.uuid().optional(), tagIds: z.array(z.uuid()).max(100).refine(ids => new Set(ids).size === ids.length).optional() }).strict()).min(1).max(100);
+const itemsSchema = z.array(aiKnowledgeApprovalSchema).min(1).max(100).refine(items => {
+  const targets = items.filter(item => item.mode === 'update').map(item => item.targetId);
+  return new Set(targets).size === targets.length;
+}, '同一批次不能重复更新同一知识条目');
 interface ChapterRow { id: string; title: string; document_json: string }
 interface Target { chapter: ChapterRow; document: WritingDocument; index: number }
 
@@ -146,6 +150,11 @@ export function approveAiKnowledge(db: Database.Database, value: AiCandidate, in
       };
     });
     const provenance = JSON.stringify({ candidateId: candidate.id, candidateText: candidate.text, requestHash: candidate.requestHash, workId: candidate.workId, evidence });
-    for (const item of parsed.data) applyAsset(db, { type: 'createKnowledge', body: item.body, source: `${item.source}${item.source ? '\n' : ''}AI 审核来源：${provenance}`, categoryId: item.categoryId ?? category.id, tagIds: item.tagIds ?? [] }, candidate.baselineRevision + 1);
+    for (const item of parsed.data) {
+      const existing = item.mode === 'update' ? assetRow<{ category_id: string }>(db, 'knowledge_entry', item.targetId) : null;
+      const tagIds = item.tagIds ?? (item.mode === 'update' ? (db.prepare('SELECT tag_id AS id FROM knowledge_tag WHERE entry_id=?').all(item.targetId) as { id: string }[]).map(tag => tag.id) : []);
+      const fields = { body: item.body, source: `${item.source}${item.source ? '\n' : ''}AI 审核来源：${provenance}`, categoryId: item.categoryId ?? existing?.category_id ?? category.id, tagIds };
+      applyAsset(db, item.mode === 'update' ? { type: 'updateKnowledge', id: item.targetId, ...fields } : { type: 'createKnowledge', ...fields }, candidate.baselineRevision + 1);
+    }
   });
 }

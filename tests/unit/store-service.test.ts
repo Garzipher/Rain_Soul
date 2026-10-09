@@ -3,6 +3,20 @@ import { StoreService } from '../../src/main/store-service';
 import { emptyDocument } from '../../src/shared/document';
 
 describe('主进程作品权限', () => {
+  it('知识更新审核协议穿过存储边界保留目标与空标签，异作和无目标更新不进入Worker', async () => {
+    const workId = crypto.randomUUID(), calls: unknown[] = [];
+    const service = new StoreService(async (command, payload) => {
+      calls.push({ command, payload }); return command === 'openWork' ? { id: workId } : '成功';
+    });
+    await service.execute('openWork', { id: workId });
+    const request = { workId, candidate: {}, operationId: crypto.randomUUID(), items: [{ mode: 'update', targetId: crypto.randomUUID(), body: '审核内容', source: '', tagIds: [] }] };
+    await expect(service.execute('approveAiKnowledge', request)).resolves.toBe('成功');
+    expect(calls.at(-1)).toEqual({ command: 'approveAiKnowledge', payload: request });
+    const before = calls.length;
+    await expect(service.execute('approveAiKnowledge', { ...request, workId: crypto.randomUUID() })).rejects.toThrow(/当前作品/);
+    await expect(service.execute('approveAiKnowledge', { ...request, items: [{ ...request.items[0], targetId: undefined }] })).rejects.toThrow();
+    expect(calls).toHaveLength(before);
+  });
   it('没有打开作品时不能提交章节', async () => {
     const service = new StoreService(async () => ({}));
     await expect(service.execute('saveChapter', { workId: crypto.randomUUID(), chapterId: crypto.randomUUID(), title: '第一章', document: emptyDocument(), expectedRevision: 1, operationId: crypto.randomUUID() })).rejects.toThrow('当前作品');

@@ -27,4 +27,12 @@ it('prepare采用主进程存储服务并冻结正文；确认前不联网，配
   await commands.execute('applyAiCandidate', { workId: work.id, candidateId: candidate.id, operationId: randomUUID() });
   expect(requests.at(-1)).toEqual(expect.objectContaining({ candidate: expect.objectContaining({ baselineRevision: 3, text: '新候选' }) }));
   await expect(commands.execute('applyAiCandidate', { workId: work.id, candidateId: randomUUID(), operationId: randomUUID() })).rejects.toThrow(/候选/);
+  const extractionPreview = await commands.execute('prepareAi', { ...request, operation: 'extractKnowledge' }) as { confirmationToken: string; requestHash: string };
+  const extraction = await commands.execute('executeAi', { confirmationToken: extractionPreview.confirmationToken, requestHash: extractionPreview.requestHash, confirmed: true }) as { id: string };
+  const items = [{ mode: 'update', targetId: randomUUID(), body: '作者审核资料', source: '正文', tagIds: [] }];
+  await commands.execute('approveAiKnowledge', { workId: work.id, candidateId: extraction.id, operationId: randomUUID(), items });
+  expect(requests.at(-1)).toMatchObject({ items, candidate: { id: extraction.id, operation: 'extractKnowledge' } });
+  const before = requests.length;
+  await expect(commands.execute('approveAiKnowledge', { workId: work.id, candidateId: extraction.id, operationId: randomUUID(), items: [{ ...items[0], targetId: undefined }] })).rejects.toThrow();
+  expect(requests).toHaveLength(before);
 });

@@ -7,6 +7,7 @@ import type { AiService } from './ai-service';
 import type { AiSettings } from './ai-settings';
 import { buildAiReferences } from '../shared/ai-reference';
 import { operationError } from '../shared/operation-errors';
+import { aiKnowledgeApprovalSchema } from '../shared/ai-extraction';
 const mutation = { workId: z.uuid(), candidateId: z.uuid(), operationId: z.uuid() };
 const schemas = {
   getAiSettings: z.object({}).strict(),
@@ -15,7 +16,7 @@ const schemas = {
   executeAi: z.object({ confirmationToken: z.string(), requestHash: z.string(), confirmed: z.boolean() }).strict(),
   cancelAi: z.object({ confirmationToken: z.string() }).strict(),
   applyAiCandidate: z.object(mutation).strict(),
-  approveAiKnowledge: z.object({ ...mutation, items: z.array(z.object({ body: z.string().trim().min(1).max(200000), source: z.string().max(5000), categoryId: z.uuid().optional(), tagIds: z.array(z.uuid()).max(100).optional() }).strict()).min(1).max(100) }).strict(),
+  approveAiKnowledge: z.object({ ...mutation, items: z.array(aiKnowledgeApprovalSchema).min(1).max(100) }).strict(),
 };
 interface Settings { get: () => AiSettings; save: (provider: unknown, key?: string) => AiSettings; clear: () => void }
 interface Frozen { workId: string; providerHash: string; requestHash: string }

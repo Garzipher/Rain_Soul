@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { aiKnowledgeApprovalSchema } from '../shared/ai-extraction';
 import { writingDocumentSchema } from '../shared/document';
 import { structureRequestSchema } from '../shared/structure-schema';
 import { assetRequestSchema, assetQuerySchema } from '../shared/assets-schema';
@@ -20,7 +21,7 @@ const schemas = {
   exportProject: z.object({ workId: id, expectedRevision: z.number().int().positive() }).strict(),
   importProject: z.object({ operationId: id, input: z.object({ manifest: archiveManifestSchema, database: z.instanceof(Uint8Array) }).strict() }).strict(),
   applyAiCandidate: z.object({ workId: id, operationId: id, candidate: z.unknown() }).strict(),
-  approveAiKnowledge: z.object({ workId: id, operationId: id, candidate: z.unknown(), items: z.array(z.object({ body: z.string(), source: z.string(), categoryId: id.optional(), tagIds: z.array(id).max(100).optional() }).strict()).min(1).max(100) }).strict(),
+  approveAiKnowledge: z.object({ workId: id, operationId: id, candidate: z.unknown(), items: z.array(aiKnowledgeApprovalSchema).min(1).max(100) }).strict(),
   openWork: z.object({ id }).strict(),
   addChapter: z.object({ ...mutation, title, volumeId: id.nullable().optional() }).strict(),
   saveChapter: z.object({ ...mutation, chapterId: id, title, document: writingDocumentSchema }).strict(),
