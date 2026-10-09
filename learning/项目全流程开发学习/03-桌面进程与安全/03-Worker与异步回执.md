@@ -1,25 +1,158 @@
-# 第三章 数据库单写者与失败传播
+# 第三章 Worker 与异步回执
 
-本章状态：数据库 Worker、请求关联和失联保护已实现；文件任务 Worker 属于后续方案。
+本章状态：数据库Worker、请求关联、错误传播和真实持久化测试已实现。
+本章关注传输结果，业务幂等与失败草稿将在第五卷深入。
+不要把异常消息自动归因于“SQLite损坏”。
 
-better-sqlite3 使用同步调用，适合直接表达事务，但在主进程执行大型查询可能冻结窗口。当前把它放进数据库 Worker，由一个写者串行处理作品操作。主进程负责权限和生命周期，Worker负责持有连接和执行仓储。这样同步 SQL 不会直接占住界面线程。
+## 学习目标与前置知识
 
-`DatabaseClient` 为每次往返生成 requestId，存入 pending Map；Worker 回传相同 ID 后，主进程 resolve 或 reject 对应 Promise。收到无对应请求的消息不会随便更新界面。Worker 出错或退出时，所有等待中的请求失败，之后请求也被拒绝，不能静默重启并重放写命令。
+知道 `Promise` 可以成功或失败。
+理解 IPC命令会通过主服务到达数据库层。
+将学会区分阻塞、传输身份、业务身份和未知回执。
+实验使用临时目录，不访问“雨落之后”的真实数据目录。
 
-失联为什么不能直接重发？假设 Worker 已把“新增章节”提交，回执尚未到达就退出。新 Worker 若用一个新 operationId 新增，会产生重复章。运输失败没有证明业务未发生，因此重试要使用仓储记录的原 operationId，且由作者明确发起。
+## 1. 为什么不在窗口线程直接写库
 
-简化示例：
+better-sqlite3提供同步数据库调用。
+同步调用便于事务编写，但长查询或写入会占用执行它的线程。
+如果它直接占据界面线程，作者可能看到输入与点击停顿。
 
-```text
-requestId A → operationId X → SQLite提交
-回执A丢失
-requestId B → operationId X → 查operation_log并取回结果
+本项目把数据库放在Node Worker中。
+主进程通过消息发送任务，Worker顺序执行同步仓储调用，再回传结果。
+React保持自己的界面事件循环。
+这不是无限并行数据库，而是把重活放到明确的执行边界。
+
+## 2. 观察Worker入口
+
+```powershell
+Set-Location E:\soulrain
+Get-Content .\src\workers\database\worker.ts
 ```
 
-实践步骤：在 `src/main/database-client.ts` 找 pending Map 和 fail；在 `src/workers/database/worker.ts` 找命令 switch；在仓储找 operation_log。分清“匹配 Promise”和“避免重复写入”分别在哪一层完成。
+启动时先读取包内课程、保证默认学习作品，然后创建仓储。
+收到命令后按switch白名单调用指定方法。
+出错会返回 `{ ok: false, message }`，不会把连接对象发给页面。
 
-关闭时主进程先等待 StoreService drain，确认已排队写入结束，再允许关窗。它不是断电保护，系统强制结束仍可能丢掉未提交草稿。SQLite 的事务和 FULL 同步负责已提交数据的持久性，不能替界面保存尚未发出的内容。
+Worker本身不展示弹窗，也不修改React状态。
+它只承担本地数据工作和回执。
+UI如何解释失败，由上层保存状态与操作门禁决定。
 
-证据：`tests/unit/database-worker.test.ts`、`database-structure-worker.test.ts` 使用真实编译 Worker；第二批链路验证新增卷章、保存、删卷恢复、删作品恢复后正文仍在。构建脚本是测试前置条件，不能让测试运行上一版 Worker。
+## 3. 看懂一次传输的结构
 
-练习：写一个时间序列，包含 Worker 提交、界面继续输入、回执迟到和关闭请求。指出哪几步可以并行，哪几步必须按顺序等待。
+```ts
+interface WorkerRequest {
+  requestId: string;
+  command: string;
+  payload: unknown;
+}
+
+interface WorkerReply {
+  requestId: string;
+  ok: boolean;
+  data?: unknown;
+  message?: string;
+}
+```
+
+这是用于讲解的完整最小传输形状。
+真实项目在database-client与worker中分别声明相应对象。
+`requestId`让调用方找到等待这次结果的Promise。
+它不等同于保存正文的 `operationId`。
+
+## 4. 两种ID分别解决什么问题
+
+假设“雨落之后”一次保存已经提交，但回执未到页面。
+作者点击重试，传输层需要一个新的 `requestId` 关联新一趟消息。
+业务层仍需原来的 `operationId`，才能取回原保存结果。
+
+| ID | 识别什么 | 重试时是否应变化 |
+| --- | --- | --- |
+| requestId | 一次进程消息往返 | 新传输通常新ID |
+| operationId | 一次确定的业务修改 | 原请求重取应保持 |
+| chapterId | 被修改的章节 | 不因保存而变化 |
+| paragraphId | 章节中的段落 | 普通文字修改不变化 |
+
+ID多不是为了复杂，而是不同对象具有不同生命周期。
+用一个随机ID承担所有责任，会让重试、定位与更新混淆。
+
+## 5. 运行真实Worker测试
+
+```powershell
+npm run test:unit -- tests/unit/database-worker.test.ts
+```
+
+`pretest:unit`先编译桌面入口，所以测试读取最新Worker产物。
+预期未知命令被拒绝后，合法创建与保存仍成功。
+测试在系统临时目录建库，结束时终止Worker并删除自己创建的样本。
+它不会需要你先在作品集里建立同名作品。
+
+```powershell
+Get-Content .\tests\unit\database-worker.test.ts
+```
+
+沿着 `new Worker`、`postMessage`、`requestId`筛选和 `openWork`阅读。
+测试保存两个汉字“落盘”，期待新版本为2、字数为2。
+重新打开后核对文档对象，是对真实持久化的进一步检查。
+仅断言 `postMessage` 被调用，并不能证明数据库更新成功。
+
+## 6. 一个请求为什么可能永久等待
+
+DatabaseClient把等待者保存到 `pending` Map。
+回执到达后删除对应项，并解决Promise。
+如果Worker启动失败或退出，所有等待者都应收到失败。
+否则作者可能一直看到保存中，也无法安全关闭。
+
+```powershell
+Get-Content .\src\main\database-client.ts
+```
+
+查 `worker.on('error')`、`worker.on('exit')` 和 `fail`。
+`fail`记录服务失败、拒绝等待者、清空Map。
+后续请求也直接失败，不再投递到已死亡的Worker。
+这是故障传播，不是数据库自动恢复。
+页面仍须保留草稿并告诉作者如何处理。
+
+## 7. 消息回执丢失意味着什么
+
+一条失败消息不能单独证明数据库没有写入。
+数据库可能完成事务，然后在回传时出现错误。
+因此业务仓储需要保存操作日志并支持同请求重放。
+第五卷会把这件事与CAS版本检查组合起来。
+
+本章只要求你能说出三个状态：
+请求尚未发送、请求可能已提交、结果已确认。
+不同状态的重试策略不同。
+例如空标题在主服务校验前失败，和事务成功后丢回执不能同样处理。
+
+## 8. 做一次不破坏稿件的排错记录
+
+如果Worker测试失败，记录第一条异常、Node版本与构建结果。
+检查 `dist/desktop/database-worker.cjs` 是否存在。
+然后查课程JSON与原生模块是否能够被加载。
+不要直接删作者的 `Projects` 目录试图让测试变绿。
+测试样本与真实数据必须隔离。
+
+## 常见问题与排查
+
+| 现象 | 先检查 | 下一步 |
+| --- | --- | --- |
+| Worker找不到 | 桌面产物是否存在 | 先构建再运行 |
+| 启动立即失败 | 课程资源、原生模块 | 保留具体异常并检查环境 |
+| 回执串到另一请求 | requestId匹配 | 检查pending关联 |
+| 保存一直等待 | Worker退出/错误传播 | 确认等待者被拒绝 |
+| 重试产生重复内容 | operationId生命周期 | 进入第五卷幂等检查 |
+
+## 本章验收与练习
+
+验收：能解释同步数据库为何放到Worker。
+验收：能区分requestId与operationId。
+验收：能指出Worker停止后等待中的请求应怎样结束。
+
+练习1：Worker测试通过，能证明输入法不会丢字吗？
+参考：不能。输入法与界面焦点需要组件和桌面场景检查。
+
+练习2：为何测试先发送未知命令，再发送合法命令？
+参考：同时检查拒绝边界与失败后继续服务的能力。
+
+练习3：画出“事务成功，回执丢失”的时序。
+提示：用两条竖线分别表示仓储与调用方，把提交点与接收点分开。
