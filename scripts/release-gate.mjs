@@ -22,7 +22,7 @@ function cloudUrl(value) {
         a === 192 && (b === 168 || b === 0 && (c === 0 || c === 2)) || a === 100 && b >= 64 && b <= 127 ||
         a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
     }
-    if (isIP(host) === 6) return /^[23][a-f\d]{3}:/i.test(host) && !/^2001:(?:db8|0):/i.test(host);
+    if (isIP(host) === 6) return /^[23][a-f\d]{3}:/i.test(host) && !/^2001:(?:db8:|0:|:)/i.test(host);
     return host.includes('.');
   }
   catch { return false; }
