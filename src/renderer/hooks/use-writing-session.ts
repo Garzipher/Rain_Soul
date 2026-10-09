@@ -10,6 +10,7 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
   const [status, setStatus] = useState<SaveStatus>({ phase: 'clean', error: null });
   const [closing, setClosing] = useState(false);
   const [closeError, setCloseError] = useState<string | null>(null);
+  const [resetGeneration, setResetGeneration] = useState(0);
   const closingRef = useRef(false);
   const composing = useRef(false);
   const coordinator = useRef<SaveCoordinator<Draft> | null>(null);
@@ -49,6 +50,7 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
         const updated = {
           ...savedWork,
           revision: result.revision,
+          assets: result.assets ?? savedWork.assets,
           chapters: savedWork.chapters.map((item) => item.id === snapshot.id ? { ...item, title: snapshot.title, document: snapshot.document, wordCount: result.wordCount } : item),
         };
         workRef.current = updated;
@@ -57,7 +59,7 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
     });
     coordinator.current = saver;
     return () => { saver.dispose(); coordinator.current = null; };
-  }, [api, work?.id, chapterId]);
+  }, [api, work?.id, chapterId, resetGeneration]);
 
   const update = useCallback((changes: Partial<Pick<Draft, 'title' | 'document'>>) => {
     if (!draftRef.current || closingRef.current || operationsRef.current.isBlocked()) return;
@@ -70,8 +72,9 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
     if (composing.current) throw new Error('输入法正在组词，请先确认输入后再操作');
     await coordinator.current?.flush();
   }, []);
-  const acceptWork = useCallback((detail: WorkDetail) => {
+  const acceptWork = useCallback((detail: WorkDetail, resetDraft = false) => {
     workRef.current = detail; revision.current = detail.revision;
+    if (resetDraft) { setResetGeneration(value => value + 1); return; }
     const currentDraft = draftRef.current;
     const chapter = detail.chapters.find((item) => item.id === currentDraft?.id);
     if (currentDraft && chapter && currentDraft.volumeId !== chapter.volumeId) { const next = { ...currentDraft, volumeId: chapter.volumeId }; draftRef.current = next; setDraft(next); }
@@ -87,7 +90,7 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
     setClosing(true);
     setCloseError(null);
     try { await operationsRef.current.beforeClose(); await coordinator.current?.flush(); }
-    catch (reason) { closingRef.current = false; setClosing(false); throw reason; }
+    catch (reason) { closingRef.current = false; setClosing(false); setCloseError(reason instanceof Error ? reason.message : '关闭前保存失败，请保留当前窗口'); throw reason; }
   }), [api]);
   const setComposing = (value: boolean) => { composing.current = value; if (!value) setCloseError(null); };
 
