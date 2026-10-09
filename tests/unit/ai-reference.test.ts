@@ -2,6 +2,17 @@ import { expect, it } from 'vitest';
 import { buildAiReferences } from '../../src/shared/ai-reference';
 import type { WorkDetail } from '../../src/shared/contracts';
 import type { OutlineNode } from '../../src/shared/assets';
+import { auditedKnowledgeSource } from './knowledge-source-helper';
+it('自动匹配和显式选择知识均只发送可读出处，不再次发送审计上下文', () => {
+  const { source } = auditedKnowledgeSource();
+  const work = { chapters: [], assets: { knowledge: [{ id: 'k', body: '雨夜摘要', source, deletedAt: null }], chapterStyles: [], styleProfiles: [], outlines: [], foreshadows: [], evidence: [] } } as unknown as WorkDetail;
+  for (const ids of [undefined, ['k']]) {
+    const references = buildAiReferences(work, 'chapter', '雨夜', ['chapter'], ids);
+    expect(references).toContain('雨夜摘要'); expect(references).toContain('出处：作者可读出处');
+    expect(references).not.toContain('上下文独有秘词'); expect(references).not.toContain('AI 审核来源');
+  }
+  expect(work.assets!.knowledge[0].source).toBe(source);
+});
 it('本作品关键词参考保留出处，软删知识不进入AI，采用章节覆盖的写作特点', () => {
     const work: WorkDetail = { id: 'work', title: '雨', revision: 1, chapters: [], volumes: [], deletedItems: [], assets: { outlines: [], foreshadows: [], evidence: [], categories: [], tags: [], chapterStyles: [{ chapterId: 'chapter', profileId: 'old' }], defaultStyleId: 'new', styleProfiles: [
       { id: 'old', version: 1, payload: { narrativePerson: '第一人称', pace: '舒缓', prohibited: [], referenceWorks: [] }, createdAt: '' },

@@ -1,5 +1,6 @@
 import type { WorkDetail } from './contracts';
 import type { OutlineNode } from './assets';
+import { readableKnowledgeSource } from './knowledge-source';
 /** 补齐选定章节的父级计划和详细场景；祖先不参与向下扩张，防止带入同卷其他章节。 */
 function scopeOutlines(nodes: OutlineNode[], chapterIds: Set<string>): OutlineNode[] {
   const live = nodes.filter(node => !node.deletedAt), byId = new Map(live.map(node => [node.id, node]));
@@ -58,6 +59,6 @@ export function buildAiReferences(work: WorkDetail, chapterId: string, text: str
     styles.join('\n'),
     outlines.length ? `范围内大纲（含所属父级计划与详细场景）：\n${outlines.map(item => `${item.chapterId ? `${work.chapters.find(chapter => chapter.id === item.chapterId)?.title ?? item.chapterId} / ` : ''}${item.title}：${item.summary}`).join('\n')}` : '',
     hints.length ? `范围内伏笔：\n${hints.map(item => `${item.name} / ${item.status}：${item.description}`).join('\n')}` : '',
-    related.length ? `本作品关键词知识参考（最多五条；借鉴写法，保留出处，不照搬未授权内容）：\n${related.map(({ entry }) => `[知识 ${entry.id}]\n${entry.body}\n出处：${entry.source || '未注明'}`).join('\n\n')}` : '',
+    related.length ? `本作品关键词知识参考（最多五条；借鉴写法，保留出处，不照搬未授权内容）：\n${related.map(({ entry }) => `[知识 ${entry.id}]\n${entry.body}\n出处：${readableKnowledgeSource(entry.source) || '未注明'}`).join('\n\n')}` : '',
   ].filter(Boolean).join('\n\n');
 }

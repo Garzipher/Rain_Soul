@@ -5,6 +5,7 @@ import { validateDocument } from '../../shared/document';
 import { assetDescendants, assetRow } from './assets-common';
 import { RepositoryError } from './errors';
 import { recordAssetHistory } from './assets-history';
+import { readableKnowledgeSource } from '../../shared/knowledge-source';
 
 const normalize = (text: string) => text.normalize('NFC').toLowerCase();
 const insertSearch = (db: Database.Database, id: string, kind: 'knowledge' | 'paragraph', chapterId: string | null, paragraphId: string | null, title: string, body: string, source: string, labels = '') =>
@@ -31,7 +32,7 @@ export function refreshKnowledgeSearch(db: Database.Database, entryId?: string):
     .all(...(entryId ? [entryId] : [])) as { id: string; body: string; source: string }[];
   for (const entry of entries) {
     const labels = (db.prepare('SELECT t.name FROM tag t JOIN knowledge_tag kt ON kt.tag_id=t.id WHERE kt.entry_id=? AND t.deleted_at IS NULL ORDER BY t.id').all(entry.id) as { name: string }[]).map(tag => tag.name).join('\n');
-    insertSearch(db, `k:${entry.id}`, 'knowledge', null, null, '', entry.body, entry.source, labels);
+    insertSearch(db, `k:${entry.id}`, 'knowledge', null, null, '', entry.body, readableKnowledgeSource(entry.source), labels);
   }
 }
 export function rebuildAssetSearch(db: Database.Database): void {
@@ -41,6 +42,14 @@ export function rebuildAssetSearch(db: Database.Database): void {
     refreshKnowledgeSearch(db);
   })();
 }
+/** 兼容已安装作品的旧索引；只修正可确认的审计后缀，不改作者原始来源。 */
+function repairKnowledgeSourceIndex(db: Database.Database): void {
+  const stale = (db.prepare("SELECT id,source FROM search_document WHERE kind='knowledge' AND instr(source,'AI 审核来源：')>0").all() as { id: string; source: string }[])
+    .filter(row => readableKnowledgeSource(row.source) !== row.source);
+  if (stale.length) db.transaction(() => {
+    for (const row of stale) refreshKnowledgeSearch(db, row.id.slice(2));
+  }).immediate();
+}
 export function searchAssets(db: Database.Database, input: AssetQuery): SearchResult[] {
   const parsed = assetQuerySchema.safeParse(input);
   if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '搜索条件无效。');
@@ -48,6 +57,7 @@ export function searchAssets(db: Database.Database, input: AssetQuery): SearchRe
   const tags = query.tagIds ?? [];
   for (const id of tags) assetRow(db, 'tag', id);
   const categoryIds = query.categoryId ? (assetRow(db, 'category', query.categoryId), assetDescendants(db, 'category', query.categoryId)) : [];
+  repairKnowledgeSourceIndex(db);
   const text = normalize(query.text.trim());
   const conditions: string[] = []; const values: (string | number)[] = [];
   if (query.mode === 'knowledge') conditions.push("d.kind='knowledge'");

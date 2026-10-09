@@ -5,7 +5,16 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { ChapterEditor } from '../../src/renderer/components/chapter-editor';
 import { emptyDocument, countDocumentWords, validateDocument } from '../../src/shared/document';
 import type { AssetState } from '../../src/shared/assets';
+import { auditedKnowledgeSource } from './knowledge-source-helper';
 afterEach(cleanup);
+it('知识书签详情仅展示可读出处，不向正文读者展开审计材料', async () => {
+  const state = assets(), doc = emptyDocument(); state.knowledge[0].source = auditedKnowledgeSource('写作练习').source;
+  doc.content[0].content = [{ type: 'bookmark', attrs: { id: crypto.randomUUID(), kind: 'knowledge', targetId: state.knowledge[0].id } }];
+  render(<ChapterEditor document={doc} assets={state} locked={false} onChange={vi.fn()} onError={vi.fn()} onCompositionChange={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: '知识书签：雨打旧站台。' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent('出处：写作练习');
+  expect(screen.getByRole('dialog')).not.toHaveTextContent('上下文独有秘词');
+});
 it.each(['knowledge', 'foreshadow'] as const)('正文 %s 书签可直接定位真实关联，已删除对象禁止定位', async kind => {
   const state = assets(), doc = emptyDocument(), onLocateAsset = vi.fn();
   const targetId = kind === 'knowledge' ? state.knowledge[0].id : state.foreshadows[0].id;

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { AssetAction, AssetQuery, AssetState, KnowledgeEntry, SearchResult } from '../../shared/assets';
 import type { WorkDetail, WorkSummary } from '../../shared/contracts';
 import { StructureDialog, type StructureDialogState } from './structure-dialog';
+import { readableKnowledgeSource, replaceKnowledgeSource, splitKnowledgeSource } from '../../shared/knowledge-source';
+import { KnowledgeSourceAudit } from './knowledge-source-audit';
 import './knowledge-workspace.css';
 export interface KnowledgeWorkspaceProps {
   selectedEntryId?: string | null;
@@ -11,7 +13,7 @@ export interface KnowledgeWorkspaceProps {
   scopeProps?: { works: WorkSummary[]; scopeId: string; onScopeChange: (id: string) => void; canEdit: boolean;
     onCopy?: (entryId: string) => Promise<boolean>; entryOwners?: Record<string, { workId: string; workTitle: string }> };
 }
-interface KnowledgeDraft { id: string | null; body: string; source: string; categoryId: string; tagIds: string[] }
+interface KnowledgeDraft { id: string | null; body: string; source: string; originalSource: string; categoryId: string; tagIds: string[] }
 export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [categoryId, setCategory] = useState<string | null>(null);
@@ -100,14 +102,14 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
   function openForm(entry?: KnowledgeEntry) {
     if (!canEdit || disabled || form) return;
     trigger.current = document.activeElement as HTMLElement;
-    const draft: KnowledgeDraft = entry ? { id: entry.id, body: entry.body, source: entry.source, categoryId: entry.categoryId, tagIds: [...entry.tagIds] }
-      : { id: null, body: '', source: '', categoryId: categoryId ?? categories.find(item => item.systemKey === 'uncategorized')?.id ?? categories[0]?.id ?? '', tagIds: [] };
+    const draft: KnowledgeDraft = entry ? { id: entry.id, body: entry.body, source: readableKnowledgeSource(entry.source), originalSource: entry.source, categoryId: entry.categoryId, tagIds: [...entry.tagIds] }
+      : { id: null, body: '', source: '', originalSource: '', categoryId: categoryId ?? categories.find(item => item.systemKey === 'uncategorized')?.id ?? categories[0]?.id ?? '', tagIds: [] };
     setForm(draft); setBaseline(JSON.stringify(draft)); setError(null);
   }
   function closeForm() { setForm(null); setError(null); trigger.current?.focus(); }
   async function save() {
     if (!form || !canEdit || !form.body.trim() || !categories.some(item => item.id === form.categoryId)) return;
-    const payload = { body: form.body, source: form.source, categoryId: form.categoryId, tagIds: form.tagIds };
+    const payload = { body: form.body, source: replaceKnowledgeSource(form.originalSource, form.source), categoryId: form.categoryId, tagIds: form.tagIds };
     const action: AssetAction = form.id ? { type: 'updateKnowledge', id: form.id, ...payload } : { type: 'createKnowledge', ...payload };
     if (await operate(() => props.onAction(action))) closeForm();
   }
@@ -138,12 +140,13 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
       </form>}
       {searchError && <p role="alert">{searchError}<button className="secondary" onClick={() => setSearchRetry(value => value + 1)}>重新搜索</button></p>}
       {searching && <p role="status">正在搜索本机内容…</p>}
-      <div className="knowledge-grid">{visible.map(entry => <article key={entry.id} ref={element => { if (element) cards.current.set(entry.id, element); else cards.current.delete(entry.id); }} tabIndex={-1} className="knowledge-entry" aria-label={`知识：${entry.body.slice(0, 20)}`}>
+      <div className="knowledge-grid">{visible.map(entry => { const source = splitKnowledgeSource(entry.source); return <article key={entry.id} ref={element => { if (element) cards.current.set(entry.id, element); else cards.current.delete(entry.id); }} tabIndex={-1} className="knowledge-entry" aria-label={`知识：${entry.body.slice(0, 20)}`}>
         <button className={`knowledge-snippet ${expanded.has(entry.id) ? '' : 'is-collapsed'}`} aria-label={`${expanded.has(entry.id) ? '收起' : '展开'}知识：${entry.body.slice(0, 20)}`} aria-expanded={expanded.has(entry.id)} onClick={() => setExpanded(previous => { const next = new Set(previous); if (next.has(entry.id)) next.delete(entry.id); else next.add(entry.id); return next; })}>{entry.body}</button>
         <div className="knowledge-entry-tags">{entry.tagIds.map(id => { const tag = tags.find(item => item.id === id); return tag && <span key={id}>{tag.name}</span>; })}</div>
         <div className="knowledge-entry-bottom"><div>{canEdit ? <><button disabled={disabled || !!form} onClick={() => openForm(entry)}>编辑知识</button><button disabled={disabled || !!form} onClick={() => setDialog({ heading: '删除知识', description: '将删除这条知识。历史内容与引用追溯仍保留，不会删除正文。', submitLabel: '确认删除', onSubmit: () => operate(() => props.onAction({ type: 'deleteKnowledge', id: entry.id })) })}>删除知识</button></> : props.scopeProps?.entryOwners?.[entry.id]?.workId === props.work.id ? <span>已在当前作品</span> : props.scopeProps?.onCopy && <button disabled={disabled} onClick={() => { void operate(() => props.scopeProps!.onCopy!(entry.id)); }}>复制到当前作品</button>}</div>
-          <div className="knowledge-source">{props.scopeProps?.entryOwners?.[entry.id] && <span>{props.scopeProps.entryOwners[entry.id].workTitle}</span>}<span>{entry.source || '未注明出处'}</span>{entry.origin && <small>来源作品：{entry.origin.workTitle}</small>}</div></div>
-      </article>)}</div>
+          <div className="knowledge-source">{props.scopeProps?.entryOwners?.[entry.id] && <span>{props.scopeProps.entryOwners[entry.id].workTitle}</span>}<span>{source.readable || '未注明出处'}</span>{entry.origin && <small>来源作品：{entry.origin.workTitle}</small>}</div></div>
+        <KnowledgeSourceAudit records={source.records} />
+      </article>; })}</div>
       {paragraphs.map(row => <article className="knowledge-paragraph-result" key={row.id}><small>正文 · {row.source}</small><p>{row.snippet}</p><button className="secondary" disabled={!row.chapterId || disabled} aria-label={`定位正文：${row.title}`} onClick={() => { if (row.chapterId) props.onLocate(row.chapterId, row.paragraphId ?? undefined); }}>{row.title}</button></article>)}
       {!searching && !searchError && !visible.length && !paragraphs.length && <p role="status">没有匹配的知识或正文内容</p>}
       {needsSearch && hasMore && <button className="secondary" disabled={searching} onClick={() => void more()}>加载更多结果</button>}

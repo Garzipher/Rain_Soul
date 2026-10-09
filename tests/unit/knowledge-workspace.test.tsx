@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AssetState, SearchResult } from '../../src/shared/assets';
 import type { WorkDetail } from '../../src/shared/contracts';
 import { KnowledgeWorkspace } from '../../src/renderer/components/knowledge-workspace';
+import { auditedKnowledgeSource } from './knowledge-source-helper';
 
 afterEach(cleanup);
 const work: WorkDetail = { id: 'work', title: '雨落之后', revision: 1, chapters: [], volumes: [], deletedItems: [] };
@@ -76,6 +77,21 @@ describe('知识卡片与搜索', () => {
   });
 });
 describe('知识编辑与跨作品权限', () => {
+  it('卡片和编辑出处只显示可读文本，审计折叠只读，保存改动保留原始审计', async () => {
+    const { source, audit } = auditedKnowledgeSource('雨夜练习'), custom = structuredClone(assets);
+    custom.knowledge[0].source = source;
+    const { onAction } = setup({ assets: custom });
+    expect(screen.getByText('雨夜练习')).toBeVisible();
+    expect(screen.queryByText(/"candidateId"/)).not.toBeInTheDocument();
+    const details = screen.getByText('AI 审核记录').closest('details')!;
+    expect(details).not.toHaveAttribute('open');
+    fireEvent.click(screen.getAllByRole('button', { name: '编辑知识' })[0]);
+    expect(screen.getByLabelText('出处')).toHaveValue('雨夜练习');
+    fireEvent.change(screen.getByLabelText('出处'), { target: { value: '作者修订出处' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存知识' }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'updateKnowledge', id: 'a', source: `作者修订出处\n${audit}` })));
+    expect(custom.knowledge[0].source).toBe(source);
+  });
   it('新添知识失败保留输入和 dirty，重试成功才关闭', async () => {
     const onAction = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const { onDirtyChange } = setup({ onAction });

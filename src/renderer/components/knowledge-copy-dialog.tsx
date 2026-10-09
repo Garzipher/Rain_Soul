@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { readableKnowledgeSource } from '../../shared/knowledge-source';
 import type { Category, KnowledgeEntry, KnowledgeTag } from '../../shared/assets';
 import type { WorkDetail } from '../../shared/contracts';
 import type { KnowledgeOwner, KnowledgeScope } from '../../shared/knowledge-scope';
@@ -64,7 +65,7 @@ export function KnowledgeCopyDialog({ preview, busy, pending = false, onRetry, o
     heading: '复制知识到当前作品', description: `从“${preview.owner.workTitle}”复制到“${preview.targetTitle}”，副本独立编辑并保留来源。`, submitLabel: '确认复制', submitTone: 'primary', onSubmit: confirm,
   }}>
     <div className="knowledge-copy-preview">
-      <p className="knowledge-copy-content">{preview.entry.body}</p><p>出处：{preview.entry.source || '未注明出处'}</p>
+      <p className="knowledge-copy-content">{preview.entry.body}</p><p>出处：{readableKnowledgeSource(preview.entry.source) || '未注明出处'}</p>
       <p>来源分类：{preview.sourceCategory}</p><p>来源标签：{preview.sourceTags.join('、') || '无'}</p>
       <label>目标主分类<select aria-label="目标主分类" value={categoryId} disabled={disabled} onChange={event => setCategoryId(event.target.value)}>{preview.categories.map(item => <option key={item.id} value={item.id}>{categoryPath(item.id, preview.categories)}</option>)}</select></label>
       <fieldset disabled={disabled}><legend>目标作品已有标签</legend>{preview.tags.length ? preview.tags.map(tag => <label key={tag.id}><input type="checkbox" checked={tagIds.includes(tag.id)} onChange={() => setTagIds(previous => previous.includes(tag.id) ? previous.filter(id => id !== tag.id) : [...previous, tag.id])} />{tag.name}</label>) : <p>当前作品尚无标签。</p>}</fieldset>

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Node, type Editor } from '@tiptap/core';
 import type { AssetState } from '../../shared/assets';
 import type { BookmarkNode } from '../../shared/contracts';
+import { readableKnowledgeSource } from '../../shared/knowledge-source';
 import './inline-bookmark.css';
 
 /** 行内只保存关联 ID；内容、状态和出处始终读取当前作品资产。 */
@@ -26,7 +27,7 @@ export function bookmarkInfo(bookmark: BookmarkNode['attrs'], assets?: AssetStat
   if (bookmark.kind === 'knowledge') {
     const entry = assets?.knowledge.find(item => item.id === bookmark.targetId);
     return { label: entry && !entry.deletedAt ? `知识书签：${entry.body.slice(0, 20)}` : '知识书签：已删除条目',
-      title: entry && !entry.deletedAt ? '知识引用' : '已删除条目', body: entry?.body ?? '原条目已不存在，关联 ID 仍保留。', source: entry?.source ?? '未注明出处', status: entry?.deletedAt ? '已删除条目，保留历史内容供追溯。' : '' };
+      title: entry && !entry.deletedAt ? '知识引用' : '已删除条目', body: entry?.body ?? '原条目已不存在，关联 ID 仍保留。', source: readableKnowledgeSource(entry?.source ?? '') || '未注明出处', status: entry?.deletedAt ? '已删除条目，保留历史内容供追溯。' : '' };
   }
   const item = assets?.foreshadows.find(value => value.id === bookmark.targetId);
   return { label: item && !item.deletedAt ? `伏笔书签：${item.name}` : '伏笔书签：已删除伏笔', title: item && !item.deletedAt ? item.name : '已删除伏笔', body: item?.description ?? '原伏笔已不存在，关联 ID 仍保留。', source: '', status: item && !item.deletedAt ? item.status : '已删除伏笔' };

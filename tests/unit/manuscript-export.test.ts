@@ -3,6 +3,7 @@ import { exportDocxManuscript, exportTxtManuscript } from '../../src/main/manusc
 import { readDocxPackage } from '../../src/main/manuscript-docx';
 import { parseWordXml } from '../../src/main/manuscript-xml';
 import type { ExportManuscript } from '../../src/shared/manuscript';
+import { auditedKnowledgeSource } from './knowledge-source-helper';
 
 function example(): ExportManuscript {
   const paragraph = (id: string, text: string) => ({ type: 'paragraph' as const, attrs: { id }, content: [{ type: 'text' as const, text }] });
@@ -28,6 +29,15 @@ function example(): ExportManuscript {
 }
 
 describe('固定版本手稿导出', () => {
+  it('TXT和DOCX引用清单只导出可读出处，原始冻结来源保留审计', async () => {
+    const work = example(), audit = auditedKnowledgeSource('作者：听雨《雨季》'); work.knowledge[0].source = audit.source;
+    const files = await readDocxPackage(await exportDocxManuscript(work), { title: '书' });
+    const docx = parseWordXml(files.get('word/document.xml')!.toString('utf8'), files.get('word/styles.xml')!.toString('utf8'));
+    for (const text of [exportTxtManuscript(work).toString('utf8'), docx.blocks.map(block => block.text).join('\n')]) {
+      expect(text).toContain('出处：作者：听雨《雨季》'); expect(text).not.toContain('上下文独有秘词'); expect(text).not.toContain('AI 审核来源');
+    }
+    expect(work.knowledge[0].source).toBe(audit.source);
+  });
   it('TXT按输入卷章顺序保留Unicode/空章/换行，重复知识复用编号并只列一次', () => {
     const work = example(), before = structuredClone(work);
     const text = exportTxtManuscript(work).toString('utf8');

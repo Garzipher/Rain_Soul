@@ -2,10 +2,36 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { assetFixture } from './assets-helper';
 import { rebuildAssetSearch, refreshChapterSearch, searchAssets } from '../../src/workers/database/assets-search';
 import { copyKnowledge } from '../../src/workers/database/assets-knowledge';
+import { auditedKnowledgeSource } from './knowledge-source-helper';
 
 describe('知识与正文离线搜索', () => {
   let fixture: ReturnType<typeof assetFixture>;
   beforeEach(() => { fixture = assetFixture(); rebuildAssetSearch(fixture.db); }); afterEach(() => fixture.db.close());
+  it('已有库的原始审计索引首次查询即修复，普通同标记出处保留且后续查询幂等', () => {
+    const { source } = auditedKnowledgeSource();
+    const categoryId = fixture.state().categories[0].id;
+    const state = fixture.change({ type: 'createKnowledge', body: '历史知识', source, categoryId, tagIds: [] });
+    fixture.change({ type: 'createKnowledge', body: '普通知识', source: '作者附注\nAI 审核来源：普通文本', categoryId, tagIds: [] });
+    fixture.db.prepare('UPDATE search_document SET source=?,normalized_text=? WHERE id=?').run(source, `历史知识\n${source}`.toLowerCase(), `k:${state.knowledge[0].id}`);
+    const before = fixture.state();
+    expect(searchAssets(fixture.db, { text: '上下文独有秘词', mode: 'knowledge' })).toEqual([]);
+    expect(searchAssets(fixture.db, { text: '普通文本', mode: 'knowledge' })).toHaveLength(1);
+    const changes = fixture.db.prepare('SELECT total_changes() AS count').get();
+    expect(searchAssets(fixture.db, { text: '作者可读出处', mode: 'knowledge' })).toHaveLength(1);
+    expect(fixture.db.prepare('SELECT total_changes() AS count').get()).toEqual(changes);
+    expect(fixture.state()).toEqual(before);
+  });
+  it('知识索引只使用可读出处，重建旧索引不改变数据库来源和历史审计', () => {
+    const { source } = auditedKnowledgeSource();
+    const state = fixture.change({ type: 'createKnowledge', body: '知识摘要', source, categoryId: fixture.state().categories[0].id, tagIds: [] });
+    for (const rebuild of [false, true]) {
+      if (rebuild) rebuildAssetSearch(fixture.db);
+      expect(searchAssets(fixture.db, { text: '上下文独有秘词', mode: 'knowledge' })).toEqual([]);
+      expect(searchAssets(fixture.db, { text: '作者可读出处', mode: 'knowledge' })).toEqual([expect.objectContaining({ id: state.knowledge[0].id, source: '作者可读出处' })]);
+      expect(fixture.state().knowledge[0].source).toBe(source);
+      expect(fixture.db.prepare('SELECT source FROM knowledge_history').get()).toEqual({ source });
+    }
+  });
   it('行内书签不打断连续正文搜索，只有真实换行节点拆开文本', () => {
     const document = structuredClone(fixture.document);
     document.content[0].content = [{ type: 'text', text: '灯塔' },

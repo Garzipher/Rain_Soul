@@ -5,8 +5,16 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { KnowledgeCopyDialog, prepareKnowledgeCopy } from '../../src/renderer/components/knowledge-copy-dialog';
 import type { WorkDetail } from '../../src/shared/contracts';
 import type { KnowledgeOwner, KnowledgeScope } from '../../src/shared/knowledge-scope';
+import { auditedKnowledgeSource } from './knowledge-source-helper';
 
 afterEach(cleanup);
+it('复制预览展示可读出处，不展开完整审计上下文，不修改待复制原始条目', () => {
+  const custom = structuredClone(source), audit = auditedKnowledgeSource('原作第2章'); custom.knowledge[0].source = audit.source;
+  render(<KnowledgeCopyDialog preview={prepareKnowledgeCopy(target, custom, owner)} busy={false} onConfirm={vi.fn()} onClose={vi.fn()} />);
+  expect(screen.getByRole('dialog')).toHaveTextContent('出处：原作第2章');
+  expect(screen.getByRole('dialog')).not.toHaveTextContent('上下文独有秘词');
+  expect(custom.knowledge[0].source).toBe(audit.source);
+});
 const owner: KnowledgeOwner = { workId: 'source', workTitle: '参考作品', sourceRevision: 4, sourceEntryId: 'entry' };
 const source: KnowledgeScope = {
   categories: [{ id: 'source-category', name: '描写', parentId: null, sortOrder: 0, systemKey: null, deletedAt: null }],

@@ -1,5 +1,6 @@
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
 import type { ExportManuscript } from '../shared/manuscript';
+import { readableKnowledgeSource } from '../shared/knowledge-source';
 
 interface OutputBlock { text: string; heading: boolean }
 
@@ -71,7 +72,7 @@ function prepare(work: ExportManuscript): OutputBlock[] {
     add('引用清单', true);
     for (const [id, number] of references) {
       const entry = knowledge.get(id)!;
-      add(`[${number}] ${entry.deletedAt ? '已删除条目（保留历史内容）\n' : ''}${entry.body}\n出处：${entry.source || '未注明'}`);
+      add(`[${number}] ${entry.deletedAt ? '已删除条目（保留历史内容）\n' : ''}${entry.body}\n出处：${readableKnowledgeSource(entry.source) || '未注明'}`);
     }
   }
   const listed = work.foreshadows.filter(item => !item.deletedAt || usedForeshadows.has(item.id));
