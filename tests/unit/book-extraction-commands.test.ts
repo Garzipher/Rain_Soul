@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { BookExtractionCommands } from '../../src/main/book-extraction-commands';
 import type { BookExtractionPreview } from '../../src/shared/book-extraction';
+import { Document, Packer, Paragraph } from 'docx';
 
 function setup() {
   const workId = crypto.randomUUID();
@@ -36,4 +37,33 @@ it('取消使预览失效；文件替换使旧token失效；失败同请求可�
   expect(store.execute).toHaveBeenCalledTimes(2);
   files.choose.mockResolvedValueOnce(null);
   expect(await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' })).toBeNull();
+});
+it('DOCX解析真实正文；拒绝任意路径、非支持格式、重复段落和空审核', async () => {
+  const { workId, files, commands, store } = setup();
+  const bytes = await Packer.toBuffer(new Document({ sections: [{ children: [new Paragraph('景物的光影')] }] }));
+  files.choose.mockResolvedValueOnce({ name: '作品.docx', bytes });
+  const preview = await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' }) as BookExtractionPreview;
+  expect(preview.format).toBe('docx'); expect(preview.segments[0].text).toBe('景物的光影');
+  const item = { segmentId: preview.segments[0].id, body: '景物的光影', categoryId: crypto.randomUUID(), tagIds: [] };
+  const request = { workId, token: preview.token, expectedRevision: 1, operationId: crypto.randomUUID(), sourceTitle: '作品', sourceAuthor: '', permissionConfirmed: true };
+  await expect(commands.execute('confirmBookExtraction', { ...request, items: [item, item] })).rejects.toThrow();
+  await expect(commands.execute('confirmBookExtraction', { ...request, items: [] })).rejects.toThrow();
+  await expect(commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8', path: 'C:/secret' })).rejects.toThrow();
+  files.choose.mockResolvedValueOnce({ name: '作品.pdf', bytes });
+  await expect(commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' })).rejects.toThrow(/TXT/);
+  await expect(commands.execute('confirmBookExtraction', { ...request, items: [item] })).rejects.toThrow(/预览/);
+  await expect(commands.execute('unknown', {})).rejects.toThrow(/未知/);
+  expect(store.execute).not.toHaveBeenCalled(); await commands.drain();
+});
+it('冻结预览不受渲染层修改影响，新文件取代旧预览，取消其他token不影响当前预览', async () => {
+  const { workId, commands, store } = setup();
+  const old = await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' }) as BookExtractionPreview;
+  const current = await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' }) as BookExtractionPreview;
+  current.filename = '伪造.txt'; current.segments[0].text = '替换原文';
+  const request = { workId, token: current.token, expectedRevision: 1, operationId: crypto.randomUUID(), sourceTitle: '书名', sourceAuthor: '', permissionConfirmed: true,
+    items: [{ segmentId: current.segments[0].id, body: '摘选内容', categoryId: crypto.randomUUID(), tagIds: [] }] };
+  await expect(commands.execute('confirmBookExtraction', { ...request, token: old.token })).rejects.toThrow(/预览/);
+  await commands.execute('cancelBookExtraction', { token: old.token });
+  await commands.execute('confirmBookExtraction', request);
+  expect(store.execute).toHaveBeenCalledWith('importBookExtraction', expect.objectContaining({ items: [expect.objectContaining({ source: expect.stringContaining('参考.txt') })] }));
 });

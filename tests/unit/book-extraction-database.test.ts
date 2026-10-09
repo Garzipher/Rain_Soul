@@ -30,3 +30,17 @@ it('无效分类/标签、版本冲突或跨作品失败原子回滚，不留下
   expect(fixture.state().knowledge).toHaveLength(0); expect(listSnapshots(fixture.db)).toHaveLength(0);
   expect(fixture.db.prepare('SELECT COUNT(*) AS count FROM operation_log').get()).toEqual({ count: 0 });
 });
+it('仅使用有效已有标签；软删除标签/分类拒绝，已删除作品也不能写入', () => {
+  const tagId = crypto.randomUUID(); fixture.change({ type: 'createTag', name: '雨景' });
+  const actual = fixture.state().tags[0].id;
+  const input = { ...request(), expectedRevision: 2 };
+  importBookExtraction(fixture.db, { ...input, items: [{ ...input.items[0], tagIds: [actual] }] });
+  expect(fixture.state().knowledge[0].tagIds).toEqual([actual]);
+  fixture.db.prepare('UPDATE tag SET deleted_at=? WHERE id=?').run(new Date().toISOString(), actual);
+  expect(() => importBookExtraction(fixture.db, { ...input, operationId: tagId, expectedRevision: 3, items: [{ ...input.items[0], tagIds: [actual] }] })).toThrow();
+  fixture.db.prepare('UPDATE category SET deleted_at=? WHERE id=?').run(new Date().toISOString(), input.items[0].categoryId);
+  expect(() => importBookExtraction(fixture.db, { ...input, operationId: crypto.randomUUID(), expectedRevision: 3 })).toThrow();
+  fixture.db.prepare('UPDATE work_meta SET deleted_at=?').run(new Date().toISOString());
+  expect(() => importBookExtraction(fixture.db, { ...input, operationId: crypto.randomUUID(), expectedRevision: 3 })).toThrow(/删除/);
+  expect(fixture.state().knowledge).toHaveLength(1); expect(listSnapshots(fixture.db)).toHaveLength(1);
+});
