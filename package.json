@@ -1,6 +1,6 @@
 {
   "name": "soulrain",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "本地优先的中文写作工作台",
   "main": "dist/desktop/main.cjs",
   "scripts": {
@@ -94,7 +94,10 @@
       "package.json"
     ],
     "extraResources": [
-      { "from": "dist/desktop/THIRD_PARTY_NOTICES.txt", "to": "THIRD_PARTY_NOTICES.txt" }
+      {
+        "from": "dist/desktop/THIRD_PARTY_NOTICES.txt",
+        "to": "THIRD_PARTY_NOTICES.txt"
+      }
     ],
     "asar": true,
     "asarUnpack": [
