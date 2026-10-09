@@ -123,7 +123,7 @@ pack自身也会执行build；单独build用于观察构建问题。
 预期目录包位于：
 
 ```text
-E:\soulrain\release\win-unpacked\RainSoul.exe
+E:\soulrain\release\current\win-unpacked\RainSoul.exe
 ```
 
 这里的EXE需要相邻资源一起运行。
@@ -152,7 +152,7 @@ npm run test:desktop
 再用同一套测试检查目录包：
 
 ```powershell
-$env:RAINSOUL_TEST_EXECUTABLE = 'E:\soulrain\release\win-unpacked\RainSoul.exe'
+$env:RAINSOUL_TEST_EXECUTABLE = 'E:\soulrain\release\current\win-unpacked\RainSoul.exe'
 npx playwright test --config playwright.desktop.config.cjs
 Remove-Item Env:RAINSOUL_TEST_EXECUTABLE
 ```
@@ -193,7 +193,7 @@ NSIS 不直接拼任意目录执行递归删除，而是启动 RainSoul 的专�
 
 删除不是数据库事务。隔离之后若中途失败，部分文件可能已经删除，剩余隔离目录不是完整备份。程序明确显示路径与残余风险，安装器中止并保留程序，不能宣称“自动完整恢复”。
 
-导出的 TXT/DOCX 与用户选择位置的 `.rainsoul` 不在固定清理目录，不受此操作影响；但本机作品、资料、配置和加密凭据都在选择删除范围中。用户应先自行导出需要的完整备份。
+只有保存到 `%LOCALAPPDATA%\RainSoul` 数据目录之外的 TXT/DOCX 和 `.rainsoul` 才不受清理影响；用户可选择导出位置，因此目录内的导出文件同样会被删除。本机作品、资料、配置和加密凭据都在选择删除范围中。用户应先将完整备份保存到该目录之外。
 
 ### 怎样安全验证卸载逻辑
 
