@@ -6,6 +6,17 @@ import { copyKnowledge } from '../../src/workers/database/assets-knowledge';
 describe('知识与正文离线搜索', () => {
   let fixture: ReturnType<typeof assetFixture>;
   beforeEach(() => { fixture = assetFixture(); rebuildAssetSearch(fixture.db); }); afterEach(() => fixture.db.close());
+  it('行内书签不打断连续正文搜索，只有真实换行节点拆开文本', () => {
+    const document = structuredClone(fixture.document);
+    document.content[0].content = [{ type: 'text', text: '灯塔' },
+      { type: 'bookmark', attrs: { id: crypto.randomUUID(), kind: 'knowledge', targetId: crypto.randomUUID() } },
+      { type: 'text', text: '旁边' }, { type: 'hardBreak' }, { type: 'text', text: '海岸' }];
+    fixture.db.prepare('UPDATE chapter SET document_json=? WHERE id=?').run(JSON.stringify(document), fixture.chapterId);
+    refreshChapterSearch(fixture.db, fixture.chapterId);
+    expect(searchAssets(fixture.db, { text: '灯塔旁边', mode: 'all' })).toHaveLength(1);
+    expect(searchAssets(fixture.db, { text: '旁边海岸', mode: 'all' })).toEqual([]);
+    expect(searchAssets(fixture.db, { text: '海岸', mode: 'all' })[0].snippet).toBe('灯塔旁边\n海岸');
+  });
   it('中文单字、双字和长词覆盖正文知识，返回真实来源与段落定位', () => {
     let state = fixture.state();
     state = fixture.change({ type: 'createKnowledge', body: '灯塔旁的海风，裹挟着雨。', source: '优秀作品', categoryId: state.categories[0].id, tagIds: [] });

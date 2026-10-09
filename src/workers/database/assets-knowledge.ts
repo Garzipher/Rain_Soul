@@ -8,6 +8,13 @@ import { refreshKnowledgeSearch } from './assets-search';
 interface CategoryRow { id: string; parent_id: string | null; system_key: string | null }
 function categoryParent(db: Database.Database, id: string | null) { if (id !== null) assetRow(db, 'category', id); }
 function tags(db: Database.Database, ids: string[]) { for (const id of ids) assetRow(db, 'tag', id); }
+function uniqueCategory(db: Database.Database, name: string, parentId: string | null, exceptId: string | null = null) {
+  // SQLite NOCASE 仅覆盖 ASCII；使用与界面一致的 Unicode 大小写规则。
+  const siblings = db.prepare('SELECT id,name FROM category WHERE parent_id IS ? AND deleted_at IS NULL').all(parentId) as { id: string; name: string }[];
+  if (siblings.some(item => item.id !== exceptId && item.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+    throw new RepositoryError('INVALID_INPUT', '同一层级下的分类名称必须唯一。');
+  }
+}
 export function writeKnowledge(db: Database.Database, id: string, body: string, source: string, categoryId: string, tagIds: string[], revision: number, origin: KnowledgeOrigin | null, create: boolean) {
   assetRow(db, 'category', categoryId); tags(db, tagIds);
   if (create) db.prepare('INSERT INTO knowledge_entry(id,body,source,category_id,origin_json,revision) VALUES(?,?,?,?,?,?)').run(id, body, source, categoryId, origin ? JSON.stringify(origin) : null, revision);
@@ -24,12 +31,14 @@ export function applyKnowledgeAsset(db: Database.Database, action: AssetAction, 
   switch (action.type) {
     case 'createCategory':
       categoryParent(db, action.parentId);
+      uniqueCategory(db, action.name, action.parentId);
       db.prepare('INSERT INTO category(id,name,parent_id,sort_order) VALUES(?,?,?,?)').run(randomUUID(), action.name, action.parentId, nextAssetOrder(db, 'category', action.parentId)); return true;
     case 'updateCategory': {
       const current = assetRow<CategoryRow>(db, 'category', action.id);
       if (current.system_key === 'uncategorized') throw new RepositoryError('INVALID_INPUT', '未分类为系统保留项，不可改名或移动。');
       categoryParent(db, action.parentId);
       if (action.parentId !== null && assetDescendants(db, 'category', action.id).includes(action.parentId)) throw new RepositoryError('INVALID_INPUT', '分类不能移入自身或后代形成环。');
+      uniqueCategory(db, action.name, action.parentId, action.id);
       const order = current.parent_id === action.parentId ? null : nextAssetOrder(db, 'category', action.parentId);
       db.prepare('UPDATE category SET name=?,parent_id=?,sort_order=COALESCE(?,sort_order) WHERE id=?').run(action.name, action.parentId, order, action.id); return true;
     }
@@ -44,9 +53,11 @@ export function applyKnowledgeAsset(db: Database.Database, action: AssetAction, 
       if (action.destinationId !== null) db.prepare('UPDATE knowledge_entry SET category_id=?,revision=? WHERE category_id=? AND deleted_at IS NULL').run(action.destinationId, revision, action.id);
       db.prepare('UPDATE category SET deleted_at=? WHERE id=?').run(new Date().toISOString(), action.id); return true;
     }
-    case 'createTag':
-      if (db.prepare('SELECT id FROM tag WHERE name=? AND deleted_at IS NULL').get(action.name)) throw new RepositoryError('INVALID_INPUT', '同名标签已存在，请选择已有标签。');
+    case 'createTag': {
+      const active = db.prepare('SELECT name FROM tag WHERE deleted_at IS NULL').all() as { name: string }[];
+      if (active.some(item => item.name.toLocaleLowerCase() === action.name.toLocaleLowerCase())) throw new RepositoryError('INVALID_INPUT', '同名标签已存在，请选择已有标签。');
       db.prepare('INSERT INTO tag(id,name) VALUES(?,?)').run(randomUUID(), action.name); return true;
+    }
     case 'deleteTag': {
       assetRow(db, 'tag', action.id);
       const affected = db.prepare('SELECT entry_id AS id FROM knowledge_tag WHERE tag_id=?').all(action.id) as { id: string }[];

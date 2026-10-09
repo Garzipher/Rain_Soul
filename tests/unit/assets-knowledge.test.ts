@@ -25,6 +25,45 @@ describe('知识分类标签与版本', () => {
     expect(state.categories.find(c => c.id === id)?.parentId).toBe(state.categories[0].id);
     expect(() => fixture.change({ type: 'createCategory', name: '错', parentId: crypto.randomUUID() })).toThrow();
   });
+  it('同层分类忽略大小写唯一，保留分类不能被复制，其他层级和软删除名称可复用', () => {
+    let state = fixture.change({ type: 'createCategory', name: 'Detail', parentId: null });
+    const original = state.categories.find(c => c.name === 'Detail')!.id;
+    const revision = fixture.db.prepare('SELECT revision FROM work_meta').get();
+    expect(() => fixture.change({ type: 'createCategory', name: ' detail ', parentId: null })).toThrow(/分类.*唯一/);
+    expect(() => fixture.change({ type: 'createCategory', name: '未分类', parentId: null })).toThrow(/分类.*唯一/);
+    expect(fixture.db.prepare('SELECT revision FROM work_meta').get()).toEqual(revision);
+    state = fixture.change({ type: 'createCategory', name: 'DETAIL', parentId: state.categories[0].id });
+    expect(state.categories.filter(c => c.name.toLowerCase() === 'detail')).toHaveLength(2);
+    fixture.change({ type: 'updateCategory', id: original, name: 'DETAIL', parentId: null });
+    fixture.change({ type: 'deleteCategory', id: original, destinationId: null });
+    state = fixture.change({ type: 'createCategory', name: 'detail', parentId: null });
+    expect(state.categories.filter(c => !c.deletedAt && c.parentId === null && c.name.toLowerCase() === 'detail')).toHaveLength(1);
+  });
+  it('分类改名或移动不能产生同层重名，拒绝操作保留原分类与版本', () => {
+    fixture.change({ type: 'createCategory', name: 'Detail', parentId: null });
+    let state = fixture.change({ type: 'createCategory', name: 'Other', parentId: null });
+    const id = state.categories.find(c => c.name === 'Other')!.id;
+    expect(() => fixture.change({ type: 'updateCategory', id, name: 'detail', parentId: null })).toThrow(/分类.*唯一/);
+    state = fixture.change({ type: 'createCategory', name: 'DETAIL', parentId: state.categories[0].id });
+    const nestedId = state.categories.find(c => c.name === 'DETAIL')!.id;
+    const before = fixture.state();
+    const revision = fixture.db.prepare('SELECT revision FROM work_meta').get();
+    expect(() => fixture.change({ type: 'updateCategory', id: nestedId, name: 'Detail', parentId: null })).toThrow(/分类.*唯一/);
+    expect(fixture.state()).toEqual(before);
+    expect(fixture.db.prepare('SELECT revision FROM work_meta').get()).toEqual(revision);
+  });
+  it('标签忽略大小写唯一，保留内部空格并允许复用已删除名称', () => {
+    let state = fixture.change({ type: 'createTag', name: 'Émotion Detail' });
+    const id = state.tags[0].id;
+    const revision = fixture.db.prepare('SELECT revision FROM work_meta').get();
+    expect(() => fixture.change({ type: 'createTag', name: ' émotion detail ' })).toThrow(/标签/);
+    expect(fixture.db.prepare('SELECT revision FROM work_meta').get()).toEqual(revision);
+    state = fixture.change({ type: 'createTag', name: 'Émotion  Detail' });
+    expect(state.tags).toHaveLength(2);
+    fixture.change({ type: 'deleteTag', id });
+    state = fixture.change({ type: 'createTag', name: 'émotion detail' });
+    expect(state.tags.filter(t => !t.deletedAt)).toHaveLength(2);
+  });
   it('条目多个标签保持名称内空格，编辑留历史，删除保留完整正文与出处', () => {
     let state = fixture.change({ type: 'createTag', name: '情绪 转折' }); const tagId = state.tags[0].id;
     expect(() => fixture.change({ type: 'createTag', name: ' 情绪 转折 ' })).toThrow(/标签/);

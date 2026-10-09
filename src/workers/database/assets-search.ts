@@ -20,7 +20,7 @@ export function refreshChapterSearch(db: Database.Database, chapterId: string): 
     return;
   }
   for (const paragraph of validateDocument(JSON.parse(chapter.document_json)).content) {
-    const body = (paragraph.content ?? []).map(node => node.type === 'text' ? node.text : '\n').join('');
+    const body = (paragraph.content ?? []).map(node => node.type === 'text' ? node.text : node.type === 'hardBreak' ? '\n' : '').join('');
     if (body.length) insertSearch(db, `p:${chapterId}:${paragraph.attrs.id}`, 'paragraph', chapterId, paragraph.attrs.id, chapter.title, body, chapter.title);
   }
 }
