@@ -36,3 +36,6 @@ release/
 coverage/
 /.ai-analysis-coverage/
 /.p0-*.log
+/.writing-*.log
+/test-results-*/
+/.legacy-artifacts-*/
