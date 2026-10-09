@@ -34,4 +34,15 @@ describe('正文与会话共享的云传输边界', () => {
     fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'isolated-test-secret' } }] })));
     await expect(sendAiCompletion(request, dependencies, new AbortController().signal)).rejects.toThrow(/敏感凭据/);
   });
+  it.each(['https://[2001:0::1]', 'https://[2001::1]', 'https://[2001:0000:0000:0000:0000:0000:0000:1]'])('IPv6规范化后仍拒绝Teredo过渡地址 %s', baseUrl => {
+    expect(() => aiCompletionEndpoint(baseUrl)).toThrow(/公开地址/);
+  });
+  it('DNS返回压缩Teredo或文档保留IPv6时，不读凭据也不发送', async () => {
+    const { dependencies, request, resolveHost, credentials, fetcher } = fixture();
+    for (const address of ['2001::1', '2001:0000::1', '2001:db8::1']) {
+      resolveHost.mockResolvedValueOnce([address]);
+      await expect(sendAiCompletion(request, dependencies, new AbortController().signal)).rejects.toThrow(/公开地址/);
+    }
+    expect(credentials.read).not.toHaveBeenCalled(); expect(fetcher).not.toHaveBeenCalled();
+  });
 });

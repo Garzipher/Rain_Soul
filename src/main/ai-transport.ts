@@ -15,7 +15,11 @@ function isPublicIp(address: string): boolean {
       a === 192 && (b === 168 || b === 0 && (c === 0 || c === 2)) || a === 100 && b >= 64 && b <= 127 ||
       a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
   }
-  if (isIP(address) === 6) return /^[23][0-9a-f]{3}:/i.test(address) && !/^2001:(?:db8|0):/i.test(address);
+  if (isIP(address) === 6) {
+    // URL 会压缩 2001:0000:: 为 2001::，按前两个数值段检查 /32，不能依赖原始拼写。
+    const [first, second] = address.split(':').map(part => Number.parseInt(part || '0', 16));
+    return first >= 0x2000 && first <= 0x3fff && !(first === 0x2001 && (second === 0 || second === 0xdb8));
+  }
   return false;
 }
 export function aiCompletionEndpoint(baseUrl: string) {
