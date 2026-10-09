@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { WorkDetail } from './contracts';
 import type { AiContext } from './ai';
-export const aiContextRequestSchema = z.object({ chapterId: z.uuid(), scope: z.enum(['chapter', 'previous', 'volume', 'custom']), chapterIds: z.array(z.uuid()).min(1).optional(), targetParagraphIds: z.array(z.uuid()).min(1).optional(), sentenceText: z.string().min(1).max(20000).optional() }).strict();
+export const aiContextRequestSchema = z.object({ chapterId: z.uuid(), scope: z.enum(['chapter', 'previous', 'volume', 'custom']), chapterIds: z.array(z.uuid()).min(1).optional(), targetParagraphIds: z.array(z.uuid()).min(1).optional(), sentenceText: z.string().min(1).max(20000).optional(), sentenceFrom: z.number().int().min(0).optional() }).strict();
 export type AiContextRequest = z.infer<typeof aiContextRequestSchema>;
 export function buildAiContext(work: WorkDetail, value: AiContextRequest): AiContext {
   const request = aiContextRequestSchema.parse(value), index = work.chapters.findIndex(chapter => chapter.id === request.chapterId);
@@ -19,12 +19,14 @@ export function buildAiContext(work: WorkDetail, value: AiContextRequest): AiCon
   if (!selected.some(chapter => chapter.document.content.some(paragraph => (paragraph.content ?? []).some(node => node.type === 'text' && node.text.trim())))) throw new Error('所选范围没有正文。');
   const targets = current.document.content.filter(paragraph => paragraphIds.includes(paragraph.attrs.id)).map(paragraph => (paragraph.content ?? []).filter(node => node.type === 'text').map(node => node.text).join('')).join('\n');
   let selection: AiContext['selection'];
+  if (request.sentenceFrom !== undefined && request.sentenceText === undefined) throw new Error('精确选区偏移必须与目标单句一起提供。');
   if (request.sentenceText !== undefined) {
     if (paragraphIds.length !== 1 || request.sentenceText.includes('\n')) throw new Error('单句润色请选择一个段落中的一句正文。');
     const paragraph = current.document.content.find(item => item.attrs.id === paragraphIds[0])!;
     const plain = (paragraph.content ?? []).map(node => node.type === 'text' ? node.text : node.type === 'hardBreak' ? '\n' : '').join('');
-    const from = plain.indexOf(request.sentenceText);
-    if (from < 0 || plain.indexOf(request.sentenceText, from + 1) >= 0) throw new Error('目标单句需在所选段落中唯一匹配，请重新选择。');
+    const from = request.sentenceFrom ?? plain.indexOf(request.sentenceText);
+    if (from < 0 || plain.slice(from, from + request.sentenceText.length) !== request.sentenceText) throw new Error('精确选区已变化或不匹配，请重新选择。');
+    if (request.sentenceFrom === undefined && plain.indexOf(request.sentenceText, from + 1) >= 0) throw new Error('目标单句需在所选段落中唯一匹配，请重新选择。');
     selection = { paragraphId: paragraphIds[0], from, to: from + request.sentenceText.length, text: request.sentenceText };
   }
   const labels = { chapter: '当前章节', previous: '前章衔接', volume: '全卷', custom: '自定义范围' };

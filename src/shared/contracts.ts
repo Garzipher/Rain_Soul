@@ -43,7 +43,7 @@ export interface DesktopApi {
   getAiSettings(): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
   saveAiSettings(provider: AiProvider, key?: string): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
   clearAiSettings(): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
-  prepareAi(request: { workId: string; chapterId: string; operation: AiOperation; scope: 'chapter' | 'previous' | 'volume' | 'custom'; chapterIds?: string[]; instruction?: string; targetParagraphIds?: string[]; sentenceText?: string; referenceKnowledgeIds?: string[] }): Promise<AiPreparedRequest>;
+  prepareAi(request: { workId: string; chapterId: string; operation: AiOperation; scope: 'chapter' | 'previous' | 'volume' | 'custom'; chapterIds?: string[]; instruction?: string; targetParagraphIds?: string[]; sentenceText?: string; sentenceFrom?: number; referenceKnowledgeIds?: string[] }): Promise<AiPreparedRequest>;
   executeAi(request: AiExecuteRequest): Promise<AiCandidate>;
   cancelAi(confirmationToken: string): Promise<void>;
   applyAiCandidate(request: { workId: string; candidateId: string; operationId: string }): Promise<WorkDetail>;

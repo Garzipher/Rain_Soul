@@ -40,7 +40,7 @@ export class AiCommands {
       if (!provider || !this.settings.get().hasCredential) throw new Error('请先在设置中配置云端模型及凭据。');
       if (request.operation === 'sentencePolish' && !request.sentenceText) throw new Error('单句润色请指定目标单句。');
       const work = await this.store.execute('freezeWork', { workId: request.workId }) as WorkDetail;
-      const context = buildAiContext(work, { chapterId: request.chapterId, scope: request.scope, ...(request.chapterIds ? { chapterIds: request.chapterIds } : {}), ...(request.targetParagraphIds ? { targetParagraphIds: request.targetParagraphIds } : {}), ...(request.sentenceText ? { sentenceText: request.sentenceText } : {}) });
+      const context = buildAiContext(work, { chapterId: request.chapterId, scope: request.scope, ...(request.chapterIds ? { chapterIds: request.chapterIds } : {}), ...(request.targetParagraphIds ? { targetParagraphIds: request.targetParagraphIds } : {}), ...(request.sentenceText ? { sentenceText: request.sentenceText } : {}), ...(request.sentenceFrom !== undefined ? { sentenceFrom: request.sentenceFrom } : {}) });
       if (['paragraphPolish', 'continue', 'correct'].includes(request.operation)) {
         const paragraphs = work.chapters.find(chapter => chapter.id === request.chapterId)!.document.content;
         const positions = context.paragraphIds.map(id => paragraphs.findIndex(paragraph => paragraph.attrs.id === id));

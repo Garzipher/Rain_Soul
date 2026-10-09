@@ -31,3 +31,11 @@ it('无卷章节不能伪称发送全卷，首章前章衔接明确声明无前�
   expect(() => buildAiContext(current, { chapterId, scope: 'volume' })).toThrow(/分卷/);
   expect(buildAiContext(current, { chapterId, scope: 'previous' }).scopeLabel).toContain('无前章');
 });
+it('精确选区按偏移锁定重复单句，错误偏移或独立偏移拒绝', () => {
+  const current = work(), chapter = current.chapters[1], paragraphId = chapter.document.content[0].attrs.id;
+  chapter.document.content[0].content = [{ type: 'text', text: '雨落。雨落。' }];
+  const request = { chapterId: chapter.id, scope: 'chapter' as const, targetParagraphIds: [paragraphId], sentenceText: '雨落。', sentenceFrom: 3 };
+  expect(buildAiContext(current, request).selection).toEqual({ paragraphId, from: 3, to: 6, text: '雨落。' });
+  expect(() => buildAiContext(current, { ...request, sentenceFrom: 2 })).toThrow(/选区|匹配/);
+  expect(() => buildAiContext(current, { chapterId: chapter.id, scope: 'chapter', sentenceFrom: 3 })).toThrow(/选区|单句/);
+});
