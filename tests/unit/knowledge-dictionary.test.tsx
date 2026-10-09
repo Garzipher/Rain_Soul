@@ -22,6 +22,36 @@ function setup(onAction = vi.fn(async () => true), onDirtyChange = vi.fn()) {
 }
 
 describe('知识分类字典', () => {
+  it.each(['分类', '标签'])('未保存%s草稿阻止其他字典操作，保存与取消仍可用', async kind => {
+    const { onAction } = setup();
+    fireEvent.click(screen.getByRole('button', { name: kind === '分类' ? '编辑分类：景物描写' : '新增标签' }));
+    fireEvent.change(screen.getByLabelText(`${kind}名称`), { target: { value: '未保存内容' } });
+    for (const name of ['编辑分类：天气', '删除分类：景物描写', '删除标签：雨夜', kind === '分类' ? '新增标签' : '新增分类']) {
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name }));
+    }
+    expect(screen.getByLabelText(`${kind}名称`)).toHaveValue('未保存内容');
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(onAction).not.toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent('请先保存或取消当前草稿');
+    expect(screen.getByRole('button', { name: `保存${kind}` })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(screen.getByRole('button', { name: '编辑分类：天气' })).toBeEnabled();
+    expect(screen.queryByText('请先保存或取消当前草稿，再操作其他分类或标签。')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '编辑分类：天气' }));
+    expect(screen.getByLabelText('分类名称')).toHaveValue('天气');
+  });
+  it('分类保存失败后字典操作持续锁定，允许重试或取消', async () => {
+    const { onAction } = setup(vi.fn(async () => false));
+    fireEvent.click(screen.getByRole('button', { name: '新增分类' }));
+    fireEvent.change(screen.getByLabelText('分类名称'), { target: { value: '待重试' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存分类' }));
+    await screen.findByRole('alert');
+    expect(onAction).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: '编辑分类：天气' })).toBeDisabled();
+    expect(screen.getByLabelText('分类名称')).toHaveValue('待重试');
+    expect(screen.getByRole('button', { name: '保存分类' })).toBeEnabled();
+  });
   it('分类按层级和排序显示；同级边界禁用，排序失败保留原顺序', async () => {
     const onAction = vi.fn(async () => false);
     const scrambled = { ...assets, categories: [...assets.categories].reverse() };

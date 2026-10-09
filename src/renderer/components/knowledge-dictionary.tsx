@@ -26,7 +26,9 @@ export function KnowledgeDictionary({ assets, busy, onAction, onDirtyChange }: K
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const lock = useRef(false);
-  const dirty = (!!draft && JSON.stringify(draft) !== baseline) || (!!tagDraft && tagDraft !== tagBaseline) || busyAction;
+  const hasDraftChanges = (!!draft && JSON.stringify(draft) !== baseline) || (tagDraft !== null && tagDraft !== tagBaseline);
+  const dirty = hasDraftChanges || busyAction;
+  const dictionaryLocked = disabled || hasDraftChanges;
   const orderedCategories = (parentId: string | null, depth = 0): { item: Category; depth: number; first: boolean; last: boolean }[] => {
     const siblings = categories.filter(item => item.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder);
     return siblings.flatMap((item, index) => [{ item, depth, first: index === 0, last: index === siblings.length - 1 }, ...orderedCategories(item.id, depth + 1)]);
@@ -46,11 +48,12 @@ export function KnowledgeDictionary({ assets, busy, onAction, onDirtyChange }: K
     return result;
   }
   function openCategory(item?: Category) {
+    if (dictionaryLocked) return;
     setError(null); setNotice(null);
     const next = item ? { id: item.id, name: item.name, parentId: item.parentId } : { id: null, name: '', parentId: null };
     setDraft(next); setBaseline(JSON.stringify(next));
   }
-  function openTag() { setError(null); setNotice(null); setTagDraft(''); setTagBaseline(''); }
+  function openTag() { if (dictionaryLocked) return; setError(null); setNotice(null); setTagDraft(''); setTagBaseline(''); }
   async function operate(action: AssetAction): Promise<boolean> {
     if (busy || lock.current) return false;
     lock.current = true; setBusyAction(true); setError(null); setNotice(null);
@@ -89,20 +92,21 @@ export function KnowledgeDictionary({ assets, busy, onAction, onDirtyChange }: K
     <div><h2>知识分类</h2><p>按层级整理人物描写、景物描写、内心描写、经典引用等知识。</p>
       <div className="knowledge-dictionary-list">{orderedCategories(null).map(({ item, depth, first, last }) => <div className="knowledge-dictionary-row" key={item.id}>
         <span style={{ paddingInlineStart: depth * 22 }}>{depth ? '↳ ' : ''}{item.name}</span>
-        <div><button type="button" aria-label={`上移分类：${item.name}`} disabled={disabled || dirty || first} onClick={() => void operate({ type: 'moveCategory', id: item.id, direction: 'up' })}>上移</button><button type="button" aria-label={`下移分类：${item.name}`} disabled={disabled || dirty || last} onClick={() => void operate({ type: 'moveCategory', id: item.id, direction: 'down' })}>下移</button><button type="button" disabled={disabled} onClick={() => openCategory(item)}>编辑分类：{item.name}</button><button type="button" aria-label={`删除分类：${item.name}`} disabled={disabled || item.systemKey === 'uncategorized'} onClick={() => { setError(null); setDeleteCategory(item); setDestinationId(''); }}>删除</button></div>
+        <div><button type="button" aria-label={`上移分类：${item.name}`} disabled={dictionaryLocked || first} onClick={() => void operate({ type: 'moveCategory', id: item.id, direction: 'up' })}>上移</button><button type="button" aria-label={`下移分类：${item.name}`} disabled={dictionaryLocked || last} onClick={() => void operate({ type: 'moveCategory', id: item.id, direction: 'down' })}>下移</button><button type="button" disabled={dictionaryLocked} onClick={() => openCategory(item)}>编辑分类：{item.name}</button><button type="button" aria-label={`删除分类：${item.name}`} disabled={dictionaryLocked || item.systemKey === 'uncategorized'} onClick={() => { setError(null); setDeleteCategory(item); setDestinationId(''); }}>删除</button></div>
       </div>)}</div>
       {draft && <form onSubmit={event => void saveCategory(event)}><h3>{draft.id ? '编辑分类' : '新增分类'}</h3>
         <label>分类名称<input aria-label="分类名称" value={draft.name} disabled={disabled} onChange={event => setDraft({ ...draft, name: event.target.value })} required /></label>
         <label>上级分类<select aria-label="上级分类" value={draft.parentId ?? ''} disabled={disabled} onChange={event => setDraft({ ...draft, parentId: event.target.value || null })}><option value="">顶级分类</option>{categories.filter(item => item.id !== draft.id && !descendants(draft.id ?? '').has(item.id)).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <div><button type="button" disabled={disabled} onClick={() => setDraft(null)}>取消</button><button type="submit" disabled={disabled || !draft.name.trim()}>{busyAction ? '正在保存…' : '保存分类'}</button></div>
       </form>}
-      {!draft && <button type="button" disabled={disabled} onClick={() => openCategory()}>新增分类</button>}
+      {!draft && <button type="button" disabled={dictionaryLocked} onClick={() => openCategory()}>新增分类</button>}
     </div>
     <div><h2>知识标签</h2><p>标签可组合筛选；删除标签只解除知识与该标签的关联。</p>
-      <div className="knowledge-dictionary-list">{tags.map(item => <div className="knowledge-dictionary-row" key={item.id}><span>{item.name}</span><button type="button" aria-label={`删除标签：${item.name}`} disabled={disabled} onClick={() => { setError(null); setDeleteTag(item); }}>删除</button></div>)}</div>
+      <div className="knowledge-dictionary-list">{tags.map(item => <div className="knowledge-dictionary-row" key={item.id}><span>{item.name}</span><button type="button" aria-label={`删除标签：${item.name}`} disabled={dictionaryLocked} onClick={() => { setError(null); setDeleteTag(item); }}>删除</button></div>)}</div>
       {tagDraft !== null && <form onSubmit={event => void saveTag(event)}><h3>新增标签</h3><label>标签名称<input aria-label="标签名称" value={tagDraft} disabled={disabled} onChange={event => setTagDraft(event.target.value)} required /></label><div><button type="button" disabled={disabled} onClick={() => setTagDraft(null)}>取消</button><button type="submit" disabled={disabled || !tagDraft.trim() || tags.some(item => item.name.toLocaleLowerCase() === tagDraft.trim().toLocaleLowerCase())}>保存标签</button></div></form>}
-      {tagDraft === null && <button type="button" disabled={disabled} onClick={openTag}>新增标签</button>}
+      {tagDraft === null && <button type="button" disabled={dictionaryLocked} onClick={openTag}>新增标签</button>}
     </div>
+    {hasDraftChanges && <p role="status">请先保存或取消当前草稿，再操作其他分类或标签。</p>}
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
     {deleteCategory && <StructureDialog role="alertdialog" busy={disabled} submitDisabled={!!categoryChildren.length || (categoryEntries.length > 0 && !destinationId)} onClose={() => setDeleteCategory(null)} state={{
       heading: `删除分类：${deleteCategory.name}`, description: categoryEntries.length ? `此分类下有 ${categoryEntries.length} 条知识，确认后先迁移知识，再删除分类。` : '删除后无法恢复分类。',
