@@ -23,9 +23,9 @@ it('历史快照导出按钮传递快照身份且不创建或恢复版本', asyn
   const work = (await adapter.api.listWorks())[0], before = await adapter.api.openWork(work.id);
   const snapshots = await adapter.api.listSnapshots(work.id);
   adapter.api.exportManuscript = vi.fn(async () => true);
-  const exportButton = await screen.findByRole('button', { name: '导出快照 TXT：导出旧稿' });
-  await waitFor(() => expect(exportButton).toBeEnabled());
-  fireEvent.click(exportButton);
+  // 快照刷新会替换列表节点，不能把刷新前的DOM按钮缓存到点击时。
+  await waitFor(() => expect(screen.getByRole('button', { name: '导出快照 TXT：导出旧稿' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '导出快照 TXT：导出旧稿' }));
   await waitFor(() => expect(adapter.api.exportManuscript).toHaveBeenCalledExactlyOnceWith(work.id, 'txt', snapshots[0].id));
   await waitFor(() => expect(screen.getByRole('button', { name: '导出快照 DOCX：导出旧稿' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: '导出快照 DOCX：导出旧稿' }));

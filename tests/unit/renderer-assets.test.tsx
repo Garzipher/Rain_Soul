@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it } from 'vitest';
 import App from '../../src/renderer/App';
 import { createStructureAdapter } from './renderer-structure-adapter';
 const adapters: ReturnType<typeof createStructureAdapter>[] = [];
+const rangeMethods = ['getClientRects', 'getBoundingClientRect'] as const;
+const rangeDescriptors = rangeMethods.map(name => Object.getOwnPropertyDescriptor(Range.prototype, name));
+// jsdom没有布局引擎，只补定位依赖的几何接口；实际滚动由Electron验收。
+beforeEach(() => {
+  Object.defineProperty(Range.prototype, 'getClientRects', { configurable: true, value: () => [] });
+  Object.defineProperty(Range.prototype, 'getBoundingClientRect', { configurable: true, value: () => new DOMRect() });
+});
 async function setup() {
   const adapter = createStructureAdapter(); adapters.push(adapter); render(<App api={adapter.api} />);
   fireEvent.click(await screen.findByRole('button', { name: '新建作品' }));
@@ -15,7 +22,13 @@ async function setup() {
   await waitFor(() => expect(screen.getByLabelText('章节正文')).toHaveAttribute('contenteditable', 'true'));
   return adapter;
 }
-afterEach(() => { cleanup(); adapters.splice(0).forEach(adapter => adapter.dispose()); });
+afterEach(() => {
+  cleanup(); adapters.splice(0).forEach(adapter => adapter.dispose());
+  rangeMethods.forEach((name, index) => {
+    if (rangeDescriptors[index]) Object.defineProperty(Range.prototype, name, rangeDescriptors[index]!);
+    else Reflect.deleteProperty(Range.prototype, name);
+  });
+});
 
 // 多次导航包含真实 SQLite 与编辑器挂载，单独给总流程预算；搜索性能另有真实窗口门禁。
 it('剧情脏草稿阻止标签、页面和关闭，保存后持久化且正文可继续保存', async () => {
