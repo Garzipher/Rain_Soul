@@ -1,0 +1,78 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { operationError } from '../../src/shared/operation-errors';
+import { setup } from './conversation-workspace-fixture';
+afterEach(cleanup);
+describe('会话回答恢复', () => {
+  it('发送回执丢失后只核对本机；进行中保持锁，明确无回答才解锁', async () => {
+    const { api, dirty } = setup();
+    vi.mocked(api.executeConversationAi).mockRejectedValueOnce(new Error('IPC回执丢失'));
+    fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '保留输入' } });
+    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认发送' }));
+    vi.mocked(api.readPendingConversationReply).mockRejectedValueOnce(operationError('发送仍在进行', 'CONVERSATION_IN_PROGRESS'));
+    fireEvent.click(await screen.findByRole('button', { name: '核对此次发送结果' }));
+    await screen.findByText('发送仍在进行');
+    expect(dirty).toHaveBeenLastCalledWith(true);
+    expect(screen.getByRole('button', { name: '预览发送' })).toBeDisabled();
+    vi.mocked(api.readPendingConversationReply).mockRejectedValueOnce(operationError('没有完整回答', 'NOT_FOUND'));
+    fireEvent.click(screen.getByRole('button', { name: '核对此次发送结果' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '预览发送' })).toBeEnabled());
+    expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('保留输入');
+    expect(api.executeConversationAi).toHaveBeenCalledTimes(1);
+  });
+  it('已提交回答的IPC回执丢失，原请求保存重试不会再次计费', async () => {
+    const { api } = setup();
+    vi.mocked(api.executeConversationAi).mockRejectedValueOnce(new Error('IPC回执丢失'));
+    fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '保留输入' } });
+    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认发送' }));
+    fireEvent.click(await screen.findByRole('button', { name: '重试保存回答' }));
+    expect(await screen.findByText('完整待保存回答')).toBeVisible();
+    expect(api.retryConversationReply).toHaveBeenCalledWith('hash');
+    expect(api.executeConversationAi).toHaveBeenCalledTimes(1);
+  });
+  it('已收到回答但落盘失败时阻止离开，重试只保存不再次联网', async () => {
+    const { api, dirty } = setup();
+    vi.mocked(api.executeConversationAi).mockRejectedValueOnce(operationError('回答尚未保存', 'CONVERSATION_REPLY_PENDING'));
+    fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '不要丢失' } });
+    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认发送' }));
+    await screen.findByRole('button', { name: '重试保存回答' });
+    expect(dirty).toHaveBeenLastCalledWith(true);
+    expect(screen.getByRole('button', { name: '预览发送' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '重试保存回答' }));
+    expect(await screen.findByText('完整待保存回答')).toBeVisible();
+    expect(api.retryConversationReply).toHaveBeenCalledWith('hash');
+    expect(api.executeConversationAi).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(dirty).toHaveBeenLastCalledWith(false));
+  });
+  it('冲突回复可纯文本查看，取消放弃保留，明确确认后才解锁', async () => {
+    const { api } = setup();
+    vi.mocked(api.executeConversationAi).mockRejectedValueOnce(operationError('回答尚未保存', 'CONVERSATION_REPLY_PENDING'));
+    fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '不要丢失' } });
+    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认发送' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看待保存回答' }));
+    await waitFor(() => expect(screen.getByText('<script>完整待保存回答</script>')).toBeVisible());
+    fireEvent.click(screen.getByRole('button', { name: '关闭回答对照' }));
+    fireEvent.click(screen.getByRole('button', { name: '放弃待保存回答' }));
+    fireEvent.click(screen.getByRole('button', { name: '继续保留回答' }));
+    expect(api.discardConversationReply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '放弃待保存回答' }));
+    vi.mocked(api.readConversation).mockRejectedValueOnce(new Error('刷新草稿失败'));
+    fireEvent.click(screen.getByRole('button', { name: '确认放弃回答' }));
+    await screen.findByText('刷新草稿失败');
+    expect(api.discardConversationReply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '确认放弃回答' }));
+    await waitFor(() => expect(api.discardConversationReply).toHaveBeenCalledWith('hash'));
+    expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('不要丢失');
+    await waitFor(() => expect(screen.getByRole('button', { name: '预览发送' })).toBeEnabled());
+  });
+});
