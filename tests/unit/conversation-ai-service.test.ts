@@ -80,4 +80,10 @@ describe('需求会话专属授权与完整回答', () => {
     const pending = expect(service.execute({ ...preview, confirmed: true }, { signal: during.signal })).rejects.toThrow(/取消/);
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1)); during.abort(); await pending;
   });
+  it('分页历史明确披露最近条数与总数，范围说明进入真正发送的系统消息', async () => {
+    const { service, fetcher } = setup(), request = { ...input(), totalMessageCount: 305 }, preview = service.prepare(request);
+    expect(preview.scopeLabel).toContain('最近2条/共305条'); expect(preview.scopeLabel).toContain('早期未发送');
+    await service.execute({ ...preview, confirmed: true });
+    const body = JSON.parse(fetcher.mock.calls[0][1]!.body as string); expect(body.messages[0].content).toContain(preview.scopeLabel); expect(body.messages).toHaveLength(4);
+  });
 });

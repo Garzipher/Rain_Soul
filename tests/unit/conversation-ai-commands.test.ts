@@ -7,7 +7,7 @@ import type { ConversationDetail, ConversationTurnRequest } from '../../src/shar
 function setup() {
   const workId = crypto.randomUUID(), id = crypto.randomUUID();
   let detail: ConversationDetail = { id, title: '创作讨论', revision: 4, createdAt: '2026-10-09T00:00:00Z', updatedAt: '2026-10-09T00:00:00Z', messageCount: 1,
-    draft: '当前需求草稿', messages: [{ id: crypto.randomUUID(), role: 'user', content: '历史问题', createdAt: '2026-10-09T00:00:00Z' }] };
+    draft: '当前需求草稿', hasMore: false, messages: [{ id: crypto.randomUUID(), role: 'user', content: '历史问题', createdAt: '2026-10-09T00:00:00Z' }] };
   let provider = { id: 'cloud-default', name: '隔离服务', baseUrl: 'https://api.example.com/v1', model: 'test' };
   const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: '创作讨论回答' } }] })));
   const credentials = { read: vi.fn(async () => 'test-conversation-key') };
@@ -85,5 +85,54 @@ describe('会话主进程冻结与原子双消息写入', () => {
     await expect(commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: false })).rejects.toThrow(/确认/);
     expect(fetcher).not.toHaveBeenCalled();
     await expect(commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: true })).resolves.toMatchObject({ draft: '' });
+  });
+  it('完整回答保存失败可用原operationId只重试数据库，无需再次联网或消费授权', async () => {
+    const { commands, store, request, fetcher, getDetail } = setup();
+    const original = store.execute.getMockImplementation()!;
+    let failed = false;
+    store.execute.mockImplementation(async (command, payload) => { if (command === 'appendConversationTurn' && !failed) { failed = true; throw new Error('磁盘写入失败'); } return original(command, payload); });
+    const preview = await commands.execute('prepareConversationAi', request) as AiPreparedRequest;
+    await expect(commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: true })).rejects.toThrow(/保存|写入/);
+    expect(getDetail().draft).toBe('当前需求草稿');
+    expect(commands.accepts('retryConversationReply')).toBe(true);
+    await expect(commands.execute('retryConversationReply', { requestHash: preview.requestHash })).resolves.toMatchObject({ revision: 5, draft: '', messageCount: 3 });
+    const writes = store.execute.mock.calls.filter(([command]) => command === 'appendConversationTurn'); expect(writes).toHaveLength(2); expect(writes[0][1]).toEqual(writes[1][1]); expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('写入成功但回执丢失仍能用同操作重放，未知hash不能造成云重发', async () => {
+    const { commands, store, request, fetcher, getDetail } = setup(), original = store.execute.getMockImplementation()!;
+    let completed: { request: unknown; result: ConversationDetail } | undefined;
+    store.execute.mockImplementation(async (command, payload) => {
+      if (command !== 'appendConversationTurn') return original(command, payload);
+      if (completed) { expect(payload).toEqual(completed.request); return completed.result; }
+      const result = await original(command, payload); completed = { request: structuredClone(payload), result }; throw new Error('回执丢失');
+    });
+    const preview = await commands.execute('prepareConversationAi', request) as AiPreparedRequest;
+    await expect(commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: true })).rejects.toThrow();
+    expect(getDetail().messageCount).toBe(3);
+    await expect(commands.execute('retryConversationReply', { requestHash: preview.requestHash })).resolves.toMatchObject({ messageCount: 3 });
+    await expect(commands.execute('retryConversationReply', { requestHash: 'a'.repeat(64) })).rejects.toThrow(/不存在|失效|未收到/); expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('保存待确认的回答可以与新草稿对照、明确放弃解锁；不能通过取消发送丢弃', async () => {
+    const { commands, store, request, fetcher, changeDetail } = setup(), original = store.execute.getMockImplementation()!;
+    store.execute.mockImplementation(async (command, payload) => { if (command === 'appendConversationTurn') throw new Error('磁盘写入失败'); return original(command, payload); });
+    const preview = await commands.execute('prepareConversationAi', request) as AiPreparedRequest;
+    await expect(commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: true })).rejects.toMatchObject({ code: 'CONVERSATION_REPLY_PENDING' });
+    changeDetail();
+    await commands.execute('cancelConversationAi', { confirmationToken: preview.confirmationToken });
+    await expect(commands.execute('readPendingConversationReply', { requestHash: preview.requestHash })).resolves.toMatchObject({ workId: request.workId, conversationId: request.conversationId, userContent: '当前需求草稿', assistantContent: '创作讨论回答', currentDraft: '新草稿', currentRevision: 5, expectedRevision: 4 });
+    await expect(commands.execute('prepareConversationAi', { ...request, expectedRevision: 5 })).rejects.toMatchObject({ code: 'CONVERSATION_REPLY_PENDING' });
+    await commands.execute('discardConversationReply', { requestHash: preview.requestHash });
+    await expect(commands.execute('readPendingConversationReply', { requestHash: preview.requestHash })).rejects.toThrow(/失效|未收到/);
+    await expect(commands.execute('prepareConversationAi', { ...request, expectedRevision: 5 })).resolves.toBeDefined(); expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('缓存详情与放弃先校验当前作品边界，已保存结果放弃不删除消息', async () => {
+    const { commands, store, request, getDetail } = setup(), original = store.execute.getMockImplementation()!;
+    const preview = await commands.execute('prepareConversationAi', request) as AiPreparedRequest;
+    await commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: true });
+    store.execute.mockImplementation(async () => { throw new Error('仅允许修改当前作品'); });
+    await expect(commands.execute('readPendingConversationReply', { requestHash: preview.requestHash })).rejects.toThrow(/当前作品/);
+    await expect(commands.execute('discardConversationReply', { requestHash: preview.requestHash })).rejects.toThrow(/当前作品/);
+    store.execute.mockImplementation(original);
+    await commands.execute('discardConversationReply', { requestHash: preview.requestHash }); expect(getDetail().messageCount).toBe(3);
   });
 });
