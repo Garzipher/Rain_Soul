@@ -23,6 +23,10 @@ import type { AiCandidate } from '../../shared/ai';
 import { applyAiCandidate, approveAiKnowledge } from './ai-apply';
 import { snapshotCreateRequestSchema, snapshotRestoreRequestSchema, type SnapshotCreateRequest, type SnapshotRestoreRequest } from '../../shared/snapshots';
 import { listSnapshots as readSnapshots, createSnapshot as captureSnapshot, restoreSnapshot as applySnapshot, previewSnapshot as readSnapshotPreview, freezeSnapshotExport } from './snapshots';
+import { listConversations, readConversation, manageConversation, appendConversationTurn } from './conversations';
+import type { ConversationRequest, ConversationTurnRequest } from '../../shared/conversations';
+import { importBookExtraction } from './book-extraction';
+import type { BookExtractionCommit } from '../../shared/book-extraction';
 export { RepositoryError } from './schema';
 
 interface Meta { id: string; title: string; revision: number; updated_at: string; deleted_at: string | null }
@@ -134,6 +138,20 @@ export class WorkRepository {
     return this.catalog.prepare(`SELECT work_id AS id, title, word_count AS wordCount,
       chapter_count AS chapterCount, updated_at AS updatedAt FROM work_catalog
       ORDER BY updated_at DESC, work_id`).all() as WorkSummary[];
+  }
+
+  listConversations(workId: string) {
+    const db = this.projectDb(workId); if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
+    return listConversations(db);
+  }
+  readConversation(workId: string, conversationId: string) {
+    const db = this.projectDb(workId); if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除。');
+    return readConversation(db, conversationId);
+  }
+  manageConversation(request: ConversationRequest) { return manageConversation(this.projectDb(request.workId), request); }
+  appendConversationTurn(request: ConversationTurnRequest) { return appendConversationTurn(this.projectDb(request.workId), request); }
+  importBookExtraction(request: BookExtractionCommit) {
+    importBookExtraction(this.projectDb(request.workId), request); this.pending.add(request.workId); return this.openWork(request.workId);
   }
 
   listDeletedWorks(): DeletedWork[] {

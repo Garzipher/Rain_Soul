@@ -1,4 +1,8 @@
 import type Database from 'better-sqlite3';
+import { createHash } from 'node:crypto';
+import { z } from 'zod';
+import { conversationRequestSchema, conversationTurnSchema, type ConversationDetail, type ConversationMessage, type ConversationRequest, type ConversationSummary, type ConversationTurnRequest } from '../../shared/conversations';
+import { RepositoryError } from './errors';
 
 export const conversationSchema = `
 CREATE TABLE conversation (
@@ -15,3 +19,91 @@ CREATE INDEX conversation_message_order ON conversation_message(conversation_id,
 CREATE TABLE conversation_operation (operation_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, result_json TEXT NOT NULL);
 `;
 export function initializeConversations(db: Database.Database) { db.exec(conversationSchema); }
+
+interface ConversationRow { id: string; title: string; revision: number; draft: string; created_at: string; updated_at: string; deleted_at: string | null }
+function row(db: Database.Database, id: string): ConversationRow {
+  const result = db.prepare('SELECT * FROM conversation WHERE id=? AND deleted_at IS NULL').get(id) as ConversationRow | undefined;
+  if (!result) throw new RepositoryError('NOT_FOUND', '会话不存在或已删除。'); return result;
+}
+function summary(value: ConversationRow, messageCount: number): ConversationSummary {
+  return { id: value.id, title: value.title, revision: value.revision, createdAt: value.created_at, updatedAt: value.updated_at, messageCount };
+}
+export function listConversations(db: Database.Database): ConversationSummary[] {
+  return (db.prepare(`SELECT conversation.*, (SELECT COUNT(*) FROM conversation_message WHERE conversation_id=conversation.id) AS message_count
+    FROM conversation WHERE deleted_at IS NULL ORDER BY updated_at DESC,id`).all() as (ConversationRow & { message_count: number })[])
+    .map(value => summary(value, value.message_count));
+}
+export function readConversation(db: Database.Database, id: string): ConversationDetail {
+  if (!z.uuid().safeParse(id).success) throw new RepositoryError('INVALID_INPUT', '会话标识无效。');
+  const value = row(db, id);
+  const messages = (db.prepare('SELECT * FROM conversation_message WHERE conversation_id=? ORDER BY sort_order').all(id) as { id: string; role: 'user' | 'assistant'; content: string; created_at: string; request_hash: string | null }[])
+    .map(message => ({ id: message.id, role: message.role, content: message.content, createdAt: message.created_at, ...(message.request_hash ? { requestHash: message.request_hash } : {}) }));
+  return { ...summary(value, messages.length), draft: value.draft, messages };
+}
+function assertWork(db: Database.Database, workId: string) {
+  const meta = db.prepare('SELECT id,deleted_at FROM work_meta').get() as { id: string; deleted_at: string | null } | undefined;
+  if (!meta || meta.id !== workId || meta.deleted_at) throw new RepositoryError('NOT_FOUND', '作品不存在或已删除。');
+}
+function assertRevision(value: ConversationRow, expected: number) {
+  if (value.revision !== expected) throw new RepositoryError('REVISION_CONFLICT', '会话已变化，请保留草稿并重新读取。');
+}
+function mutate(db: Database.Database, workId: string, operationId: string, payload: unknown, change: () => ConversationDetail | null) {
+  const hash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+  return db.transaction(() => {
+    assertWork(db, workId);
+    const prior = db.prepare('SELECT request_hash,result_json FROM conversation_operation WHERE operation_id=?').get(operationId) as { request_hash: string; result_json: string } | undefined;
+    if (prior) {
+      if (prior.request_hash !== hash) throw new RepositoryError('INVALID_INPUT', '操作标识已用于不同会话内容。');
+      const receipt = JSON.parse(prior.result_json) as { id: string } | null;
+      if (!receipt || !db.prepare('SELECT 1 FROM conversation WHERE id=? AND deleted_at IS NULL').get(receipt.id)) return null;
+      return readConversation(db, receipt.id);
+    }
+    const result = change();
+    db.prepare('INSERT INTO conversation_operation VALUES(?,?,?)').run(operationId, hash, JSON.stringify(result ? { id: result.id } : null)); return result;
+  }).immediate();
+}
+function append(db: Database.Database, conversationId: string, message: Omit<ConversationMessage, 'createdAt'>, date: string) {
+  if (db.prepare('SELECT 1 FROM conversation_message WHERE id=?').get(message.id)) throw new RepositoryError('INVALID_INPUT', '消息标识已存在。');
+  const order = (db.prepare('SELECT COALESCE(MAX(sort_order),-1)+1 AS value FROM conversation_message WHERE conversation_id=?').get(conversationId) as { value: number }).value;
+  db.prepare('INSERT INTO conversation_message VALUES(?,?,?,?,?,?,?)').run(message.id, conversationId, message.role, message.content, date, message.requestHash ?? null, order);
+}
+export function manageConversation(db: Database.Database, input: ConversationRequest): ConversationDetail | null {
+  const parsed = conversationRequestSchema.safeParse(input);
+  if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '会话操作参数无效。');
+  const request = parsed.data, action = request.action;
+  return mutate(db, request.workId, request.operationId, ['conversation', request], () => {
+    const date = new Date().toISOString();
+    if (action.type === 'create') {
+      if (db.prepare('SELECT 1 FROM conversation WHERE id=?').get(action.id)) throw new RepositoryError('INVALID_INPUT', '会话标识已存在。');
+      db.prepare('INSERT INTO conversation VALUES(?,?,1,?,?,?,NULL)').run(action.id, action.title.trim(), '', date, date);
+    } else {
+      assertRevision(row(db, action.id), action.expectedRevision);
+      if (action.type === 'delete') {
+        db.prepare('UPDATE conversation SET deleted_at=?,updated_at=?,revision=revision+1 WHERE id=?').run(date, date, action.id); return null;
+      }
+      if (action.type === 'rename') db.prepare('UPDATE conversation SET title=? WHERE id=?').run(action.title.trim(), action.id);
+      if (action.type === 'saveDraft') db.prepare('UPDATE conversation SET draft=? WHERE id=?').run(action.draft, action.id);
+      if (action.type === 'appendMessage') {
+        append(db, action.id, action.message, date);
+        if (action.clearDraft) db.prepare("UPDATE conversation SET draft='' WHERE id=?").run(action.id);
+      }
+      db.prepare('UPDATE conversation SET updated_at=?,revision=revision+1 WHERE id=?').run(date, action.id);
+    }
+    return readConversation(db, action.id);
+  });
+}
+export function appendConversationTurn(db: Database.Database, input: ConversationTurnRequest): ConversationDetail {
+  const parsed = conversationTurnSchema.safeParse(input);
+  if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '会话回复参数无效。');
+  const request = parsed.data;
+  const result = mutate(db, request.workId, request.operationId, ['conversationTurn', request], () => {
+    const value = row(db, request.conversationId); assertRevision(value, request.expectedRevision);
+    if (value.draft !== request.userContent) throw new RepositoryError('REVISION_CONFLICT', '发送草稿已变化，请重新预览确认。');
+    const date = new Date().toISOString();
+    append(db, value.id, { id: request.userMessageId, role: 'user', content: request.userContent, requestHash: request.requestHash }, date);
+    append(db, value.id, { id: request.assistantMessageId, role: 'assistant', content: request.assistantContent, requestHash: request.requestHash }, date);
+    db.prepare("UPDATE conversation SET draft='',updated_at=?,revision=revision+1 WHERE id=?").run(date, value.id);
+    return readConversation(db, value.id);
+  });
+  if (!result) throw new RepositoryError('NOT_FOUND', '会话已删除，回复只能保留为历史。'); return result;
+}

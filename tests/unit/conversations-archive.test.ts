@@ -66,4 +66,19 @@ describe('会话归档与正文快照边界', () => {
       expect(db.prepare('SELECT content FROM conversation_message').all()).toEqual([{ content: '我的想法' }]);
     } finally { db.close(); }
   });
+  it.each(['role', 'hash', 'date', 'orphan', 'order'])('拒绝篡改会话消息 %s，原项目仍可打开', async mode => {
+    const { projects, work, file } = setup(), db = new Database(file); seed(db); db.close();
+    const bytes = await exportProjectDatabase(projects, work.id, 1);
+    const invalid = mutate(bytes, altered => {
+      altered.pragma('ignore_check_constraints=ON');
+      altered.pragma('foreign_keys=OFF');
+      if (mode === 'role') altered.prepare("UPDATE conversation_message SET role='system'").run();
+      if (mode === 'hash') altered.prepare("UPDATE conversation_message SET request_hash='伪造'").run();
+      if (mode === 'date') altered.prepare("UPDATE conversation_message SET created_at='伪造'").run();
+      if (mode === 'orphan') altered.prepare('UPDATE conversation_message SET conversation_id=?').run(randomUUID());
+      if (mode === 'order') altered.prepare('UPDATE conversation_message SET sort_order=-1').run();
+    });
+    expect(() => importArchivedProject(projects, input(work.id, invalid), randomUUID())).toThrow();
+    const original = new Database(file); try { expect(original.prepare('SELECT content FROM conversation_message').all()).toEqual([{ content: '我的想法' }]); } finally { original.close(); }
+  });
 });
