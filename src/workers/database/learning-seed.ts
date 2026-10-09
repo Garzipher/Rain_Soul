@@ -6,6 +6,7 @@ import type { WritingDocument } from '../../shared/contracts';
 import { countDocumentWords } from '../../shared/document';
 import { validateLearningCourse } from './learning-course-schema';
 import { initializeSchema, RepositoryError } from './schema';
+import { refreshChapterSearch } from './assets-search';
 
 export interface LearningCourse {
   id: string;
@@ -79,6 +80,7 @@ function appendCourse(db: Database.Database, course: LearningCourse): boolean {
         VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM chapter WHERE volume_id = ?), ?)`)
         .run(chapter.id, chapter.title, JSON.stringify(chapter.document), countDocumentWords(chapter.document), volume.id, volume.id);
       db.prepare('INSERT INTO learning_seed VALUES (?, ?)').run(chapter.key, chapter.id);
+      refreshChapterSearch(db, chapter.id);
       changed = true;
     }
   }
@@ -96,7 +98,7 @@ function updateCourse(directory: string, course: LearningCourse) {
   const db = new Database(file, { fileMustExist: true });
   try {
     const version = db.pragma('user_version', { simple: true });
-    if (version !== 1 && version !== 2) throw new RepositoryError('UNSUPPORTED_SCHEMA', '学习作品数据库版本不受此客户端支持。');
+    if (version !== 1 && version !== 2 && version !== 3) throw new RepositoryError('UNSUPPORTED_SCHEMA', '学习作品数据库版本不受此客户端支持。');
     assertIdentity(db, course);
     initializeSchema(db, 'project');
     db.transaction(() => {

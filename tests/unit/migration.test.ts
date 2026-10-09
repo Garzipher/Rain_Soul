@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { migrateProjectV1 } from '../../src/workers/database/migration';
 import { WorkRepository } from '../../src/workers/database/repository';
+import { searchAssets } from '../../src/workers/database/assets-search';
 
 describe('v1 作品库的一致备份与前向迁移', () => {
   let directory: string;
@@ -48,7 +49,10 @@ describe('v1 作品库的一致备份与前向迁移', () => {
       expect(JSON.parse((backup.prepare('SELECT document_json FROM chapter').get() as { document_json: string }).document_json)).toEqual(document);
       expect(backup.prepare('SELECT * FROM operation_log').all()).toHaveLength(1);
     } finally { backup.close(); }
-    expect(source.pragma('user_version', { simple: true })).toBe(2);
+    expect(source.pragma('user_version', { simple: true })).toBe(3);
+    expect(source.prepare('SELECT COUNT(*) AS count FROM category').get()).toEqual({ count: 6 });
+    expect(searchAssets(source, { text: '旧版', mode: 'all' })).toHaveLength(1);
+    expect(readdirSync(projectDirectory).filter((name) => name.includes('v2-backup'))).toEqual([]);
     expect(source.prepare('SELECT * FROM operation_log').all()).toHaveLength(1);
     repository.close(); repository = new WorkRepository(directory);
     expect(readdirSync(projectDirectory).filter((name) => name.includes('v1-backup'))).toEqual(backups);
@@ -65,9 +69,9 @@ describe('v1 作品库的一致备份与前向迁移', () => {
   });
 
   it('未来版本拒绝启动且不改写数据库或制造错误降级备份', () => {
-    source.pragma('user_version = 3');
+    source.pragma('user_version = 99');
     expect(() => new WorkRepository(directory)).toThrowError(expect.objectContaining({ code: 'UNSUPPORTED_SCHEMA' }));
-    expect(source.pragma('user_version', { simple: true })).toBe(3);
+    expect(source.pragma('user_version', { simple: true })).toBe(99);
     expect(readdirSync(join(directory, 'Projects', id)).filter((name) => name.includes('backup'))).toEqual([]);
   });
 

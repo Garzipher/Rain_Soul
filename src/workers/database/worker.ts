@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { WorkRepository } from './repository';
 import { ensureLearningWork } from './learning-seed';
 import type { StructureRequest, WritingDocument } from '../../shared/contracts';
+import type { AssetRequest, AssetQuery } from '../../shared/assets';
 
 const directory = (workerData as { directory: string }).directory;
 ensureLearningWork(join(directory, 'Projects'), JSON.parse(readFileSync(join(__dirname, 'learning-course.json'), 'utf8')));
@@ -15,6 +16,8 @@ parentPort?.on('message', ({ requestId, command, payload }: { requestId: string;
       case 'listWorks': data = repository.listWorks(); break;
       case 'listDeletedWorks': data = repository.listDeletedWorks(); break;
       case 'manageStructure': data = repository.manageStructure(payload as unknown as StructureRequest); break;
+      case 'manageAssets': data = repository.manageAssets(payload as unknown as AssetRequest); break;
+      case 'searchWork': data = repository.searchWork(payload.workId as string, payload.query as AssetQuery); break;
       case 'createWork': data = repository.createWork(payload.title as string); break;
       case 'openWork': data = repository.openWork(payload.id as string); break;
       case 'addChapter': data = repository.addChapter(payload.workId as string, payload.title as string, payload.expectedRevision as number, payload.operationId as string, payload.volumeId as string | null | undefined); break;

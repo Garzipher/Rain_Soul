@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { writingDocumentSchema } from '../shared/document';
 import { structureRequestSchema } from '../shared/structure-schema';
+import { assetRequestSchema, assetQuerySchema } from '../shared/assets-schema';
 
 type Transport = (command: string, payload: unknown) => Promise<unknown>;
 const id = z.uuid();
@@ -14,6 +15,8 @@ const schemas = {
   addChapter: z.object({ ...mutation, title, volumeId: id.nullable().optional() }).strict(),
   saveChapter: z.object({ ...mutation, chapterId: id, title, document: writingDocumentSchema }).strict(),
   manageStructure: structureRequestSchema,
+  manageAssets: assetRequestSchema,
+  searchWork: z.object({ workId: id, query: assetQuerySchema }).strict(),
 };
 export type StoreCommand = keyof typeof schemas;
 export class StoreService {

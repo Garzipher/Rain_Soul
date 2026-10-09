@@ -19,6 +19,8 @@ export function createStructureAdapter() {
     if (command === 'createWork') return repository.createWork(input.title as string);
     if (command === 'openWork') return repository.openWork(input.id as string);
     if (command === 'manageStructure') return repository.manageStructure(input as unknown as Parameters<WorkRepository['manageStructure']>[0]);
+    if (command === 'manageAssets') return repository.manageAssets(input as unknown as Parameters<WorkRepository['manageAssets']>[0]);
+    if (command === 'searchWork') return repository.searchWork(input.workId as string, input.query as Parameters<WorkRepository['searchWork']>[1]);
     if (command === 'addChapter') return repository.addChapter(input.workId as string, input.title as string, input.expectedRevision as number, input.operationId as string, input.volumeId as string | null | undefined);
     if (command === 'saveChapter') {
       if (failing) throw new Error('磁盘空间不足');
@@ -28,6 +30,12 @@ export function createStructureAdapter() {
   });
   function remember(detail: WorkDetail) { works.set(detail.id, structuredClone(detail)); return detail; }
   const api: DesktopApi = {
+    async manageAssets(request) { return remember(await store.execute('manageAssets', request) as WorkDetail); },
+    async searchWork(workId, query) { return await store.execute('searchWork', { workId, query }) as Awaited<ReturnType<DesktopApi['searchWork']>>; },
+    async getAuthorProfile() { return { penName: '', avatarDataUrl: null }; },
+    async setPenName(penName) { return { penName, avatarDataUrl: null }; },
+    async chooseAvatar() { return { penName: '', avatarDataUrl: null }; },
+    async clearAvatar() { return { penName: '', avatarDataUrl: null }; },
     async listWorks() { return await store.execute('listWorks', {}) as Awaited<ReturnType<DesktopApi['listWorks']>>; },
     async listDeletedWorks() { return await store.execute('listDeletedWorks', {}) as Awaited<ReturnType<DesktopApi['listDeletedWorks']>>; },
     async createWork(title) { return remember(await store.execute('createWork', { title }) as WorkDetail); },

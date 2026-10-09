@@ -7,6 +7,10 @@ import { countDocumentWords, emptyDocument, validateDocument } from '../../share
 import { structureRequestSchema } from '../../shared/structure-schema';
 import { initializeSchema, RepositoryError } from './schema';
 import { applyStructure, assertVolume, nextChapterOrder } from './structure';
+import { applyAsset, readAssets } from './assets';
+import { searchAssets, refreshChapterSearch } from './assets-search';
+import { assetRequestSchema, assetQuerySchema } from '../../shared/assets-schema';
+import type { AssetRequest, AssetQuery } from '../../shared/assets';
 export { RepositoryError } from './schema';
 
 interface Meta { id: string; title: string; revision: number; updated_at: string; deleted_at: string | null }
@@ -59,7 +63,7 @@ export class WorkRepository {
     const db = new Database(file, { fileMustExist: true });
     try {
       const version = db.pragma('user_version', { simple: true });
-      if (version === 1 || version === 2) this.checkMetadata(db, id);
+      if (version === 1 || version === 2 || version === 3) this.checkMetadata(db, id);
       initializeSchema(db, 'project');
       this.checkMetadata(db, id);
     } catch (error) { db.close(); throw error; }
@@ -181,7 +185,26 @@ export class WorkRepository {
     const deletedItems = db.prepare(`SELECT id, title, 'chapter' AS kind, deleted_at AS deletedAt FROM chapter WHERE deleted_at IS NOT NULL
       UNION ALL SELECT id, title, 'volume' AS kind, deleted_at AS deletedAt FROM volume WHERE deleted_at IS NOT NULL
       ORDER BY deletedAt DESC, kind, id`).all() as DeletedItem[];
-    return { id: meta.id, title: meta.title, revision: meta.revision, chapters, volumes, deletedItems };
+    return { id: meta.id, title: meta.title, revision: meta.revision, chapters, volumes, deletedItems, assets: readAssets(db) };
+  }
+
+  manageAssets(value: AssetRequest): WorkDetail {
+    const parsed = assetRequestSchema.safeParse(value);
+    if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '作品资产操作参数无效。');
+    const { workId, expectedRevision, operationId, action } = parsed.data;
+    this.commit(workId, expectedRevision, operationId, ['assets', action, expectedRevision], (db, revision) => {
+      applyAsset(db, action, revision);
+      return { revision };
+    });
+    return this.openWork(workId);
+  }
+
+  searchWork(workId: string, value: AssetQuery) {
+    const parsed = assetQuerySchema.safeParse(value);
+    if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '作品搜索参数无效。');
+    const db = this.projectDb(workId);
+    if (this.meta(db).deleted_at) throw new RepositoryError('NOT_FOUND', '作品已删除，可从设置的本机数据恢复。');
+    return searchAssets(db, parsed.data);
   }
 
   private commit<T>(workId: string, expectedRevision: number, operationId: string,
@@ -216,7 +239,18 @@ export class WorkRepository {
     if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '卷章操作参数无效。');
     const { workId, expectedRevision, operationId, action } = parsed.data;
     this.commit(workId, expectedRevision, operationId, ['structure', action, expectedRevision],
-      (db, revision) => applyStructure(db, action, revision), true);
+      (db, revision) => {
+        applyStructure(db, action, revision);
+        if (action.type === 'deleteChapter' || action.type === 'restoreChapter') {
+          refreshChapterSearch(db, action.chapterId);
+        } else if (action.type === 'deleteVolume' || action.type === 'restoreVolume') {
+          const volumeId = action.volumeId;
+          for (const chapter of db.prepare('SELECT id FROM chapter WHERE volume_id = ?').all(volumeId) as { id: string }[]) {
+            refreshChapterSearch(db, chapter.id);
+          }
+        }
+        return { revision };
+      }, true);
     return this.meta(this.projectDb(workId)).deleted_at ? null : this.openWork(workId);
   }
 
@@ -248,6 +282,7 @@ export class WorkRepository {
         const changed = db.prepare('UPDATE chapter SET title = ?, document_json = ?, word_count = ? WHERE id = ? AND deleted_at IS NULL')
           .run(title, JSON.stringify(document), words, chapterId);
         if (!changed.changes) throw new RepositoryError('NOT_FOUND', '章节不属于当前作品。');
+        refreshChapterSearch(db, chapterId);
         return { revision, wordCount: words };
       });
   }

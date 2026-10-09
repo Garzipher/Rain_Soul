@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emptyDocument } from '../../src/shared/document';
 import { ensureLearningWork, type LearningCourse } from '../../src/workers/database/learning-seed';
 import { WorkRepository } from '../../src/workers/database/repository';
+import { searchAssets } from '../../src/workers/database/assets-search';
+import { projectSchema } from '../../src/workers/database/project-schema';
 
 describe('项目开发学习作品', () => {
   let directory: string;
@@ -41,6 +43,51 @@ describe('项目开发学习作品', () => {
     try { expect(reopened.prepare('SELECT * FROM work_meta').get()).toEqual(initial); }
     finally { reopened.close(); }
     expect(readdirSync(join(directory, 'Projects'))).toEqual([course.id]);
+  });
+
+  it('schema 3课程重启保留学习笔记，新增章节离线搜索立即可用', () => {
+    seed(); const db = database();
+    expect(db.pragma('user_version', { simple: true })).toBe(3);
+    const edited = emptyDocument(); edited.content[0].content = [{ type: 'text', text: '我的个人笔记' }];
+    db.prepare('UPDATE chapter SET document_json=?').run(JSON.stringify(edited)); db.close();
+    const next = chapter('foundation/02'); next.document.content[0].content = [{ type: 'text', text: '本批新知识' }];
+    course.volumes[0].chapters.push(next); seed(); seed();
+    const reopened = database();
+    try {
+      expect(JSON.parse((reopened.prepare('SELECT document_json FROM chapter WHERE id=?').get(course.volumes[0].chapters[0].id) as { document_json: string }).document_json)).toEqual(edited);
+      expect(searchAssets(reopened, { text: '新知识', mode: 'all' })).toHaveLength(1);
+    } finally { reopened.close(); }
+  });
+
+  it('真实旧schema 2课程先校验身份再迁移，保留作者笔记并为新旧章建立搜索', () => {
+    const target = join(directory, 'Projects', course.id);
+    mkdirSync(target, { recursive: true });
+    const db = database(); const volume = course.volumes[0]; const first = volume.chapters[0];
+    const edited = emptyDocument(); edited.content[0].content = [{ type: 'text', text: '作者的旧版学习笔记' }];
+    db.exec(`${projectSchema}
+      CREATE TABLE learning_course (course_key TEXT PRIMARY KEY);
+      CREATE TABLE learning_volume (key TEXT PRIMARY KEY, volume_id TEXT NOT NULL UNIQUE);
+      CREATE TABLE learning_seed (key TEXT PRIMARY KEY, chapter_id TEXT NOT NULL UNIQUE);`);
+    db.prepare('INSERT INTO work_meta(id,title,revision,updated_at) VALUES(?,?,6,?)').run(course.id, '作者修改的课程名', new Date().toISOString());
+    db.prepare('INSERT INTO volume(id,title,sort_order) VALUES(?,?,0)').run(volume.id, '作者的卷名');
+    db.prepare('INSERT INTO chapter(id,title,document_json,word_count,sort_order,volume_id) VALUES(?,?,?,10,0,?)')
+      .run(first.id, '作者的章名', JSON.stringify(edited), volume.id);
+    db.prepare('INSERT INTO learning_course VALUES(?)').run('project-full-development-learning');
+    db.prepare('INSERT INTO learning_volume VALUES(?,?)').run(volume.key, volume.id);
+    db.prepare('INSERT INTO learning_seed VALUES(?,?)').run(first.key, first.id);
+    db.pragma('user_version=2'); db.close();
+    const next = chapter('foundation/02'); next.document.content[0].content = [{ type: 'text', text: '新增的索引课程' }];
+    volume.chapters.push(next); seed(); seed();
+    const reopened = database();
+    try {
+      expect(reopened.pragma('user_version', { simple: true })).toBe(3);
+      expect(reopened.prepare('SELECT title,revision FROM work_meta').get()).toEqual({ title: '作者修改的课程名', revision: 7 });
+      expect(reopened.prepare('SELECT title FROM volume').get()).toEqual({ title: '作者的卷名' });
+      expect(JSON.parse((reopened.prepare('SELECT document_json FROM chapter WHERE id=?').get(first.id) as { document_json: string }).document_json)).toEqual(edited);
+      expect(searchAssets(reopened, { text: '旧版学习', mode: 'all' })).toHaveLength(1);
+      expect(searchAssets(reopened, { text: '索引课程', mode: 'all' })).toHaveLength(1);
+      expect(readdirSync(target).filter(name => name.includes('v2-backup'))).toHaveLength(1);
+    } finally { reopened.close(); }
   });
 
   it('自动追加新章和新卷，只递增一次版本且正文统计正确', () => {
