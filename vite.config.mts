@@ -7,6 +7,7 @@ export default defineConfig({
   build: {
     outDir: '../../dist/renderer', emptyOutDir: true,
     rolldownOptions: { output: { codeSplitting: { groups: [
+      { name: 'textbook-content', test: /virtual:rainsoul-textbook/ },
       { name: 'editor', test: /node_modules[\\/](@tiptap|prosemirror|orderedmap|w3c-keyname)/ },
       { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
       { name: 'textbook', test: /node_modules[\\/](react-markdown|remark-|rehype-|unified|highlight.js|lowlight|hast-|mdast-|micromark|unist-|vfile|property-information|parse-entities)/ },
