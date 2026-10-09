@@ -44,3 +44,10 @@ it('npm包漏发许可文件时只使用与名称版本对应的仓库原文', (
   writeFileSync(join(fallback, 'alpha@1.0.0.txt'), '从已核对版本上游取得的版权原文');
   expect(collectThirdPartyNotices(root)).toContain('从已核对版本上游取得的版权原文');
 });
+it('安装文件版本与锁文件不一致时拒绝打包声明', () => {
+  const root = fixture();
+  writeFileSync(join(root, 'package-lock.json'), JSON.stringify({ packages: {
+    'node_modules/alpha': { version: '1.0.1' }, 'node_modules/beta': { version: '1.0.0' }, 'node_modules/shared': { version: '1.0.0' },
+  } }));
+  expect(() => collectThirdPartyNotices(root)).toThrow(/锁定版本/);
+});

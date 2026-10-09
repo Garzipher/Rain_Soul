@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
-import { dirname, join, parse, resolve } from 'node:path';
+import { dirname, join, parse, relative, resolve, sep } from 'node:path';
 
 function dependencyDirectory(directory, name) {
   if (!/^(@[a-z0-9_.-]+\/)?[a-z0-9_.-]+$/i.test(name)) throw new Error('生产依赖名称无效。');
@@ -16,12 +16,17 @@ function dependencyDirectory(directory, name) {
 /** 仅构建时读取已安装生产依赖，为分发包保留第三方版权与许可原文。 */
 export function collectThirdPartyNotices(directory) {
   const root = resolve(directory), visited = new Set(), notices = [];
+  const lockFile = join(root, 'package-lock.json');
+  const lock = existsSync(lockFile) ? JSON.parse(readFileSync(lockFile, 'utf8')).packages : null;
   function visit(packageDirectory) {
     const path = realpathSync(packageDirectory);
     if (visited.has(path)) return;
     visited.add(path);
     const manifest = JSON.parse(readFileSync(join(path, 'package.json'), 'utf8'));
     if (path !== root) {
+      if (lock?.[relative(root, path).split(sep).join('/')]?.version !== manifest.version && lock) {
+        throw new Error(`生产依赖不符合锁定版本：${manifest.name}@${manifest.version}`);
+      }
       const files = readdirSync(path, { withFileTypes: true })
         .filter(entry => entry.isFile() && /^(licen[cs]e|copying|notice)([._-].*)?$/i.test(entry.name))
         .map(entry => entry.name).sort();
