@@ -39,7 +39,9 @@
     { "key": "continuation", "title": "第八卷 持续学习与后续 P0", "chapters": [
       { "key": "continuation/01", "title": "把开发过程保存为默认作品", "file": "08-持续学习与后续P0/01-把开发过程保存为默认作品.md" },
       { "key": "continuation/02", "title": "知识、剧情与版本的下一步", "file": "08-持续学习与后续P0/02-本地知识剧情与版本的下一步.md" },
-      { "key": "continuation/03", "title": "AI 与 Python 学习验证路径", "file": "08-持续学习与后续P0/03-AI与Python学习验证路径.md" }
+      { "key": "continuation/03", "title": "AI 与 Python 学习验证路径", "file": "08-持续学习与后续P0/03-AI与Python学习验证路径.md" },
+      { "key": "continuation/04", "title": "教材阅读升级与旧笔记勘误", "file": "08-持续学习与后续P0/04-教材阅读升级与旧笔记勘误.md" },
+      { "key": "continuation/05", "title": "本机作者资料实践", "file": "08-持续学习与后续P0/05-本机作者资料实践.md" }
     ] }
   ]
 }
