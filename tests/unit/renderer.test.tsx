@@ -16,7 +16,7 @@ export async function createWork(title = '雨落之后') {
 afterEach(cleanup);
 
 describe('真实桌面写作界面', () => {
-  it('作品集默认收起侧栏，展开后能导航到后置入口', async () => {
+  it('作品集默认收起侧栏，展开后能导航到正式会话空状态', async () => {
     render(<App api={createAdapter().api} />);
     await screen.findByRole('heading', { name: '作品集' });
     expect(screen.getByRole('button', { name: '展开侧栏' }).getAttribute('aria-expanded')).toBe('false');
@@ -24,7 +24,7 @@ describe('真实桌面写作界面', () => {
     fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
     expect(screen.getByText('未设置名称')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '需求会话' }));
-    expect(await screen.findByText('后续开发：本功能尚未交付')).toBeTruthy();
+    expect(await screen.findByText('先选择一部作品')).toBeTruthy();
   });
 
   it('新建作品使用空正文，不携带演示内容，工作区保留三个标签', async () => {

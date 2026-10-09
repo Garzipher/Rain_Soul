@@ -6,6 +6,7 @@ import { readableKnowledgeSource, replaceKnowledgeSource, splitKnowledgeSource }
 import { KnowledgeSourceAudit } from './knowledge-source-audit';
 import './knowledge-workspace.css';
 export interface KnowledgeWorkspaceProps {
+  onBookExtraction?: () => void;
   selectedEntryId?: string | null;
   work: WorkDetail; assets: AssetState; busy: boolean;
   onAction: (action: AssetAction) => Promise<boolean>; onDirtyChange?: (dirty: boolean) => void;
@@ -116,7 +117,7 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
   function toggleTag(id: string) { setTags(previous => previous.includes(id) ? previous.filter(value => value !== id) : [...previous, id]); }
   const paragraphs = results.filter(row => row.kind === 'paragraph');
   return <section className="knowledge-workspace" aria-label="知识工作区">
-    <div className="knowledge-heading"><p>按分类、标签和来源整理作品素材。</p><div><button className="secondary" onClick={() => setSplitter(true)}>拆书工具</button><button className="primary" disabled={disabled || !canEdit || !!form || !categories.length} onClick={() => openForm()}>新增知识</button></div></div>
+    <div className="knowledge-heading"><p>按分类、标签和来源整理作品素材。</p><div><button className="secondary" disabled={disabled || !!form} onClick={() => props.onBookExtraction ? props.onBookExtraction() : setSplitter(true)}>拆书工具</button><button className="primary" disabled={disabled || !canEdit || !!form || !categories.length} onClick={() => openForm()}>新增知识</button></div></div>
     {splitter ? <div className="knowledge-deferred" role="status"><h2>后续开发：本功能尚未交付</h2><p>素材拆文会将参考作品中的描写与写法整理入知识库，保留出处供学习与创作参考。当前阶段：知识库与手工条目。</p><button className="secondary" onClick={() => setSplitter(false)}>返回知识库</button></div> : <div className={`knowledge-layout ${collapsed ? 'is-collapsed' : ''}`}>
       {!collapsed && <nav className="knowledge-categories" aria-label="知识分类"><div><strong>分类</strong><button className="secondary" aria-expanded="true" onClick={() => setCollapsed(true)}>收起分类</button></div>
         <button aria-pressed={categoryId === null} onClick={() => setCategory(null)}>全部知识</button>
