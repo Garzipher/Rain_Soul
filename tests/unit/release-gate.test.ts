@@ -61,9 +61,17 @@ it('真实云每操作均需授权、费用、返回格式、无自动重试与�
   input.cloud[0].serviceUrl = 'http://127.0.0.1:8999'; input.cloud[1].model = ''; input.cloud[2].requestHash = '假哈希';
   expect(validateReleaseEvidence(input).issues.length).toBeGreaterThan(7);
 });
-it.each(['https://127.0.0.1/v1', 'https://10.0.0.1/v1', 'https://192.168.1.1/v1', 'https://[::1]/v1', 'https://mock.invalid/v1', 'https://machine.local/v1', 'https://user:password@provider.org/v1'])('明显本地/私网/保留或带凭据服务不算真实云地址：%s', url => {
+it.each(['https://127.0.0.1/v1', 'https://10.0.0.1/v1', 'https://192.168.1.1/v1', 'https://[::1]/v1', 'https://mock.invalid/v1', 'https://machine.local/v1', 'https://user:password@provider.org/v1',
+  'https://0.1.2.3/v1', 'https://224.0.0.1/v1', 'https://169.254.1.1/v1', 'https://172.16.1.1/v1', 'https://192.0.0.1/v1', 'https://192.0.2.1/v1',
+  'https://100.64.1.1/v1', 'https://198.18.1.1/v1', 'https://198.19.1.1/v1', 'https://198.51.100.1/v1', 'https://203.0.113.1/v1',
+  'https://[2001:db8::1]/v1', 'https://[2001:0::1]/v1', 'https://provider.org/v1?key=private', 'https://provider.org/v1#key', 'broken-url',
+])('明显本地/私网/保留或带凭据服务不算真实云地址：%s', url => {
   const input = complete(); input.cloud[0].serviceUrl = url;
   expect(validateReleaseEvidence(input).issues.some(item => item.path === 'cloud[0].serviceUrl')).toBe(true);
+});
+it.each(['https://8.8.8.8/v1', 'https://[2606:4700:4700::1111]/v1'])('公开IP地址结构可接受，仍不能证明真实服务：%s', url => {
+  const input = complete(); input.cloud[0].serviceUrl = url;
+  expect(validateReleaseEvidence(input).status).toBe('evidence-complete');
 });
 it('CLI只读证据，blocked返回2；不能把pending模板当成功，损坏JSON返回1', () => {
   const directory = mkdtempSync(join(tmpdir(), 'rainsoul-release-gate-')), path = join(directory, 'evidence.json');
