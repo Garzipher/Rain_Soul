@@ -3,13 +3,13 @@
   "name": "Compound Engineering Knowledge Base",
   "description": "知识复利层 - 结构化沉淀开发经验，避免重复造轮子",
   "created_at": "2026-09-28",
-  "last_updated": "2026-09-28",
+  "last_updated": "2026-10-09",
   "stats": {
-    "total_entries": 63,
+    "total_entries": 64,
     "categories": {
       "architecture-patterns": 6,
       "best-practices": 11,
-      "bug-patterns": 4,
+      "bug-patterns": 5,
       "design-patterns": 36,
       "integration-solutions": 3,
       "performance-optimizations": 3
@@ -1463,6 +1463,28 @@
       "source": "compound-engineering-plugin",
       "severity": "medium",
       "applies_when": []
+    },
+    {
+      "id": "rainsoul-reply-persistence-boundary",
+      "title": "回复落盘与读取失败边界",
+      "path": ".trae/knowledge/回复落盘与读取失败边界.md",
+      "category": "bug-patterns",
+      "summary": "云执行、数据库提交与IPC回执分别核对；按原请求只重试落盘，写后读取失败独立恢复。",
+      "tags": [
+        "IPC",
+        "CAS",
+        "云回复",
+        "幂等",
+        "失败恢复"
+      ],
+      "date": "2026-10-09",
+      "source": "project-local",
+      "severity": "high",
+      "applies_when": [
+        "云端回复持久化",
+        "写后刷新",
+        "未知回执"
+      ]
     }
   ]
 }
