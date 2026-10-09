@@ -82,14 +82,14 @@ npm run pack
 
 实际环境为Windows 10 Pro build19045、i5-4460四核/四逻辑核、8GB、1280×840视口；临时作品位于C盘，已通过卷/磁盘映射确认GLOWAY 256GB SATA SSD。测试窗显示但不抢焦点；这是生产构建开发入口的成绩，安装包和其他系统仍按发布门禁另验。专用重跑命令为 `npx playwright test --config playwright.desktop.config.cjs search-performance.spec.cjs --workers=1`，报告在对应 `test-results-desktop` 用例目录中的 `search-performance.json`。完整过程见教材第八卷第14章。
 
-`npm run pack` 生成 Windows x64 目录包，默认输出位于 `release\current\win-unpacked`；`npm run pack:installer` 生成 `release\current\RainSoul Setup 1.0.2.exe`。可以指定独立输出目录，避免覆盖正在运行的程序：
+`npm run pack` 生成 Windows x64 目录包，默认输出位于 `release\current\win-unpacked`；`npm run pack:installer` 生成 `release\current\RainSoul Setup 1.0.3.exe`。可以指定独立输出目录，避免覆盖正在运行的程序：
 
 ```powershell
 $env:RAINSOUL_PACK_DIRECTORY = 'release/verification'
 npm run pack:installer
 ```
 
-当前版本为 1.0.2，目录包入口为 `release\current\win-unpacked\RainSoul.exe`。复制目录包时需要保留整个 `win-unpacked` 目录；分享安装器只需发送安装器文件。退出旧版后再启动新版，避免单实例锁聚焦旧窗口。目录包启动验证不代表 NSIS 安装、升级和卸载流程已经验收。
+当前版本为 1.0.3，目录包入口为 `release\current\win-unpacked\RainSoul.exe`。复制目录包时需要保留整个 `win-unpacked` 目录；分享安装器只需发送安装器文件。退出旧版后再启动新版，避免单实例锁聚焦旧窗口。目录包启动验证不代表 NSIS 安装、升级和卸载流程已经验收。
 
 打包入口针对 Windows 刚重命名程序文件时的 `UNKNOWN/open` 临时访问失败，最多尝试 5 次，间隔 1500ms；每次执行原工具的完整性写入，其他错误直接返回。适配仅验证过锁定的 electron-builder/app-builder-lib 26.15.3，升级这两个工具后需重新验证。
 
@@ -101,12 +101,12 @@ Demo 是视觉和交互参考，包含示例数据及后置功能工作区；作
 
 旧产物清理状态已在本轮重新核对：`release/p0-20261009` 和 `.legacy-artifacts-20261009` 均不存在；此前 ASAR 被占用的说明已失效。作者作品数据不属于产物清理范围。
 
-### 当前开发与验收（2026-10-09，1.0.2）
+### 当前开发与验收（2026-10-09，1.0.3）
 
-本轮补齐跨作品知识复制的分类与标签预览，保护字典未保存草稿，统一多段书签与TXT/DOCX结构顺序；AI保留硬换行，纳入授权章节的父级计划、详细场景和相关伏笔，长章名清单使用摘要而不截断正文。教材同步原理、源码、跟做与练习，默认学习作品仍为八卷三十五章，十二张离线图片。
+本轮补齐AI知识更新：默认新建，更新需显式选择条目、对比并逐条审核；稳定ID、引用、保护快照、历史、索引与回执保持一致。跨章提取保留完整授权材料来源；审计材料从普通出处、搜索及云参考中分离，旧索引可幂等修复。云端截断、过滤、拒绝、工具调用和未知结束响应不生成可应用候选；写作特点草稿锁住章节覆盖。
 
-完整验证577项单元/组件、17项真实Electron、69项Demo通过，类型/Lint与生产构建通过；核心行覆盖96.63%、分支86.29%，搜索P95为108.10ms。实际1.0.2 EXE另跑17项全套全部通过，搜索P95为154.10ms。独立review最终无未解决阻断项。
+教材仍为八卷35章，增加真实授权预览截图，共13张离线图片；补原理、项目链路、跟做、回滚实验和拓展练习。真实窗口测试只预览并取消，使用隔离目录和虚构配置，未向云服务发送请求。详细测试、覆盖率、搜索P95及安装包核验结果见 [本轮验收记录](tasks/p0-ai-knowledge-completion.md)。
 
-当前安装器 `release/current/RainSoul Setup 1.0.2.exe` 为129,522,240字节，与目录包EXE均NotSigned；SHA-256为 `646DEA0BDDA9C8CDB68AB2AE0E26F24F35FCFD6185F90CBFA14853DD83F7EAFA`。包内31个构建文件与最终构建匹配，许可齐备，不含作者数据。干净Windows10/11安装升级卸载、真实云模型与费用、Microsoft Word实际打开仍需对应环境验收。
+新交付安装器为 `release/current/RainSoul Setup 1.0.3.exe`。本机Microsoft Word 2007已实际打开导出样稿并验证中文、引用、伏笔及标题字号，生成PDF后检查版面。干净Windows10/11安装升级卸载、真实云模型与费用及其他Word版本仍需对应环境验收；本机测试不替代最终发布门禁。
 
-删除旧1.0.1安装器及blockmap被自动审批拒绝，两个旧文件仍存在；使用上述1.0.2文件。具体记录、日志和精确清理命令见 [本轮验收任务](tasks/p0-consistency-completion.md)。
+本轮重新核对，旧1.0.1文件已不存在。清理旧版本时仅删除明确版本的安装器与blockmap；作者作品目录不在清理范围内。手动命令见本轮验收记录。
