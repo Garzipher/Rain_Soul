@@ -1,0 +1,39 @@
+import { expect, it, vi } from 'vitest';
+import { BookExtractionCommands } from '../../src/main/book-extraction-commands';
+import type { BookExtractionPreview } from '../../src/shared/book-extraction';
+
+function setup() {
+  const workId = crypto.randomUUID();
+  const store = { execute: vi.fn(async (_command: string, _payload: unknown) => ({ id: workId })) };
+  const files = { choose: vi.fn(async () => ({ name: '参考.txt', bytes: Buffer.from('第一章 雨夜\n雨落在窗上。\n灯火很暖。') } as { name: string; bytes: Buffer } | null)) };
+  return { workId, store, files, commands: new BookExtractionCommands(store, files) };
+}
+it('只预览不落库，确认只提交已审核段落，出处由冻结文件重建', async () => {
+  const { workId, store, commands } = setup();
+  const preview = await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' }) as BookExtractionPreview;
+  expect(store.execute).not.toHaveBeenCalled(); expect(preview.segments).toHaveLength(2);
+  const request = { workId, token: preview.token, expectedRevision: 1, operationId: crypto.randomUUID(), sourceTitle: '优秀作品', sourceAuthor: '原作者', permissionConfirmed: true,
+    items: [{ segmentId: preview.segments[1].id, body: '审核后的灯火描写', categoryId: crypto.randomUUID(), tagIds: [] }] };
+  await commands.execute('confirmBookExtraction', request);
+  expect(store.execute).toHaveBeenCalledWith('importBookExtraction', expect.objectContaining({ workId, items: [expect.objectContaining({ body: '审核后的灯火描写', source: expect.stringContaining('第2段') })] }));
+  const commit = store.execute.mock.calls[0][1] as { items: { source: string }[] };
+  expect(commit.items[0].source).toContain(preview.fileHash); expect(commit.items[0].source).toContain('原作者'); expect(commit.items[0].source).not.toContain('雨落在窗上');
+  await expect(commands.execute('confirmBookExtraction', { ...request, source: '伪造来源' })).rejects.toThrow();
+  await expect(commands.execute('confirmBookExtraction', { ...request, workId: crypto.randomUUID() })).rejects.toThrow(/预览/);
+  await expect(commands.execute('confirmBookExtraction', { ...request, permissionConfirmed: false })).rejects.toThrow();
+  await expect(commands.execute('confirmBookExtraction', { ...request, items: [{ ...request.items[0], segmentId: crypto.randomUUID() }] })).rejects.toThrow(/段落/);
+});
+it('取消使预览失效；文件替换使旧token失效；失败同请求可以重试', async () => {
+  const { workId, store, commands, files } = setup();
+  const preview = await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' }) as BookExtractionPreview;
+  const request = { workId, token: preview.token, expectedRevision: 1, operationId: crypto.randomUUID(), sourceTitle: '书名', sourceAuthor: '', permissionConfirmed: true,
+    items: [{ segmentId: preview.segments[0].id, body: '雨落在窗上。', categoryId: crypto.randomUUID(), tagIds: [] }] };
+  store.execute.mockRejectedValueOnce(new Error('磁盘已满'));
+  await expect(commands.execute('confirmBookExtraction', request)).rejects.toThrow('磁盘已满');
+  await commands.execute('confirmBookExtraction', request);
+  await commands.execute('cancelBookExtraction', { token: preview.token });
+  await expect(commands.execute('confirmBookExtraction', request)).rejects.toThrow(/预览/);
+  expect(store.execute).toHaveBeenCalledTimes(2);
+  files.choose.mockResolvedValueOnce(null);
+  expect(await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' })).toBeNull();
+});
