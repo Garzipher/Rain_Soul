@@ -1,14 +1,16 @@
 const { test, expect } = require('@playwright/test');
-const { readFile, writeFile } = require('node:fs/promises');
+const { readFile, writeFile, mkdir } = require('node:fs/promises');
 const path = require('node:path');
-const { activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup } = require('./structure-helper.cjs');
+const { activate, temporaryDirectory, dataDirectory, launch, offlineWindow, closeNormally, cleanup } = require('./structure-helper.cjs');
 
 test('离线作者资料可直接改名、清除头像，关闭重启后保留且不改变作品', async () => {
   const directory = await temporaryDirectory();
   let application;
   try {
     const avatar = await readFile('assets/rainsoul.png');
-    await writeFile(path.join(directory, 'author-profile.json'), JSON.stringify({ penName: '雨夜作者', avatarDataUrl: `data:image/png;base64,${avatar.toString('base64')}` }));
+    const profileDirectory = dataDirectory(directory);
+    await mkdir(profileDirectory, { recursive: true });
+    await writeFile(path.join(profileDirectory, 'author-profile.json'), JSON.stringify({ penName: '雨夜作者', avatarDataUrl: `data:image/png;base64,${avatar.toString('base64')}` }));
     application = await launch(directory);
     const jpeg = (await readFile('tests/unit/fixtures/avatar-valid.jpg')).toString('base64');
     expect(await application.evaluate(({ nativeImage }, data) => {

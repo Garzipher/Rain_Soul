@@ -19,6 +19,10 @@ async function temporaryDirectory() {
   return mkdtemp(path.join(tmpdir(), 'rainsoul-structure-'));
 }
 
+function dataDirectory(directory) {
+  return process.env.RAINSOUL_TEST_EXECUTABLE ? path.join(directory, 'RainSoul') : directory;
+}
+
 async function launch(directory) {
   const env = { ...process.env, RAINSOUL_TEST_DIRECTORY: directory };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -87,4 +91,4 @@ async function writeChapter(page, title, body) {
   // 结构操作自身也必须 flush；此处刻意不等 500ms 自动保存。
 }
 
-module.exports = { activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup, createWork, writeChapter };
+module.exports = { activate, temporaryDirectory, dataDirectory, launch, offlineWindow, closeNormally, cleanup, createWork, writeChapter };
