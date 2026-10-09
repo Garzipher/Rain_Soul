@@ -135,7 +135,16 @@ export class AiService {
     let payload: unknown;
     try { const text = await response.text(); if (text.length > 2_000_000) throw new Error(); payload = JSON.parse(text); } catch { throw new Error('云端服务响应格式无效或过大。'); }
     signal.throwIfAborted();
-    const content = (payload as { choices?: { message?: { content?: unknown } }[] } | null)?.choices?.[0]?.message?.content;
+    const choice = (payload as { choices?: { finish_reason?: unknown; message?: { content?: unknown; refusal?: unknown } }[] } | null)?.choices?.[0];
+    const refusal = choice?.message?.refusal;
+    if (refusal != null && (typeof refusal !== 'string' || refusal.trim())) throw new Error('云端服务拒绝生成本次内容，未生成可用候选；请调整要求后重新预览确认。');
+    const finishReason = choice?.finish_reason;
+    if (finishReason === 'length') throw new Error('云端响应因输出上限而截断，未生成完整候选；请缩小目标范围后重新预览确认。');
+    if (finishReason === 'content_filter') throw new Error('云端响应被内容过滤，未生成完整候选；请调整要求后重新预览确认。');
+    if (finishReason === 'tool_calls' || finishReason === 'function_call') throw new Error('云端服务返回了不支持的工具调用，未生成完整正文候选；请检查模型配置后重新预览确认。');
+    // 部分兼容服务不提供结束原因；明确提供时只接受正常完成，不回显厂商原始字段。
+    if (finishReason !== undefined && finishReason !== 'stop') throw new Error('无法确认云端响应已完整结束，未生成可用候选；请检查服务兼容性后重新预览确认。');
+    const content = choice?.message?.content;
     if (typeof content !== 'string' || !content.trim()) throw new Error('云端服务未返回有效响应内容。');
     if (content.includes(key)) throw new Error('云端服务响应包含敏感凭据，已阻止展示。');
     const { context, operation } = frozen.request;

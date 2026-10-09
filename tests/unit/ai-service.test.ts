@@ -63,6 +63,39 @@ describe('云端 AI 冻结、授权和候选保护', () => {
   });
 });
 describe('地址与故障保护', () => {
+  it.each(['length', 'content_filter', 'tool_calls', 'function_call', 'unknown', null, '', 42])('结束原因为 %s 时不把非空响应当作完整候选且不能重用授权', async finishReason => {
+    const { service, fetcher } = setup({ choices: [{ finish_reason: finishReason, message: { content: '未完成的半句' } }] });
+    const prepared = service.prepare(request());
+    await expect(service.execute({ ...prepared, confirmed: true })).rejects.toThrow(/完整|截断|过滤|工具/);
+    await expect(service.execute({ ...prepared, confirmed: true })).rejects.toThrow(/使用|过期|取消/);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it.each([undefined, 'stop'])('兼容缺失结束原因或正常 stop 的完整文本响应：%s', async finishReason => {
+    const choice = { ...(finishReason === undefined ? {} : { finish_reason: finishReason }), message: { content: '完整候选正文。', refusal: null } };
+    const { service, fetcher } = setup({ choices: [choice] });
+    const prepared = service.prepare(request());
+    await expect(service.execute({ ...prepared, confirmed: true })).resolves.toMatchObject({ text: '完整候选正文。' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it.each(['stop', undefined])('显式拒绝即使附带非空正文也不生成候选，不回显厂商敏感内容：%s', async finishReason => {
+    const { service, fetcher } = setup({ choices: [{ ...(finishReason ? { finish_reason: finishReason } : {}), message: { content: '厂商附带的正文', refusal: `厂商拒绝原因含${secret}` } }] });
+    const prepared = service.prepare(request());
+    const result = await service.execute({ ...prepared, confirmed: true }).then(value => value, (reason: unknown) => reason);
+    expect(result).toBeInstanceOf(Error);
+    expect((result as Error).message).toMatch(/拒绝/);
+    expect((result as Error).message).not.toContain(secret);
+    expect((result as Error).message).not.toContain('厂商拒绝原因');
+    await expect(service.execute({ ...prepared, confirmed: true })).rejects.toThrow(/使用|过期|取消/);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('未知结束原因不回显厂商原始字段', async () => {
+    const { service, fetcher } = setup({ choices: [{ finish_reason: secret, message: { content: '非空候选' } }] });
+    const prepared = service.prepare(request());
+    const result = await service.execute({ ...prepared, confirmed: true }).then(value => value, (reason: unknown) => reason);
+    expect(result).toBeInstanceOf(Error);
+    expect((result as Error).message).not.toContain(secret);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
   it.each([204, 205, 304])('无正文状态 %s 不能构造带body响应或使进程崩溃', status => {
     const response = responseFromPublicHttp(status, Buffer.from('意外响应体'));
     expect(response.status).toBe(status); expect(response.body).toBeNull();
