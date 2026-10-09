@@ -6,6 +6,24 @@ export function createAdapter() {
   let closeHandler: (() => Promise<void>) | null = null;
   const emptyDocument = (): WritingDocument => ({ type: 'doc', content: [{ type: 'paragraph', attrs: { id: crypto.randomUUID() } }] });
   const api: DesktopApi = {
+    async getAiSettings() { return { provider: null, hasCredential: false }; },
+    async saveAiSettings(provider) { return { provider, hasCredential: true }; },
+    async clearAiSettings() { return { provider: null, hasCredential: false }; },
+    async prepareAi() { throw new Error('此测试未启用 AI'); },
+    async executeAi() { throw new Error('此测试未启用 AI'); },
+    async cancelAi() {},
+    async applyAiCandidate() { throw new Error('此测试未启用 AI'); },
+    async approveAiKnowledge() { throw new Error('此测试未启用 AI'); },
+    async chooseProjectArchive() { return null; },
+    async confirmProjectArchive() { throw new Error('此测试未启用归档'); },
+    async exportProjectArchive() { return false; },
+    async chooseManuscript() { return null; },
+    async confirmManuscript() { throw new Error('此测试未启用手稿导入'); },
+    async exportManuscript() { return false; },
+    async getAuthorProfile() { return { penName: '', avatarDataUrl: null }; },
+    async setPenName(penName) { return { penName, avatarDataUrl: null }; },
+    async chooseAvatar() { return { penName: '', avatarDataUrl: null }; },
+    async clearAvatar() { return { penName: '', avatarDataUrl: null }; },
     async listWorks() {
       return [...works.values()].map((work) => ({ id: work.id, title: work.title, wordCount: work.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0), chapterCount: work.chapters.length, updatedAt: new Date().toISOString() }));
     },
@@ -38,7 +56,16 @@ export function createAdapter() {
       return { revision: work.revision, wordCount: chapter.wordCount };
     },
     async manageStructure() { throw new Error('此测试未启用结构操作'); },
+    async manageAssets() { throw new Error('此测试未启用资产操作'); },
+    async searchWork() { return []; },
+    async readKnowledgeScope() { return { knowledge: [], categories: [], tags: [], entryOwners: {} }; },
+    async searchKnowledgeScope() { return []; },
+    async copyKnowledge() { throw new Error('此测试未启用知识复制'); },
     async listDeletedWorks() { return []; },
+    async listSnapshots() { return []; },
+    async previewSnapshot() { throw new Error('此测试未启用快照预览'); },
+    async createSnapshot() { throw new Error('此测试未启用快照操作'); },
+    async restoreSnapshot() { throw new Error('此测试未启用快照操作'); },
     async getRuntimeInfo() { return { version: '0.1.0', dataDirectory: 'C:\\Local\\RainSoul\\Projects' }; },
     onCloseRequested(handler) { closeHandler = handler; return () => { closeHandler = null; }; },
   };

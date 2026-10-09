@@ -1,12 +1,31 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopApi } from '../shared/contracts';
+import { operationError } from '../shared/operation-errors';
 
 const invoke = async <T>(command: string, payload: unknown): Promise<T> => {
-  const reply = await ipcRenderer.invoke('rainsoul:command', command, payload) as { ok: boolean; data: T; message?: string };
-  if (!reply.ok) throw new Error(reply.message ?? '本机操作失败');
+  const reply = await ipcRenderer.invoke('rainsoul:command', command, payload) as { ok: boolean; data: T; message?: string; code?: string };
+  if (!reply.ok) throw operationError(reply.message ?? '本机操作失败', reply.code);
   return reply.data;
 };
 const api: DesktopApi = {
+  getAiSettings: () => invoke('getAiSettings', {}),
+  saveAiSettings: (provider, key) => invoke('saveAiSettings', { provider, ...(key !== undefined ? { key } : {}) }),
+  clearAiSettings: () => invoke('clearAiSettings', {}),
+  prepareAi: request => invoke('prepareAi', request),
+  executeAi: request => invoke('executeAi', request),
+  cancelAi: confirmationToken => invoke('cancelAi', { confirmationToken }),
+  applyAiCandidate: request => invoke('applyAiCandidate', request),
+  approveAiKnowledge: request => invoke('approveAiKnowledge', request),
+  chooseProjectArchive: () => invoke('chooseProjectArchive', {}),
+  confirmProjectArchive: request => invoke('confirmProjectArchive', request),
+  exportProjectArchive: workId => invoke('exportProjectArchive', { workId }),
+  chooseManuscript: encoding => invoke('chooseManuscript', { encoding }),
+  confirmManuscript: request => invoke('confirmManuscript', request),
+  exportManuscript: (workId, format, snapshotId) => invoke('exportManuscript', { workId, format, ...(snapshotId ? { snapshotId } : {}) }),
+  getAuthorProfile: () => invoke('getAuthorProfile', {}),
+  setPenName: penName => invoke('setPenName', { penName }),
+  chooseAvatar: () => invoke('chooseAvatar', {}),
+  clearAvatar: () => invoke('clearAvatar', {}),
   listWorks: () => invoke('listWorks', {}),
   createWork: title => invoke('createWork', { title }),
   openWork: id => invoke('openWork', { id }),
@@ -14,6 +33,15 @@ const api: DesktopApi = {
   saveChapter: (workId, chapterId, title, document, expectedRevision, operationId) => invoke('saveChapter', { workId, chapterId, title, document, expectedRevision, operationId }),
   getRuntimeInfo: () => invoke('runtimeInfo', {}),
   manageStructure: request => invoke('manageStructure', request),
+  manageAssets: request => invoke('manageAssets', request),
+  searchWork: (workId, query) => invoke('searchWork', { workId, query }),
+  readKnowledgeScope: scopeId => invoke('readKnowledgeScope', { scopeId }),
+  searchKnowledgeScope: (scopeId, query) => invoke('searchKnowledgeScope', { scopeId, query }),
+  copyKnowledge: request => invoke('copyKnowledge', request),
+  listSnapshots: workId => invoke('listSnapshots', { workId }),
+  previewSnapshot: (workId, snapshotId) => invoke('previewSnapshot', { workId, snapshotId }),
+  createSnapshot: request => invoke('createSnapshot', request),
+  restoreSnapshot: request => invoke('restoreSnapshot', request),
   listDeletedWorks: () => invoke('listDeletedWorks', {}),
   onCloseRequested: handler => {
     const listener = (_event: Electron.IpcRendererEvent, token: string) => { void handler().then(() => ipcRenderer.send('rainsoul:close-confirm', token)).catch(() => {}); };
