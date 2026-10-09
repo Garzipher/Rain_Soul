@@ -11,6 +11,37 @@
 知道浏览器与 Node 拥有不同的运行能力。
 本章会出现接口、模块与构建三个概念，不要求先精通编译原理。
 
+## 技术基础：类型、模块与编译产物
+
+### 变量类型与运行时值
+
+`const revision: number = 3` 表示开发者预计这里是数字。TypeScript 可以阻止源码把 `'三'` 赋进去，但运行时从网络、IPC 或文件读取的对象仍可能不符合声明。类型系统检查源码关系，运行时 schema 检查输入值，二者不能互换。
+
+联合类型表示有限选择。例如 `phase: 'clean' | 'dirty' | 'saving' | 'failed'` 把保存状态限定为四种；分支中就可以明确处理每一种，而不是随便传字符串。`unknown` 表示尚未验证的值，必须缩小范围才能使用；`any` 会绕开这种检查。
+
+### 模块与构建
+
+`import` 把另一个模块的公开成员引入当前文件，`export` 决定哪些成员可被使用。源码可以拆成很多文件，但 Electron 加载的是构建入口。构建器解析导入关系、转译 TS/JSX、合并模块并复制资产；这一步叫“构建”，安装器把产物分发到用户机器，叫“打包”。
+
+CommonJS 使用 `require` 与 `module.exports`，ES Module 使用 `import/export`。本项目源码可使用 ES Module 写法，esbuild 为 Electron 生成 `.cjs`。文件后缀和构建配置告诉运行时怎样装载它们。
+
+### 用一处错误理解类型检查
+
+在独立草稿文件中阅读下面例子，不修改生产契约：
+
+```typescript
+interface ChapterLabel { title: string; wordCount: number }
+const chapter: ChapterLabel = { title: '雨夜来信', wordCount: 12 };
+const next = { ...chapter, wordCount: chapter.wordCount + 1 };
+// 把 12 改成 '十二'，类型检查会拒绝；浏览器不会替你补运行时校验。
+```
+
+对象展开创建了新对象，原来的 `chapter` 保持不变。React 经常用这种方式表达状态更新。可运行文件必须经过转译，类型标注不会留在 JavaScript 中替用户保护文件输入。
+
+### 原生模块为什么特殊
+
+一般 JS 代码由 JS 引擎执行；原生 `.node` 模块还依赖操作系统、CPU 架构与 Node ABI。`better-sqlite3` 不适合直接合入浏览器 bundle。项目构建保留外部依赖，打包再携带对应模块；仅有 `main.cjs` 不代表安装目录完整。
+
 ## 1. 类型检查不是生成程序
 
 TypeScript 接口描述数据形状，例如一章拥有标题与正文。
