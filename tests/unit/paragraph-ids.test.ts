@@ -6,10 +6,29 @@ import Text from '@tiptap/extension-text';
 import HardBreak from '@tiptap/extension-hard-break';
 import { describe, expect, it } from 'vitest';
 import { stableParagraphIds } from '../../src/renderer/lib/paragraph-ids';
-import { emptyDocument, validateDocument } from '../../src/shared/document';
+import { countDocumentWords, emptyDocument, validateDocument } from '../../src/shared/document';
 import { inlineBookmark, insertBookmarkAtSelection } from '../../src/renderer/components/inline-bookmark';
 
 describe('稳定段落标识', () => {
+  it.each(['knowledge', 'foreshadow'] as const)('多段正反选区的%s书签归属文档首段，文字和字数保留', kind => {
+    for (const selection of [{ from: 2, to: 9 }, { from: 9, to: 2 }]) {
+      const doc = emptyDocument();
+      doc.content[0].content = [{ type: 'text', text: '春雨落城' }];
+      doc.content.push({ type: 'paragraph', attrs: { id: crypto.randomUUID() }, content: [{ type: 'text', text: '归途有灯' }] });
+      const editor = new Editor({ extensions: [Document, Paragraph, Text, HardBreak, inlineBookmark, stableParagraphIds], content: doc });
+      try {
+        editor.commands.setTextSelection(selection);
+        const targetId = crypto.randomUUID();
+        expect(insertBookmarkAtSelection(editor, kind, targetId)).toBe(true);
+        const saved = validateDocument(editor.getJSON());
+        expect(saved.content[0].content?.find(node => node.type === 'bookmark')).toMatchObject({ attrs: { kind, targetId } });
+        expect(saved.content[1]).toEqual(doc.content[1]);
+        expect(saved.content.map(paragraph => paragraph.attrs.id)).toEqual(doc.content.map(paragraph => paragraph.attrs.id));
+        expect(saved.content[0].content?.filter(node => node.type === 'text').map(node => node.text).join('')).toBe('春雨落城');
+        expect(countDocumentWords(saved)).toBe(8);
+      } finally { editor.destroy(); }
+    }
+  });
   it('选择正文时在选择末尾插入书签，不覆盖原文；锁定后拒绝插入', () => {
     const doc = emptyDocument(); doc.content[0].content = [{ type: 'text', text: '春雨落城' }];
     const editor = new Editor({ extensions: [Document, Paragraph, Text, HardBreak, inlineBookmark, stableParagraphIds], content: doc });

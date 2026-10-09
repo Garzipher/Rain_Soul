@@ -16,7 +16,10 @@ export const inlineBookmark = Node.create({
 });
 export function insertBookmarkAtSelection(editor: Editor, kind: BookmarkNode['attrs']['kind'], targetId: string): boolean {
   if (!editor.isEditable || !targetId) return false;
-  return editor.chain().focus(undefined, { scrollIntoView: false }).setTextSelection(editor.state.selection.to)
+  const { $from, $to, from, to } = editor.state.selection;
+  // 选区已按文档顺序归一；跨段插入首段，单段仍在末尾，不替换所选正文。
+  const position = $from.sameParent($to) ? to : from;
+  return editor.chain().focus(undefined, { scrollIntoView: false }).setTextSelection(position)
     .insertContent({ type: 'bookmark', attrs: { id: crypto.randomUUID(), kind, targetId } }).run();
 }
 export function bookmarkInfo(bookmark: BookmarkNode['attrs'], assets?: AssetState) {
