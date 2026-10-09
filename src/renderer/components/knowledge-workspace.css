@@ -31,6 +31,8 @@
 .knowledge-copy-preview { display: grid; gap: 12px; max-height: 58vh; overflow: auto; color: #536a7c; font-size: 13px; }
 .knowledge-copy-preview p { margin: 0; line-height: 1.8; overflow-wrap: anywhere; }
 .knowledge-copy-content { white-space: pre-wrap; color: #354c5e; }
+.knowledge-copy-preview > label { display: grid; gap: 8px; }
+.knowledge-copy-preview select { width: 100%; padding: 9px 12px; border: 1px solid #cddbe5; border-radius: 8px; background: #fff; color: #354c5e; font: inherit; }
 .knowledge-copy-preview fieldset { margin: 0; padding: 12px; border: 1px solid #e1e9ef; border-radius: 8px; }
 .knowledge-copy-preview fieldset label { display: inline-flex; align-items: center; gap: 6px; margin: 6px 14px 6px 0; }
 .knowledge-copy-preview input[type=checkbox] { width: auto; }

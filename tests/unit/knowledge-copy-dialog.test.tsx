@@ -24,6 +24,11 @@ function setup(onConfirm = vi.fn(async () => true)) {
   render(<KnowledgeCopyDialog preview={prepareKnowledgeCopy(target, source, owner)} busy={false} onConfirm={onConfirm} onClose={onClose} />);
   return { onConfirm, onClose };
 }
+it('复制是普通确认操作，使用主色按钮而非删除警示色', () => {
+  setup();
+  expect(screen.getByRole('button', { name: '确认复制' })).toHaveClass('primary');
+  expect(screen.getByRole('button', { name: '确认复制' })).not.toHaveClass('delete-button');
+});
 it('预览内容出处及两端字典；标签按名称匹配目标ID，未匹配不创建', async () => {
   const { onConfirm } = setup();
   expect(screen.getByRole('dialog')).toHaveTextContent('雨落旧站台。');

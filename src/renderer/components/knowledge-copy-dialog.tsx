@@ -61,7 +61,7 @@ export function KnowledgeCopyDialog({ preview, busy, pending = false, onRetry, o
     } finally { lock.current = false; setWorking(false); }
   }
   return <StructureDialog busy={disabled} onClose={onClose} submitDisabled={!preview.categories.some(item => item.id === categoryId)} state={{
-    heading: '复制知识到当前作品', description: `从“${preview.owner.workTitle}”复制到“${preview.targetTitle}”，副本独立编辑并保留来源。`, submitLabel: '确认复制', onSubmit: confirm,
+    heading: '复制知识到当前作品', description: `从“${preview.owner.workTitle}”复制到“${preview.targetTitle}”，副本独立编辑并保留来源。`, submitLabel: '确认复制', submitTone: 'primary', onSubmit: confirm,
   }}>
     <div className="knowledge-copy-preview">
       <p className="knowledge-copy-content">{preview.entry.body}</p><p>出处：{preview.entry.source || '未注明出处'}</p>
