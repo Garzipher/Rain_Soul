@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { assetFixture } from './assets-helper';
 import { initializeSnapshots, listSnapshots, restoreSnapshot } from '../../src/workers/database/snapshots';
@@ -6,7 +6,8 @@ import { applyAiCandidate, approveAiKnowledge } from '../../src/workers/database
 import { refreshChapterSearch, searchAssets } from '../../src/workers/database/assets-search';
 import { countDocumentWords } from '../../src/shared/document';
 import type { AiCandidate } from '../../src/shared/ai';
-import type { WritingDocument } from '../../src/shared/contracts';
+import type { WorkDetail, WritingDocument } from '../../src/shared/contracts';
+import { buildAiContext, type AiContextRequest } from '../../src/shared/ai-context';
 
 describe('AI 作者确认写入事务', () => {
   let fixture: ReturnType<typeof assetFixture>;
@@ -16,6 +17,31 @@ describe('AI 作者确认写入事务', () => {
     id: randomUUID(), operation, workId: (fixture.db.prepare('SELECT id FROM work_meta').get() as { id: string }).id,
     baselineRevision: revision(), paragraphIds: [fixture.paragraphId], text: '新描写\n第二段', requestHash: 'a'.repeat(64), createdAt: new Date().toISOString(),
   });
+  const contextFixture = () => {
+    const volumeId = randomUUID();
+    fixture.db.prepare('INSERT INTO volume(id,title,sort_order) VALUES(?,?,0)').run(volumeId, '授权分卷');
+    fixture.db.prepare('UPDATE chapter SET volume_id=?,sort_order=1 WHERE id=?').run(volumeId, fixture.chapterId);
+    const addChapter = (title: string, sortOrder: number, inVolume: boolean) => {
+      const id = randomUUID(), paragraphId = randomUUID(), extraParagraphId = randomUUID();
+      const chapterDocument: WritingDocument = { type: 'doc', content: [
+        { type: 'paragraph', attrs: { id: paragraphId }, content: [{ type: 'text', text: `${title}材料` }, { type: 'hardBreak' }, { type: 'text', text: '第二行' }] },
+        { type: 'paragraph', attrs: { id: extraParagraphId }, content: [{ type: 'text', text: `${title}另一段` }] },
+      ] };
+      fixture.db.prepare('INSERT INTO chapter(id,title,document_json,word_count,sort_order,volume_id) VALUES(?,?,?,?,?,?)').run(id, title, JSON.stringify(chapterDocument), 10, sortOrder, inVolume ? volumeId : null);
+      return { id, paragraphId, extraParagraphId };
+    };
+    const previous = addChapter('前章', 0, true), next = addChapter('后章', 2, true), excluded = addChapter('未授权章', 3, false);
+    const extraction = (scope: AiContextRequest['scope']) => {
+      const work: WorkDetail = { id: candidate().workId, title: '测试作品', revision: revision(), volumes: [{ id: volumeId, title: '授权分卷' }], deletedItems: [],
+        chapters: (fixture.db.prepare('SELECT * FROM chapter WHERE deleted_at IS NULL ORDER BY sort_order').all() as { id: string; title: string; document_json: string; volume_id: string | null; word_count: number }[])
+          .map(row => ({ id: row.id, title: row.title, document: JSON.parse(row.document_json) as WritingDocument, volumeId: row.volume_id, wordCount: row.word_count })),
+      };
+      const context = buildAiContext(work, { chapterId: fixture.chapterId, scope, ...(scope === 'custom' ? { chapterIds: [next.id] } : {}) });
+      return { ...candidate('extractKnowledge'), workId: context.workId, baselineRevision: context.baselineRevision,
+        paragraphIds: context.paragraphIds, referenceChapterIds: context.referenceChapterIds, text: `${scope}已审核摘要` };
+    };
+    return { previous, next, excluded, extraction };
+  };
   beforeEach(() => { fixture = assetFixture(); initializeSnapshots(fixture.db); refreshChapterSearch(fixture.db, fixture.chapterId); });
   afterEach(() => fixture.db.close());
   it('审核可以指定作品内分类和标签，失效或跨作品字典不得留下部分数据', () => {
@@ -98,6 +124,49 @@ describe('AI 作者确认写入事务', () => {
     fixture.db.exec("CREATE TRIGGER reject_knowledge BEFORE INSERT ON knowledge_entry WHEN NEW.body='失败' BEGIN SELECT RAISE(ABORT,'模拟知识失败'); END;");
     expect(() => approveAiKnowledge(fixture.db, input, [{ body: '先入', source: '' }, { body: '失败', source: '' }], randomUUID())).toThrow(/知识失败/);
     expect(fixture.state().knowledge).toEqual([]); expect(revision()).toBe(1); expect(listSnapshots(fixture.db)).toEqual([]);
+  });
+  it.each(['previous', 'volume', 'custom'] as const)('真实%s上下文知识回写保留全部授权段落的版本摘录和哈希，不伪归当前目标', scope => {
+    const { previous, next, excluded, extraction } = contextFixture(), input = extraction(scope), operationId = randomUUID();
+    expect(input.paragraphIds).toEqual([fixture.paragraphId]);
+    const items = [{ body: '跨章知识', source: '作者审核' }];
+    approveAiKnowledge(fixture.db, input, items, operationId);
+    const source = fixture.state().knowledge[0].source;
+    const provenance = JSON.parse(source.split('AI 审核来源：')[1]);
+    const authorized = scope === 'previous' ? [previous] : scope === 'volume' ? [previous, next] : [next];
+    expect(provenance.evidence).toHaveLength(1 + authorized.length * 2);
+    for (const chapter of authorized) {
+      expect(provenance.evidence).toEqual(expect.arrayContaining([
+        expect.objectContaining({ chapterId: chapter.id, paragraphId: chapter.paragraphId, revision: 1, role: 'authorized-context', excerpt: `${chapter.id === previous.id ? '前章' : '后章'}材料\n第二行`, hash: createHash('sha256').update(`${chapter.id === previous.id ? '前章' : '后章'}材料\n第二行`).digest('hex') }),
+        expect.objectContaining({ chapterId: chapter.id, paragraphId: chapter.extraParagraphId }),
+      ]));
+    }
+    expect(source).not.toContain(excluded.id); expect(source).not.toContain('未授权章材料');
+    if (scope === 'custom') expect(source).not.toContain(previous.id);
+    if (scope === 'previous') expect(source).not.toContain(next.id);
+    fixture.db.prepare('UPDATE chapter SET title=?,document_json=? WHERE id=?').run('后来改名', JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', attrs: { id: authorized[0].paragraphId }, content: [{ type: 'text', text: '后来改写' }] }] }), authorized[0].id);
+    approveAiKnowledge(fixture.db, input, items, operationId);
+    expect(fixture.state().knowledge).toHaveLength(1); expect(fixture.state().knowledge[0].source).toBe(source);
+    expect(fixture.db.prepare('SELECT source FROM knowledge_history').get()).toEqual({ source });
+    const snapshot = fixture.db.prepare('SELECT payload_json,source_revision FROM snapshot').get() as { payload_json: string; source_revision: number };
+    expect(snapshot.source_revision).toBe(1); expect(JSON.parse(snapshot.payload_json).chapter.find((row: { id: string }) => row.id === authorized[0].id).title).toBe(scope === 'custom' ? '后章' : '前章');
+    expect(listSnapshots(fixture.db)).toHaveLength(1); expect(revision()).toBe(2);
+  });
+  it.each(['missing', 'deleted', 'duplicate-chapter', 'duplicate-paragraph', 'conflict-outside-scope', 'missing-target'] as const)('授权上下文%s身份失效时，知识、历史、快照、版本与回执全部回滚', failure => {
+    const { previous, next, extraction } = contextFixture(), input = extraction('previous');
+    if (failure === 'missing') fixture.db.prepare('DELETE FROM chapter WHERE id=?').run(previous.id);
+    if (failure === 'deleted') fixture.db.prepare('UPDATE chapter SET deleted_at=? WHERE id=?').run('已删除', previous.id);
+    if (failure === 'duplicate-chapter') input.referenceChapterIds!.push(previous.id);
+    if (failure === 'missing-target') input.paragraphIds = [randomUUID()];
+    if (failure === 'duplicate-paragraph' || failure === 'conflict-outside-scope') {
+      const conflictingChapterId = failure === 'duplicate-paragraph' ? previous.id : next.id;
+      const conflicting = JSON.parse((fixture.db.prepare('SELECT document_json FROM chapter WHERE id=?').get(conflictingChapterId) as { document_json: string }).document_json) as WritingDocument;
+      conflicting.content[1].attrs.id = previous.paragraphId;
+      fixture.db.prepare('UPDATE chapter SET document_json=? WHERE id=?').run(JSON.stringify(conflicting), conflictingChapterId);
+    }
+    expect(() => approveAiKnowledge(fixture.db, input, [{ body: '不可写入', source: '' }], randomUUID())).toThrow();
+    expect(fixture.state().knowledge).toEqual([]); expect(revision()).toBe(1); expect(listSnapshots(fixture.db)).toEqual([]);
+    expect(fixture.db.prepare('SELECT COUNT(*) AS count FROM knowledge_history').get()).toEqual({ count: 0 });
+    expect(fixture.db.prepare('SELECT COUNT(*) AS count FROM operation_log').get()).toEqual({ count: 0 });
   });
   it('知识来源可以跨章，失效来源和缺少未分类时全部回滚', () => {
     const other = randomUUID(), paragraphId = randomUUID();

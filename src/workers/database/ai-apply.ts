@@ -14,7 +14,7 @@ const candidateSchema = z.object({ id: z.uuid(), operation: z.enum(aiOperations)
   paragraphIds: z.array(z.uuid()).min(1).max(50000).refine(ids => new Set(ids).size === ids.length),
   text: z.string().min(1).max(2_000_000).refine(value => !!value.trim()), requestHash: z.string().regex(/^[a-f0-9]{64}$/), createdAt: z.iso.datetime(),
   selection: z.object({ paragraphId: z.uuid(), from: z.number().int().nonnegative(), to: z.number().int().positive(), text: z.string().min(1).max(200000) }).strict().optional(),
-  referenceChapterIds: z.array(z.uuid()).min(1).max(50000).optional(),
+  referenceChapterIds: z.array(z.uuid()).min(1).max(50000).refine(ids => new Set(ids).size === ids.length).optional(),
 }).strict();
 const itemsSchema = z.array(z.object({ body: z.string().min(1).max(200000).refine(value => !!value.trim()), source: z.string().max(10000), categoryId: z.uuid().optional(), tagIds: z.array(z.uuid()).max(100).refine(ids => new Set(ids).size === ids.length).optional() }).strict()).min(1).max(100);
 interface ChapterRow { id: string; title: string; document_json: string }
@@ -64,6 +64,24 @@ function targets(db: Database.Database, candidate: AiCandidate): Target[] {
   return candidate.paragraphIds.map(id => {
     const target = found.get(id); if (!target) throw new RepositoryError('NOT_FOUND', 'AI 候选目标段落已失效，请重新对比或生成。');
     return target;
+  });
+}
+function knowledgeSources(db: Database.Database, candidate: AiCandidate, selected: Target[]): Target[] {
+  if (!candidate.referenceChapterIds) return selected;
+  const authorized = new Set(candidate.referenceChapterIds), chapters = new Map<string, Target[]>(), identities = new Map<string, number>();
+  for (const chapter of db.prepare('SELECT id,title,document_json FROM chapter WHERE deleted_at IS NULL').all() as ChapterRow[]) {
+    const document = validateDocument(JSON.parse(chapter.document_json));
+    const paragraphs = document.content.map((paragraph, index) => {
+      identities.set(paragraph.attrs.id, (identities.get(paragraph.attrs.id) ?? 0) + 1);
+      return { chapter, document, index };
+    });
+    if (authorized.has(chapter.id)) chapters.set(chapter.id, paragraphs);
+  }
+  return candidate.referenceChapterIds.flatMap(id => {
+    const paragraphs = chapters.get(id);
+    if (!paragraphs) throw new RepositoryError('NOT_FOUND', 'AI 候选授权上下文章节已失效，请重新生成。');
+    if (paragraphs.some(target => identities.get(target.document.content[target.index].attrs.id) !== 1)) throw new RepositoryError('INVALID_INPUT', '授权上下文段落身份重复，不能记录知识来源。');
+    return paragraphs;
   });
 }
 function commit(db: Database.Database, candidate: AiCandidate, operationId: string, kind: string, detail: unknown, mutate: () => void): void {
@@ -118,10 +136,15 @@ export function approveAiKnowledge(db: Database.Database, value: AiCandidate, in
     const selected = targets(db, candidate);
     const category = db.prepare("SELECT id FROM category WHERE system_key='uncategorized' AND deleted_at IS NULL").get() as { id: string } | undefined;
     if (!category) throw new RepositoryError('NOT_FOUND', '作品缺少未分类类别，无法写入知识。');
-    const evidence = selected.map(target => ({ chapterId: target.chapter.id, chapterTitle: target.chapter.title,
-      paragraphId: target.document.content[target.index].attrs.id, revision: candidate.baselineRevision,
-      excerpt: target.document.content[target.index].content?.map(node => node.type === 'text' ? node.text : node.type === 'hardBreak' ? '\n' : '').join('') ?? '',
-    }));
+    // 来源记录表示模型获准读取的材料，不声明每条知识都被模型逐段引用。
+    const evidence = knowledgeSources(db, candidate, selected).map(target => {
+      const paragraph = target.document.content[target.index];
+      const excerpt = paragraph.content?.map(node => node.type === 'text' ? node.text : node.type === 'hardBreak' ? '\n' : '').join('') ?? '';
+      return { chapterId: target.chapter.id, chapterTitle: target.chapter.title, paragraphId: paragraph.attrs.id,
+        revision: candidate.baselineRevision, excerpt, hash: createHash('sha256').update(excerpt).digest('hex'),
+        role: candidate.referenceChapterIds ? 'authorized-context' : 'target',
+      };
+    });
     const provenance = JSON.stringify({ candidateId: candidate.id, candidateText: candidate.text, requestHash: candidate.requestHash, workId: candidate.workId, evidence });
     for (const item of parsed.data) applyAsset(db, { type: 'createKnowledge', body: item.body, source: `${item.source}${item.source ? '\n' : ''}AI 审核来源：${provenance}`, categoryId: item.categoryId ?? category.id, tagIds: item.tagIds ?? [] }, candidate.baselineRevision + 1);
   });
