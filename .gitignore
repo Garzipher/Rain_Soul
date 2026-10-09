@@ -34,3 +34,5 @@ playwright/.cache/
 dist/
 release/
 coverage/
+/.ai-analysis-coverage/
+/.p0-*.log
