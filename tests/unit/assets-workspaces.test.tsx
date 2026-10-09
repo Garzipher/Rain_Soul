@@ -173,6 +173,32 @@ it('写作特点发布失败保留表单，章节可以明确恢复作品默认'
   fireEvent.click(screen.getByRole('button', { name: '发布新版本' }));
   await waitFor(() => expect(onAction).toHaveBeenCalledWith({ type: 'publishStyle', payload: { narrativePerson: '第三人称', pace: '紧凑', prohibited: ['套话'], referenceWorks: [] } }));
   expect(screen.getByRole('textbox', { name: '节奏' })).toHaveProperty('value', '紧凑');
+  expect(screen.getByRole('combobox', { name: '雨夜来信写作特点' })).toHaveProperty('disabled', true);
+  fireEvent.click(screen.getByRole('button', { name: '放弃更改' }));
+  expect(screen.getByRole('textbox', { name: '节奏' })).toHaveProperty('value', '缓慢');
+  expect(screen.getByRole('combobox', { name: '雨夜来信写作特点' })).toHaveProperty('disabled', false);
   fireEvent.change(screen.getByRole('combobox', { name: '雨夜来信写作特点' }), { target: { value: '' } });
   await waitFor(() => expect(onAction).toHaveBeenCalledWith({ type: 'setChapterStyle', chapterId: 'chapter', profileId: null }));
+});
+
+it.each(['人称', '节奏', '禁用项', '参考作品'])('写作特点的%s草稿未发布时保护章节覆盖，发布成功后解除保护', async (field) => {
+  const onAction = vi.fn(async () => true);
+  const onDirtyChange = vi.fn();
+  render(<StyleProfilePanel {...base} onAction={onAction} onDirtyChange={onDirtyChange} />);
+  const input = screen.getByRole('textbox', { name: field });
+  const override = screen.getByRole('combobox', { name: '雨夜来信写作特点' });
+  expect(override).toHaveProperty('disabled', false);
+  fireEvent.change(input, { target: { value: '未发布的练习稿' } });
+  expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+  expect(override).toHaveProperty('disabled', true);
+  expect(input).toHaveProperty('disabled', false);
+  expect(screen.getByRole('button', { name: '发布新版本' })).toHaveProperty('disabled', false);
+  expect(screen.getByRole('button', { name: '放弃更改' })).toHaveProperty('disabled', false);
+  expect(onAction).not.toHaveBeenCalled();
+  expect(input).toHaveProperty('value', '未发布的练习稿');
+  fireEvent.click(screen.getByRole('button', { name: '发布新版本' }));
+  await waitFor(() => expect(override).toHaveProperty('disabled', false));
+  expect(onAction).toHaveBeenCalledTimes(1);
+  expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'publishStyle' }));
+  expect(onDirtyChange).toHaveBeenLastCalledWith(false);
 });
