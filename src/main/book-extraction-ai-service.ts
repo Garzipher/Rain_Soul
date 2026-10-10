@@ -47,8 +47,9 @@ export class BookExtractionAiService {
     for (const [token, frozen] of this.pending) if (frozen.prepared.expiresAt <= this.now()) this.pending.delete(token);
     if (this.pending.size >= 100) throw new Error('待确认拆书请求过多，请先取消旧请求。');
     const body = JSON.stringify({ model: request.provider.model, stream: false, max_tokens: maxOutputTokens, messages });
+    const confirmationToken = randomBytes(32).toString('hex');
     const prepared: AiPreparedRequest = {
-      confirmationToken: randomBytes(32).toString('hex'), requestHash: createHash('sha256').update(JSON.stringify([address.url, body, request.provider, request.workId, request.previewToken, request.baselineRevision])).digest('hex'),
+      confirmationToken, requestHash: createHash('sha256').update(JSON.stringify([confirmationToken, address.url, body, request.provider, request.workId, request.previewToken, request.baselineRevision])).digest('hex'),
       expiresAt: this.now() + (this.dependencies.confirmationTtlMs ?? 300000), service: request.provider.name, model: request.provider.model, paragraphIds: request.segments.map(item => item.id),
       scopeLabel, previewText, billingHint: request.provider.billingHint || '按所选云服务计费；当前无法准确估算金额，确认发送可能产生费用。', estimatedInputTokens, maxOutputTokens,
     };

@@ -100,4 +100,12 @@ describe('拆书专属云服务', () => {
     expect(() => service.prepare(request)).toThrow(/过多/); service.cancel(first.confirmationToken); expect(() => service.prepare(request)).not.toThrow();
     advance(); expect(() => service.prepare(request)).not.toThrow();
   });
+  it('相同素材重新预览生成新的授权hash，旧请求重放拒绝，新确认才再次发送', async () => {
+    const { service, fetcher, answer } = setup(), request = input(), first = service.prepare(request), second = service.prepare(request);
+    expect(second.requestHash).not.toBe(first.requestHash); expect(second.previewText).toBe(first.previewText); expect(fetcher).not.toHaveBeenCalled();
+    fetcher.mockImplementation(async () => answer({ suggestions: [] }));
+    await service.execute({ ...first, confirmed: true });
+    await expect(service.execute({ ...first, confirmed: true })).rejects.toThrow(/使用/); expect(fetcher).toHaveBeenCalledTimes(1);
+    await service.execute({ ...second, confirmed: true }); expect(fetcher).toHaveBeenCalledTimes(2);
+  });
 });

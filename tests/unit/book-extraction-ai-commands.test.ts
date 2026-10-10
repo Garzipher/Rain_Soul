@@ -64,10 +64,11 @@ describe('拆书 AI 命令只推荐不写入', () => {
     const cached = await state.commands.execute('getBookExtractionAiResult', state.lookup(prepared)) as { status: 'ready'; result: BookExtractionAiResult };
     cached.result.rawText = '渲染层篡改';
     await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(prepared))).resolves.toMatchObject({ status: 'ready', result: { rawText: expect.stringContaining('风穿过门缝') } });
-    await expect(state.prepare()).rejects.toThrow(/核对|重复|已执行/);
+    const next = await state.prepare(); expect(next.requestHash).not.toBe(prepared.requestHash); expect(state.fetcher).toHaveBeenCalledTimes(1);
+    await expect(state.execute(prepared)).rejects.toThrow(/失效|已执行/);
     await state.commands.execute('cancelBookExtractionAi', { confirmationToken: prepared.confirmationToken });
     await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(prepared))).resolves.toEqual({ status: 'missing' });
-    await expect(state.prepare()).rejects.toThrow(/重复|已执行/); expect(state.fetcher).toHaveBeenCalledTimes(1);
+    await expect(state.execute(prepared)).rejects.toThrow(/失效|已执行/); expect(state.fetcher).toHaveBeenCalledTimes(1);
   });
   it('hash绑定作品及预览，不能跨边界读取缓存', async () => {
     const state = setup(), prepared = await state.prepare(); await state.execute(prepared);
@@ -80,10 +81,10 @@ describe('拆书 AI 命令只推荐不写入', () => {
     const pending = expect(state.execute(prepared)).rejects.toThrow(/取消/);
     await vi.waitFor(() => expect(state.fetcher).toHaveBeenCalledTimes(1));
     await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(prepared))).resolves.toEqual({ status: 'running' });
-    await expect(state.prepare()).rejects.toThrow(/核对|进行|重复/);
+    const next = await state.prepare(); expect(next.requestHash).not.toBe(prepared.requestHash); expect(state.fetcher).toHaveBeenCalledTimes(1);
     await state.commands.execute('cancelBookExtractionAi', { confirmationToken: prepared.confirmationToken }); await pending; await state.commands.drain();
     await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(prepared))).resolves.toEqual({ status: 'missing' });
-    await expect(state.prepare()).rejects.toThrow(/重复|已执行/); expect(state.fetcher).toHaveBeenCalledTimes(1);
+    await expect(state.execute(prepared)).rejects.toThrow(/失效|已执行/); expect(state.fetcher).toHaveBeenCalledTimes(1);
   });
   it('后验期间收到完整回答已经可核对，取消后仍保留并禁止应用', async () => {
     const state = setup(), prepared = await state.prepare(), original = state.store.execute.getMockImplementation()!;
@@ -120,12 +121,13 @@ describe('拆书 AI 命令只推荐不写入', () => {
     await state.commands.execute('cancelBookExtractionAi', { confirmationToken: first.confirmationToken });
     await expect(state.prepare()).resolves.toBeDefined(); expect(state.fetcher).toHaveBeenCalledTimes(100);
   });
-  it('未配置、错误hash和未确认不发送，重复授权无法绕过已执行请求', async () => {
+  it('未配置、错误hash和未确认不发送，新授权可发送而旧授权不能重放', async () => {
     const state = setup(), prepared = await state.prepare(), duplicate = await state.prepare();
     await expect(state.commands.execute('executeBookExtractionAi', { confirmationToken: prepared.confirmationToken, requestHash: 'wrong', confirmed: true })).rejects.toThrow(/失效/);
     await expect(state.commands.execute('executeBookExtractionAi', { confirmationToken: prepared.confirmationToken, requestHash: prepared.requestHash, confirmed: false })).rejects.toThrow(/确认/);
     expect(state.fetcher).not.toHaveBeenCalled(); await state.execute(prepared);
-    await expect(state.execute(duplicate)).rejects.toThrow(/重复/);
+    await expect(state.execute(prepared)).rejects.toThrow(/失效/); expect(state.fetcher).toHaveBeenCalledTimes(1);
+    await state.execute(duplicate); expect(state.fetcher).toHaveBeenCalledTimes(2);
     const unconfigured = setup(); unconfigured.clearCredential(); await expect(unconfigured.prepare()).rejects.toThrow(/配置/);
   });
   it('取消未执行授权可重新准备，准备读取过程中预览或配置变化也拒绝', async () => {
@@ -136,5 +138,12 @@ describe('拆书 AI 命令只推荐不写入', () => {
       other.store.execute.mockImplementationOnce(async (command, payload) => { if (change === 'preview') other.replacePreview(); else other.changeProvider(); return original(command, payload); });
       await expect(other.prepare()).rejects.toThrow(/变化|失效/); expect(other.fetcher).not.toHaveBeenCalled();
     }
+  });
+  it('连接失败没有自动重发，作者重新预览确认同素材后允许手动重试', async () => {
+    const state = setup(), first = await state.prepare(); state.fetcher.mockRejectedValueOnce(new Error('网络失效'));
+    await expect(state.execute(first)).rejects.toThrow(/连接失败/); expect(state.fetcher).toHaveBeenCalledTimes(1);
+    const retry = await state.prepare(); expect(retry.requestHash).not.toBe(first.requestHash); expect(state.fetcher).toHaveBeenCalledTimes(1);
+    await expect(state.execute(retry)).resolves.toMatchObject({ rawText: expect.stringContaining('风穿过门缝') }); expect(state.fetcher).toHaveBeenCalledTimes(2);
+    await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(first))).resolves.toEqual({ status: 'missing' });
   });
 });
