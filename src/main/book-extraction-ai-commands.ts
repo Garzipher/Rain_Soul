@@ -44,12 +44,21 @@ export class BookExtractionAiCommands {
     if (work.id !== workId || !Number.isInteger(work.revision) || work.revision < 1) throw new Error('仅允许当前作品的拆书分析。');
     return work;
   }
+  private async interruptible<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+    let abort!: () => void;
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      abort = () => reject(new Error('拆书请求已取消；未自动重新发送。'));
+      if (signal.aborted) abort(); else signal.addEventListener('abort', abort, { once: true });
+    });
+    try { return await Promise.race([operation, cancelled]); }
+    finally { signal.removeEventListener('abort', abort); }
+  }
   private async validate(frozen: Frozen, signal: AbortSignal): Promise<void> {
     signal.throwIfAborted();
     const settings = this.settings.get();
     if (!settings.hasCredential || fingerprint(settings.provider) !== frozen.providerHash) throw new Error('模型配置已变化，请重新预览确认。');
     if (fingerprint(this.preview(frozen.request)) !== frozen.previewHash) throw new Error('拆书预览已变化，请重新选择。');
-    const work = await this.work(frozen.request.workId); signal.throwIfAborted();
+    const work = await this.interruptible(this.work(frozen.request.workId), signal); signal.throwIfAborted();
     if (work.revision !== frozen.baselineRevision || fingerprint(dictionaries(work)) !== frozen.dictionaryHash) throw new Error('作品或分类标签已变化，请重新预览确认。');
     if (!this.settings.get().hasCredential || fingerprint(this.settings.get().provider) !== frozen.providerHash || fingerprint(this.preview(frozen.request)) !== frozen.previewHash) throw new Error('拆书预览或模型配置已变化，请重新确认。');
   }
@@ -85,6 +94,8 @@ export class BookExtractionAiCommands {
       const entry = this.entries.get(lookup.requestHash);
       if (!entry || entry.frozen.request.workId !== lookup.workId || entry.frozen.request.token !== lookup.previewToken) return { status: 'missing' } satisfies BookExtractionAiStatus;
       if (entry.controller) return { status: 'running' } satisfies BookExtractionAiStatus;
+      try { await this.validate(entry.frozen, new AbortController().signal); }
+      catch { entry.result!.validationError ??= '完整回答已保留，但作品、预览、配置或核对检查已变化；禁止应用，请核对原始回答。'; }
       return { status: 'ready', result: structuredClone(entry.result!) } satisfies BookExtractionAiStatus;
     }
     return this.send(schemas.executeBookExtractionAi.parse(payload));

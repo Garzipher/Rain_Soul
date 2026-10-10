@@ -84,4 +84,20 @@ describe('拆书专属云服务', () => {
     fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: '部分回答' } }] }))); preview = service.prepare(input());
     await expect(service.execute({ ...preview, confirmed: true })).rejects.toThrow(/截断/);
   });
+  it('外部取消信号在发送前或发送期间终止请求，正常配置完整空建议可返回', async () => {
+    const { service, fetcher, answer } = setup(), signal = new AbortController(); signal.abort();
+    let prepared = service.prepare(input()); await expect(service.execute({ ...prepared, confirmed: true }, { signal: signal.signal })).rejects.toThrow(/取消/); expect(fetcher).not.toHaveBeenCalled();
+    const during = new AbortController(); fetcher.mockImplementationOnce(async () => new Promise(() => undefined)); prepared = service.prepare(input());
+    const pending = expect(service.execute({ ...prepared, confirmed: true }, { signal: during.signal })).rejects.toThrow(/取消/);
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1)); during.abort(); await pending;
+    fetcher.mockResolvedValueOnce(answer({ suggestions: [] })); const request = input(); request.provider.billingHint = '按次计费'; request.provider.contextWindowTokens = 100000;
+    prepared = service.prepare(request); expect(prepared.billingHint).toBe('按次计费');
+    const result = await service.execute({ ...prepared, confirmed: true }); expect(result.suggestions).toEqual([]); expect(result.validationError).toBeUndefined();
+  });
+  it('待确认数量达上限拒绝，取消或过期后可以释放容量', () => {
+    const { service, advance } = setup(), request = input(), first = service.prepare(request);
+    for (let index = 1; index < 100; index++) service.prepare(request);
+    expect(() => service.prepare(request)).toThrow(/过多/); service.cancel(first.confirmationToken); expect(() => service.prepare(request)).not.toThrow();
+    advance(); expect(() => service.prepare(request)).not.toThrow();
+  });
 });

@@ -96,4 +96,45 @@ describe('拆书 AI 命令只推荐不写入', () => {
     const result = await pending; expect(result.validationError).toBeTruthy();
     await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(prepared))).resolves.toMatchObject({ status: 'ready', result });
   });
+  it('缓存核对时再检查当前版本，后续配置或预览变化也禁止应用', async () => {
+    for (const change of ['revision', 'provider', 'preview']) {
+      const state = setup(), prepared = await state.prepare(); await state.execute(prepared);
+      if (change === 'revision') state.changeRevision(); else if (change === 'provider') state.changeProvider(); else state.replacePreview();
+      await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(prepared))).resolves.toMatchObject({ status: 'ready', result: { validationError: expect.any(String), rawText: expect.stringContaining('风穿过门缝') } });
+    }
+  });
+  it('作品冻结读取未返回时取消也及时结束执行且不联网', async () => {
+    const state = setup(), prepared = await state.prepare();
+    state.store.execute.mockImplementationOnce(async () => new Promise(() => undefined));
+    const pending = expect(state.execute(prepared)).rejects.toThrow(/取消/);
+    await state.commands.execute('cancelBookExtractionAi', { confirmationToken: prepared.confirmationToken });
+    await pending; await state.commands.drain(); expect(state.fetcher).not.toHaveBeenCalled();
+  });
+  it('一百个待审核结果占满缓存时拒绝新请求，明确放弃后释放且不静默淘汰', async () => {
+    const state = setup(); let first!: AiPreparedRequest;
+    for (let index = 0; index < 100; index++) {
+      state.changeRevision(); const prepared = await state.prepare(); if (!index) first = prepared; await state.execute(prepared);
+    }
+    state.changeRevision(); await expect(state.prepare()).rejects.toThrow(/过多/);
+    await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(first))).resolves.toMatchObject({ status: 'ready', result: { rawText: expect.stringContaining('风穿过门缝') } });
+    await state.commands.execute('cancelBookExtractionAi', { confirmationToken: first.confirmationToken });
+    await expect(state.prepare()).resolves.toBeDefined(); expect(state.fetcher).toHaveBeenCalledTimes(100);
+  });
+  it('未配置、错误hash和未确认不发送，重复授权无法绕过已执行请求', async () => {
+    const state = setup(), prepared = await state.prepare(), duplicate = await state.prepare();
+    await expect(state.commands.execute('executeBookExtractionAi', { confirmationToken: prepared.confirmationToken, requestHash: 'wrong', confirmed: true })).rejects.toThrow(/失效/);
+    await expect(state.commands.execute('executeBookExtractionAi', { confirmationToken: prepared.confirmationToken, requestHash: prepared.requestHash, confirmed: false })).rejects.toThrow(/确认/);
+    expect(state.fetcher).not.toHaveBeenCalled(); await state.execute(prepared);
+    await expect(state.execute(duplicate)).rejects.toThrow(/重复/);
+    const unconfigured = setup(); unconfigured.clearCredential(); await expect(unconfigured.prepare()).rejects.toThrow(/配置/);
+  });
+  it('取消未执行授权可重新准备，准备读取过程中预览或配置变化也拒绝', async () => {
+    const state = setup(), prepared = await state.prepare(); await state.commands.execute('cancelBookExtractionAi', { confirmationToken: prepared.confirmationToken });
+    await expect(state.execute(prepared)).rejects.toThrow(/失效/); await expect(state.prepare()).resolves.toBeDefined();
+    for (const change of ['preview', 'provider']) {
+      const other = setup(), original = other.store.execute.getMockImplementation()!;
+      other.store.execute.mockImplementationOnce(async (command, payload) => { if (change === 'preview') other.replacePreview(); else other.changeProvider(); return original(command, payload); });
+      await expect(other.prepare()).rejects.toThrow(/变化|失效/); expect(other.fetcher).not.toHaveBeenCalled();
+    }
+  });
 });
