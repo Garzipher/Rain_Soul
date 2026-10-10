@@ -14,14 +14,15 @@ export class RetrievalEngine {
   constructor(private readonly cache: RetrievalCache, private readonly model: CpuEmbeddingModel,
     private readonly fingerprint: string, private readonly threshold: number) { cache.beginGeneration(fingerprint); }
   invalidateWork(workId: string) { this.cache.invalidateWork(workId); }
-  async index(entries: IndexEntry[]): Promise<void> {
+  async index(entries: IndexEntry[], workIds=[...new Set(entries.map(entry=>entry.workId))]): Promise<void> {
     if (this.closed) throw new Error('本机检索已关闭。');
     this.cache.beginGeneration(this.fingerprint);
+    const tokens=workIds.map(workId=>this.cache.stageWork(workId,entries.filter(entry=>entry.workId===workId).map(({entryId,bodyHash})=>({entryId,bodyHash}))));
     for (const entry of entries) {
       if (this.closed) return;
-      if (this.cache.readWork(entry.workId, [{ entryId: entry.entryId, bodyHash: entry.bodyHash }]).length) continue;
-      this.cache.beginGeneration(this.fingerprint);
-      const token = this.cache.getWorkToken(entry.workId), chunks = chunkKnowledgeText(entry.body, text => this.model.tokenize(text));
+      const token=tokens.find(item=>item.workId===entry.workId)!;
+      if (this.cache.readStaged(token, [{ entryId: entry.entryId, bodyHash: entry.bodyHash }]).length) continue;
+      const chunks = chunkKnowledgeText(entry.body, text => this.model.tokenize(text));
       if (!chunks.length) continue;
       const vectors: Float32Array[] = [];
       for (let offset = 0; offset < chunks.length; offset += 32) {
@@ -30,9 +31,10 @@ export class RetrievalEngine {
         // 每个推理批次让出事件循环，主进程的保存使用独立数据库Worker。
         await new Promise<void>(resolve => setImmediate(resolve));
       }
-      if (!this.closed) this.cache.writeCAS(token, { entryId: entry.entryId, bodyHash: entry.bodyHash,
+      if (!this.closed) this.cache.writeStagedCAS(token, { entryId: entry.entryId, bodyHash: entry.bodyHash,
         chunks: chunks.map((chunk, index) => ({ ...chunk, vector: vectors[index] })) });
     }
+    if(!this.closed)for(const token of tokens)this.cache.activateStage(token);
   }
   async search(request: EngineQuery): Promise<RankedHit[]> {
     if (this.closed) throw new Error('本机检索已关闭。');
