@@ -70,7 +70,7 @@ npm run pack
 
 `npm run verify` 依次执行 TypeScript 检查、ESLint、覆盖率测试、真实 Electron 集成测试和原有 Demo 浏览器测试。`npm test` 的覆盖率与桌面测试均自动前置构建，不需要先手动生成 `dist`。
 
-原有 `tests/browser-setup.test.js` 会访问百度检查网络连通性，因此完整验证需要外网；这项测试的联网需求不代表写作客户端依赖网络。
+`tests/browser-setup.test.js` 通过临时本机 HTTP 服务检查真实 Chrome 连通性及离线阻断，不依赖外部搜索网站。真实云兼容及计费仍使用独立发布矩阵验收，本机检查不能替代它。
 
 | 命令 | 用途 |
 | --- | --- |
