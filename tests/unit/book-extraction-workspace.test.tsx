@@ -15,10 +15,11 @@ function setup(extraSegments = 0) {
   ] };
   for (let index = 0; index < extraSegments; index++) preview.segments.push({ id: crypto.randomUUID(), chapterTitle: '后章', chapterIndex: 2, paragraphIndex: index + 1, text: `后章第${index + 1}段` });
   const aiPrepared = { confirmationToken: crypto.randomUUID(), requestHash: 'a'.repeat(64), expiresAt: Date.now() + 10000, service: '测试云服务', model: '测试模型', scopeLabel: '所选素材', previewText: '原始段落', paragraphIds: [preview.segments[0].id], billingHint: '可能产生费用', estimatedInputTokens: 80, maxOutputTokens: 4096 };
+  const aiResult = { workId: work.id, previewToken: preview.token, requestHash: aiPrepared.requestHash, rawText: '原始回答', suggestions: [{ segmentId: preview.segments[0].id, excerpt: '优美的雨景', categoryId, tagIds: [], technique: '声音与景物结合', usage: '适合夜景', exercise: '用三句话描写雨夜' }] };
   const api: BookExtractionApi & BookExtractionAiApi = {
     prepareBookExtractionAi: vi.fn(async () => aiPrepared),
-    executeBookExtractionAi: vi.fn(async () => ({ workId: work.id, previewToken: preview.token, requestHash: aiPrepared.requestHash, rawText: '原始回答', suggestions: [{ segmentId: preview.segments[0].id, excerpt: '优美的雨景', categoryId, tagIds: [], technique: '声音与景物结合', usage: '适合夜景', exercise: '用三句话描写雨夜' }] })),
-    getBookExtractionAiResult: vi.fn(async () => ({ status: 'missing' as const })), cancelBookExtractionAi: vi.fn(async () => {}),
+    executeBookExtractionAi: vi.fn(async () => aiResult),
+    getBookExtractionAiResult: vi.fn(async () => ({ status: 'ready' as const, result: aiResult })), cancelBookExtractionAi: vi.fn(async () => {}),
     chooseBookExtraction: vi.fn(async () => preview), confirmBookExtraction: vi.fn(async () => ({ ...work, revision: 2 })), cancelBookExtraction: vi.fn(async () => {}) };
   const onClose = vi.fn(), onCommitted = vi.fn(), onDirtyChange = vi.fn();
   render(<BookExtractionWorkspace work={work} api={api} onClose={onClose} onCommitted={onCommitted} onDirtyChange={onDirtyChange} />);
@@ -57,7 +58,7 @@ it('AI分析选择不预选入库，作者采纳后带入摘录与写法，仍�
   expect(screen.getByRole('checkbox', { name: '审核通过段落 1' })).toHaveProperty('checked', false);
   expect(api.confirmBookExtraction).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
-  expect(screen.getByRole('textbox', { name: '摘选内容 1' })).toHaveProperty('value', '原文摘录：\n优美的雨景\n\n写作手法：\n声音与景物结合\n\n适用场景：\n适合夜景\n\n仿写练习：\n用三句话描写雨夜');
+  await waitFor(() => expect(screen.getByRole('textbox', { name: '摘选内容 1' })).toHaveProperty('value', '原文摘录：\n优美的雨景\n\n写作手法：\n声音与景物结合\n\n适用场景：\n适合夜景\n\n仿写练习：\n用三句话描写雨夜'));
   expect(screen.getByRole('button', { name: '确认入库（0）' })).toHaveProperty('disabled', true);
   fireEvent.click(screen.getByRole('checkbox', { name: '审核通过段落 1' }));
   fireEvent.click(screen.getByRole('button', { name: '确认入库（1）' }));
@@ -73,8 +74,19 @@ it('AI建议不会静默覆盖手工编辑，取消替换保留原稿，确认�
   expect(screen.getByRole('textbox', { name: '摘选内容 1' })).toHaveProperty('value', '我的手工学习笔记');
   expect(screen.getByRole('checkbox', { name: '审核通过段落 1' })).toHaveProperty('checked', true);
   fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
+  await screen.findByRole('dialog', { name: '替换本段审核内容？' });
   fireEvent.click(screen.getByRole('button', { name: '替换并重新审核' }));
   await waitFor(() => expect(screen.getByRole('checkbox', { name: '审核通过段落 1' })).toHaveProperty('checked', false));
+});
+it('替换确认期间配置变化，确认按钮重新核对本机结果并保留手工内容', async () => {
+  const { api } = setup(); await generateAiSuggestion();
+  fireEvent.change(screen.getByRole('textbox', { name: '摘选内容 1' }), { target: { value: '手工内容不能丢失' } });
+  fireEvent.click(screen.getByRole('button', { name: '带入审核' })); await screen.findByRole('dialog', { name: '替换本段审核内容？' });
+  const result = await vi.mocked(api.executeBookExtractionAi).mock.results[0].value;
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'ready', result: { ...result, validationError: '模型配置已经变化' } });
+  fireEvent.click(screen.getByRole('button', { name: '替换并重新审核' }));
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveProperty('textContent', expect.stringContaining('模型配置已经变化')));
+  expect(screen.getByRole('textbox', { name: '摘选内容 1' })).toHaveProperty('value', '手工内容不能丢失'); expect(api.confirmBookExtraction).not.toHaveBeenCalled();
 });
 it('失败保留审核并用原操作ID重试；取消退出需确认且不入库', async () => {
   const { api, onClose } = setup(); vi.mocked(api.confirmBookExtraction).mockRejectedValueOnce(new Error('磁盘空间不足'));

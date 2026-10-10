@@ -78,7 +78,7 @@ it('推荐展示写法、场景、练习和分类标签，点击带入审核才�
   for (const text of ['用于紧张场面', '以三句话仿写骤雨', '景物描写', '雨景']) expect(screen.getByText(text)).toBeVisible();
   expect(onUse).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
-  expect(onUse).toHaveBeenCalledWith(result.suggestions[0]);
+  await waitFor(() => expect(onUse).toHaveBeenCalledWith(result.suggestions[0], expect.any(Function)));
   expect(api.executeBookExtractionAi).toHaveBeenCalledTimes(1);
   expect(api.executeBookExtractionAi).toHaveBeenCalledWith(expect.objectContaining({ confirmed: true }));
 });
@@ -125,6 +125,7 @@ it('联网期间可以明确取消，取消后的晚响应不能覆盖旧成功�
   await execute(); await screen.findByText('用声音刻画雨景');
   let resolve!: (value: BookExtractionAiResult) => void;
   vi.mocked(api.executeBookExtractionAi).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'missing' });
   await execute();
   fireEvent.click(screen.getByRole('button', { name: '取消本次 AI 请求' }));
   await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
@@ -136,6 +137,7 @@ it('取消失败保留退出保护，可重试取消并解除', async () => {
   const { api, onBusyChange } = setup();
   vi.mocked(api.cancelBookExtractionAi).mockRejectedValueOnce(new Error('取消回执不明'));
   vi.mocked(api.executeBookExtractionAi).mockRejectedValueOnce(new Error('发送回执不明'));
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'missing' });
   await execute(); await screen.findByRole('button', { name: '核对本机结果' });
   fireEvent.click(screen.getByRole('button', { name: '取消本次 AI 请求' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('取消回执不明'); expect(onBusyChange).toHaveBeenLastCalledWith(true);
@@ -238,7 +240,53 @@ it('更换原文预览后清空选择和推荐，旧发送晚回执不进入新�
 });
 it('授权模态框Tab与ShiftTab保持焦点边界，取消不改变已有分析范围', async () => {
   setup(); const dialog = await prepare(), cancel = within(dialog).getByRole('button', { name: '取消' }), submit = within(dialog).getByRole('button', { name: '确认发送' });
-  expect(cancel).toHaveFocus(); fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true }); expect(submit).toHaveFocus();
-  fireEvent.keyDown(dialog, { key: 'Tab' }); expect(cancel).toHaveFocus(); fireEvent.click(cancel);
+  const summary = within(dialog).getByText('完整发送内容', { selector: 'summary' });
+  expect(cancel).toHaveFocus(); expect(within(dialog).getByLabelText('完整发送内容')).toHaveAttribute('tabindex', '0');
+  summary.focus(); fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true }); expect(submit).toHaveFocus();
+  fireEvent.keyDown(dialog, { key: 'Tab' }); expect(summary).toHaveFocus(); fireEvent.click(cancel);
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); expect(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })).toBeChecked();
+});
+it.each(['版本变化', '配置变化', '预览变化'])('采纳前本机核对发现%s时保留原始回答并禁止带入，不重新联网', async reason => {
+  const { api, result, onUse } = setup(); await execute(); await screen.findByText('用声音刻画雨景');
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'ready', result: { ...result, validationError: reason } });
+  fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(reason); expect(onUse).not.toHaveBeenCalled();
+  expect(screen.getByText(result.rawText)).toBeVisible(); expect(screen.getByRole('button', { name: '带入审核' })).toBeDisabled();
+  expect(api.executeBookExtractionAi).toHaveBeenCalledTimes(1);
+});
+it.each(['running', 'missing'] as const)('采纳前本机结果为%s时不能带入，保留旧回答供核对', async status => {
+  const { api, result, onUse } = setup(); await execute(); await screen.findByText('用声音刻画雨景');
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status }); fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('本机'); expect(onUse).not.toHaveBeenCalled(); expect(screen.getByText(result.rawText)).toBeVisible();
+});
+it('采纳核对使用冻结身份，期间保护编辑退出且只能调用一次本机核对', async () => {
+  const { api, result, onUse, onBusyChange } = setup(); await execute(); await screen.findByText('用声音刻画雨景');
+  let resolve!: (value: { status: 'ready'; result: BookExtractionAiResult }) => void;
+  vi.mocked(api.getBookExtractionAiResult).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  fireEvent.click(screen.getByRole('button', { name: '带入审核' })); fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
+  expect(onBusyChange).toHaveBeenLastCalledWith(true); expect(onUse).not.toHaveBeenCalled();
+  await act(async () => resolve({ status: 'ready', result }));
+  expect(onUse).toHaveBeenCalledTimes(1); expect(api.getBookExtractionAiResult).toHaveBeenCalledWith({ workId: result.workId, previewToken: result.previewToken, requestHash: result.requestHash });
+  expect(onBusyChange).toHaveBeenLastCalledWith(false); expect(api.executeBookExtractionAi).toHaveBeenCalledTimes(1);
+});
+it.each(['摘录', '建议身份'])('采纳本机回执的%s与点击候选不一致时拒绝带入', async kind => {
+  const { api, result, onUse } = setup(); await execute(); await screen.findByText('用声音刻画雨景');
+  const changed = { ...result, ...(kind === '摘录' ? { suggestions: [{ ...result.suggestions[0], excerpt: '另一份推荐' }] } : { requestHash: 'f'.repeat(64) }) };
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'ready', result: changed });
+  fireEvent.click(screen.getByRole('button', { name: '带入审核' })); expect(await screen.findByRole('alert')).toHaveTextContent('不匹配'); expect(onUse).not.toHaveBeenCalled();
+});
+it('采纳核对失败或核对期间撤销许可都不能回调审核', async () => {
+  const context = setup(), { api, result, view, onUse } = context; await execute(); await screen.findByText('用声音刻画雨景');
+  vi.mocked(api.getBookExtractionAiResult).mockRejectedValueOnce(new Error('本机核对失败'));
+  fireEvent.click(screen.getByRole('button', { name: '带入审核' })); expect(await screen.findByRole('alert')).toHaveTextContent('本机核对失败'); expect(onUse).not.toHaveBeenCalled();
+  let resolve!: (value: { status: 'ready'; result: BookExtractionAiResult }) => void;
+  vi.mocked(api.getBookExtractionAiResult).mockReturnValueOnce(new Promise(done => { resolve = done; })); fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
+  view.rerender(<BookExtractionAiPanel {...context} permission={false} />); await act(async () => resolve({ status: 'ready', result })); expect(onUse).not.toHaveBeenCalled();
+});
+it('取消回执返回但本机仍running时继续保护，待missing核对才解除', async () => {
+  const { api, onBusyChange } = setup(); vi.mocked(api.executeBookExtractionAi).mockRejectedValueOnce(new Error('发送回执丢失'));
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'running' }).mockResolvedValueOnce({ status: 'missing' });
+  await execute(); await screen.findByRole('button', { name: '核对本机结果' }); fireEvent.click(screen.getByRole('button', { name: '取消本次 AI 请求' }));
+  await waitFor(() => expect(api.getBookExtractionAiResult).toHaveBeenCalledTimes(1)); expect(onBusyChange).toHaveBeenLastCalledWith(true);
+  fireEvent.click(screen.getByRole('button', { name: '核对本机结果' })); await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
 });
