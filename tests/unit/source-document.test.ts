@@ -24,6 +24,11 @@ describe('冻结来源协议', () => {
     expect(freezeSource({ ...input(), segments: [{ text: 'ab' }, { text: 'c' }] }).bodyHash)
       .not.toBe(freezeSource({ ...input(), segments: [{ text: 'a' }, { text: 'bc' }] }).bodyHash);
   });
+  it('保存原章序与段号，拒绝缺失半个坐标及非正整数', () => {
+    expect(freezeSource({ ...input(), segments: [{ text: '章内原文', chapterIndex: 2, paragraphIndex: 1 }] }).segments[0]).toMatchObject({ chapterIndex: 2, paragraphIndex: 1 });
+    for (const coordinates of [{ chapterIndex: 2 }, { paragraphIndex: 1 }, { chapterIndex: 0, paragraphIndex: 1 }, { chapterIndex: 2, paragraphIndex: 1.5 }])
+      expect(() => freezeSource({ ...input(), segments: [{ text: '原文', ...coordinates }] })).toThrow();
+  });
   it('允许四种来源，网页保留完整原始元信息', () => {
     for (const kind of ['txt', 'docx', 'paste'] as const) expect(freezeSource({ ...input(), kind }).kind).toBe(kind);
     const source = freezeSource({ ...input(), kind: 'web', originalUrl: 'https://example.com/article', finalUrl: 'https://example.org/final', fetchedAt: '2026-10-10T01:00:00.000Z' });

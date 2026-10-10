@@ -19,7 +19,8 @@ export const sourceSegmentSchema = z.object({
   id: z.uuid(), ordinal: z.number().int().positive(), chapterTitle: boundedText(200),
   text: boundedText(200000).refine(value => value.trim().length > 0 && !value.includes('\r'), '段落必须非空且换行已规范'),
   textHash: hash,
-}).strict();
+  chapterIndex: z.number().int().positive().optional(), paragraphIndex: z.number().int().positive().optional(),
+}).strict().refine(segment => (segment.chapterIndex === undefined) === (segment.paragraphIndex === undefined), '原文坐标必须成对提供');
 export type SourceSegment = z.infer<typeof sourceSegmentSchema>;
 
 export const frozenSourceDocumentSchema = z.object({
@@ -44,6 +45,6 @@ export type FrozenSourceDocument = z.infer<typeof frozenSourceDocumentSchema>;
 /** 仅由主进程从可信提取结果构造，渲染层不能替换原始字节或正文。 */
 export interface SourceInput {
   kind: FrozenSourceDocument['kind']; rawBytes: Uint8Array; title: string;
-  segments: { text: string; chapterTitle?: string }[];
+  segments: { text: string; chapterTitle?: string; chapterIndex?: number; paragraphIndex?: number }[];
   originalUrl?: string | null; finalUrl?: string | null; fetchedAt?: string | null;
 }

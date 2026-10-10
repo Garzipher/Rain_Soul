@@ -13,8 +13,12 @@ const pasteRequest = z.object({ workId: z.uuid(), title: z.string().trim().min(1
 export interface WebExtractionDependencies { fetch: typeof fetchPublicArticle; parse: typeof parseWebArticle }
 
 export function sourcePreview(workId: string, source: FrozenSourceDocument): BookExtractionPreview {
+  const missingLocations = source.kind === 'txt' || source.kind === 'docx' ? source.segments.filter(segment => segment.chapterIndex === undefined).length : 0;
   return { token: randomUUID(), workId, filename: source.title, fileHash: source.rawHash, format: source.kind,
-    source, warnings: [], segments: source.segments.map(segment => ({ id: segment.id, chapterTitle: segment.chapterTitle || source.title, chapterIndex: 1, paragraphIndex: segment.ordinal, text: segment.text })) };
+    source, warnings: missingLocations ? [{ code: 'source-location-unknown', message: '旧素材未保存章内坐标，章序未知；段号仅表示原文顺序。', count: missingLocations }] : [],
+    segments: source.segments.map(segment => ({ id: segment.id, chapterTitle: segment.chapterTitle || source.title,
+      chapterIndex: segment.chapterIndex ?? (missingLocations ? 0 : 1), paragraphIndex: segment.paragraphIndex ?? segment.ordinal, text: segment.text,
+      ...(missingLocations && segment.chapterIndex === undefined ? { locationUnknown: true } : {}) })) };
 }
 
 /** 网络与解析不进入文件串行队列；切换来源会立即取消旧任务。 */

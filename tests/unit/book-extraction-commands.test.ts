@@ -7,6 +7,8 @@ import { ExtractionDraftCoordinator } from '../../src/main/extraction-draft-coor
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { sourcePreview } from '../../src/main/web-extraction-commands';
+import { freezeSource } from '../../src/main/freeze-source';
 
 function setup() {
   const workId = crypto.randomUUID();
@@ -52,6 +54,25 @@ it('生产拆书预览重启后恢复，正文与学习注释分别入库，保�
     await restarted.execute('discardExtractionDraft', { workId, token: preview.token });
     expect(await drafts.readExtractionDraft(workId)).toBeNull();
     expect(() => restarted.getPreview(workId, preview.token)).toThrow();
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+it('多章素材重启保留原章序与章内段号，旧草稿明确降级而不伪造位置', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rainsoul-source-position-'));
+  try {
+    const { workId, store, files } = setup();
+    files.choose.mockResolvedValueOnce({ name: '多章.txt', bytes: Buffer.from('第一章 开篇\n第一段。\n第二段。\n第二章 重逢\n重逢第一段。') });
+    const drafts = new ExtractionDraftStore(root);
+    const commands = new BookExtractionCommands(store, files, undefined, new ExtractionDraftCoordinator(drafts, store));
+    const preview = await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' }) as BookExtractionPreview;
+    const restarted = new BookExtractionCommands(store, files, undefined, new ExtractionDraftCoordinator(drafts, store));
+    const recovered = await restarted.execute('readExtractionDraft', { workId }) as { preview: BookExtractionPreview };
+    expect(recovered.preview.segments).toEqual(preview.segments);
+    await restarted.execute('confirmBookExtraction', { workId, token: preview.token, expectedRevision: 1, operationId: crypto.randomUUID(), sourceTitle: '多章作品', sourceAuthor: '', permissionConfirmed: true,
+      items: [{ segmentId: preview.segments[2].id, body: '重逢第一段。', categoryId: crypto.randomUUID(), tagIds: [] }] });
+    expect(store.execute).toHaveBeenLastCalledWith('importBookExtraction', expect.objectContaining({ items: [expect.objectContaining({ source: expect.stringContaining('第2章 第二章 重逢 第1段') })] }));
+    const legacy = sourcePreview(workId, freezeSource({ kind: 'txt', title: '旧草稿', rawBytes: Buffer.from('旧'), segments: [{ chapterTitle: '第二章', text: '旧原文' }] }));
+    expect(legacy.warnings).toContainEqual(expect.objectContaining({ code: 'source-location-unknown' }));
+    expect(legacy.segments[0]).toMatchObject({ locationUnknown: true, chapterIndex: 0, paragraphIndex: 1 });
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 it('取消使预览失效；文件替换使旧token失效；失败同请求可以重试', async () => {

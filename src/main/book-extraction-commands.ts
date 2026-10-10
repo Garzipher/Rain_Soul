@@ -93,7 +93,7 @@ export class BookExtractionCommands {
         }))).filter(segment => segment.text.trim());
         if (!segments.length) throw new Error('文件没有可摘选的正文段落。');
         const source = freezeSource({ kind: draft.format, title: options.title, rawBytes: file.bytes,
-          segments: segments.map(segment => ({ text: segment.text, chapterTitle: segment.chapterTitle })) });
+          segments: segments.map(segment => ({ text: segment.text, chapterTitle: segment.chapterTitle, chapterIndex: segment.chapterIndex, paragraphIndex: segment.paragraphIndex })) });
         const frozenSegments = segments.map((segment, index) => ({ ...segment, id: source.segments[index].id, text: source.segments[index].text }));
         this.preview = { token: randomUUID(), workId, filename, fileHash: source.rawHash, format: draft.format, warnings: draft.warnings, segments: frozenSegments, source };
         const preview = this.preview;
@@ -107,7 +107,8 @@ export class BookExtractionCommands {
         const segment = preview.segments.find(value => value.id === item.segmentId);
         if (!segment) throw new Error('摘选段落已失效，不能写入知识库。');
         const web = preview.source?.kind === 'web' ? `；原始网址：${preview.source.originalUrl}；最终网址：${preview.source.finalUrl}；获取时间：${preview.source.fetchedAt}` : '';
-        const source = `《${request.sourceTitle}》${request.sourceAuthor ? `／作者：${request.sourceAuthor}` : ''}；${preview.filename}；第${segment.chapterIndex}章 ${segment.chapterTitle} 第${segment.paragraphIndex}段；文件 SHA-256：${preview.fileHash}；段落 SHA-256：${createHash('sha256').update(segment.text).digest('hex')}${web}`;
+        const location = segment.locationUnknown ? `${segment.chapterTitle}（章序未知） 原文第${segment.paragraphIndex}段` : `第${segment.chapterIndex}章 ${segment.chapterTitle} 第${segment.paragraphIndex}段`;
+        const source = `《${request.sourceTitle}》${request.sourceAuthor ? `／作者：${request.sourceAuthor}` : ''}；${preview.filename}；${location}；文件 SHA-256：${preview.fileHash}；段落 SHA-256：${createHash('sha256').update(segment.text).digest('hex')}${web}`;
         return { body: item.body, categoryId: item.categoryId, tagIds: item.tagIds, source, segmentId: item.segmentId, ...(item.annotation ? { annotation: item.annotation } : {}) };
       });
       const commit = { workId: request.workId, expectedRevision: request.expectedRevision, operationId: request.operationId, sourceDocument: preview.source, items };

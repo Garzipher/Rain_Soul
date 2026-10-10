@@ -6,7 +6,7 @@ import { frozenSourceDocumentSchema } from './source-document';
 import { learningAnnotationPayloadSchema } from './source-assets';
 import type { ExtractionDraft, ExtractionDraftRecovery, ExtractionReviewRequest } from './extraction-draft';
 
-export interface BookExtractionSegment { id: string; chapterTitle: string; chapterIndex: number; paragraphIndex: number; text: string }
+export interface BookExtractionSegment { id: string; chapterTitle: string; chapterIndex: number; paragraphIndex: number; text: string; locationUnknown?: boolean }
 export interface BookExtractionPreview {
   token: string; workId: string; filename: string; fileHash: string; format: 'txt' | 'docx' | 'web' | 'paste';
   warnings: ManuscriptWarning[]; segments: BookExtractionSegment[];

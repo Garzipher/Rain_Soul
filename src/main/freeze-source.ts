@@ -16,6 +16,7 @@ export function freezeSource(input: SourceInput): FrozenSourceDocument {
     segments: paragraphs.map((segment, index) => ({
       id: randomUUID(), ordinal: index + 1, chapterTitle: segment.chapterTitle ?? '',
       text: segment.text, textHash: sha256(segment.text),
+      ...(segment.chapterIndex === undefined && segment.paragraphIndex === undefined ? {} : { chapterIndex: segment.chapterIndex, paragraphIndex: segment.paragraphIndex }),
     })),
   });
 }
