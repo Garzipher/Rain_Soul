@@ -54,6 +54,11 @@
       { "key": "continuation/15", "title": "需求会话的存储与逐次云授权", "file": "08-持续学习与后续P0/15-需求会话的存储与逐次云授权.md" },
       { "key": "continuation/16", "title": "本地拆书的出处冻结与批量事务", "file": "08-持续学习与后续P0/16-本地拆书的出处冻结与批量事务.md" },
       { "key": "continuation/17", "title": "AI辅助拆书的授权与学习建议", "file": "08-持续学习与后续P0/17-AI辅助拆书的授权与学习建议.md" }
+    ] },
+    { "key": "source-intelligence", "title": "第九卷 来源与本机检索", "chapters": [
+      { "key": "source-intelligence/01", "title": "公开网页到冻结来源", "file": "09-来源与本机检索/01-公开网页到冻结来源.md" },
+      { "key": "source-intelligence/02", "title": "草稿回执与跨作品证据", "file": "09-来源与本机检索/02-草稿回执与跨作品证据.md" },
+      { "key": "source-intelligence/03", "title": "本机向量与混合检索", "file": "09-来源与本机检索/03-本机向量与混合检索.md" }
     ] }
   ]
 }
