@@ -7,7 +7,8 @@ const { promisify } = require('node:util');
 const { seedSearchProject, expectedResults, queries } = require('../fixtures/search-performance.cjs');
 const { activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup, createWork } = require('./structure-helper.cjs');
 
-test.setTimeout(300000);
+// 总预算包含种库、400次准备/正式输入和200次真实渲染；单次P95门槛仍为1秒。
+test.setTimeout(900000);
 const runFile = promisify(execFile);
 async function machineEnvironment() {
   const environment = { platform: os.platform(), release: os.release(), osVersion: os.version(), cpuModel: os.cpus()[0]?.model,
@@ -25,9 +26,9 @@ async function machineEnvironment() {
 }
 
 /** input 事件开始；真实搜索状态结束且正确结果已渲染后跨两帧完成。没有替换 IPC 或查询实现。 */
-async function measureInput(page, text, expected) {
-  const sortedExpected = { ...expected, knowledge: [...expected.knowledge].sort((left, right) => left.source.localeCompare(right.source)) };
-  await page.evaluate(expected => {
+async function measureInput(page, text, expected, mode) {
+  const sortedExpected = { ...expected, knowledge: (mode === 'knowledge' ? expected.knowledge.slice(0, 20) : [...expected.knowledge]).sort((left, right) => left.source.localeCompare(right.source)) };
+  await page.evaluate(({ expected, total }) => {
     const input = document.querySelector('input[aria-label="模糊搜索知识与正文"]');
     const workspace = document.querySelector('.knowledge-workspace');
     window.__searchMeasurement = new Promise((resolve, reject) => {
@@ -38,7 +39,8 @@ async function measureInput(page, text, expected) {
         paragraphs: [...workspace.querySelectorAll('.knowledge-paragraph-result')].map(card => ({ title: card.querySelector('button').textContent, snippet: card.querySelector('p').textContent })),
       });
       const searching = () => [...workspace.querySelectorAll('[role="status"]')].some(node => node.textContent === '正在搜索本机内容…');
-      const isComplete = () => start !== undefined && sawMutation && !searching() && JSON.stringify(rendered()) === JSON.stringify(expected);
+      const isComplete = () => start !== undefined && sawMutation && !searching() && JSON.stringify(rendered()) === JSON.stringify(expected)
+        && (total === null || workspace.querySelector('.knowledge-pagination span')?.textContent === `第 1 页 · 共 ${total} 条`);
       const observer = new MutationObserver(records => {
         if (start === undefined || finished) return;
         sawMutation = true;
@@ -61,7 +63,7 @@ async function measureInput(page, text, expected) {
         }, 20000);
       }, { once: true, capture: true });
     });
-  }, sortedExpected);
+  }, { expected: sortedExpected, total: mode === 'knowledge' ? expected.knowledge.length : null });
   await page.getByRole('searchbox', { name: '模糊搜索知识与正文', exact: true }).fill(text);
   return page.evaluate(() => window.__searchMeasurement);
 }
@@ -109,8 +111,8 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
       }
       // 唯一出处稳定命中一条，确保正式查询的空结果也必须发生真实DOM变化，不能沿用旧空结果。
       reset++;
-      await measureInput(page, '性能夹具参考0000', expectedResults(fixture, { ...query, text: '性能夹具参考0000' }));
-      return { queryIndex: index, text: query.text, mode: query.mode, tags: query.tags, ...await measureInput(page, query.text, expected[index]) };
+      await measureInput(page, '性能夹具参考0000', expectedResults(fixture, { ...query, text: '性能夹具参考0000' }), query.mode);
+      return { queryIndex: index, text: query.text, mode: query.mode, tags: query.tags, ...await measureInput(page, query.text, expected[index], query.mode) };
     }
     for (let index = 0; index < queries.length; index++) warmups.push(await sample(index));
     console.log(`预热20查询完成；耗时范围 ${Math.min(...warmups.map(item => item.durationMs)).toFixed(2)}–${Math.max(...warmups.map(item => item.durationMs)).toFixed(2)}ms。`);
@@ -118,6 +120,17 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
       for (let index = 0; index < queries.length; index++) samples.push({ round, ...await sample(index) });
       console.log(`真实性能样本已完成 ${samples.length}/200。`);
     }
+    // 分页改变的是首屏数量，性能门槛不变；另独立核对第二页没有遗漏或重复。
+    const paginatedIndex = queries.findIndex((query, index) => query.mode === 'knowledge' && expected[index].knowledge.length > 20);
+    expect(paginatedIndex).toBeGreaterThanOrEqual(0);
+    await sample(paginatedIndex);
+    await activate(page.getByRole('button', { name: '下一页检索结果', exact: true }));
+    const secondPage = expected[paginatedIndex].knowledge.slice(20, 40).sort((left, right) => left.source.localeCompare(right.source));
+    await expect.poll(() => page.locator('.knowledge-entry').evaluateAll(cards => cards.map(card => ({
+      body: card.querySelector('.knowledge-snippet').textContent,
+      source: card.querySelector('.knowledge-source span:last-of-type').textContent,
+    })).sort((left, right) => left.source.localeCompare(right.source)))).toEqual(secondPage);
+    await expect(page.getByRole('navigation', { name: '检索结果分页', exact: true })).toContainText(`第 2 页 · 共 ${expected[paginatedIndex].knowledge.length} 条`);
     const sorted = samples.map(sample => sample.durationMs).sort((left, right) => left - right);
     const rank = Math.ceil(0.95 * sorted.length), p95Ms = sorted[rank - 1];
     const report = { measuredAt: new Date().toISOString(), environment,

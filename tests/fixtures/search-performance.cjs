@@ -89,7 +89,8 @@ function expectedResults(fixture, query) {
   const matched = fixture.rows.filter(row => (query.mode === 'all' || row.kind === 'knowledge')
     && normalize(`${row.body}\n${row.source}\n${row.tagNames.join('\n')}`).includes(text)
     && (row.kind === 'paragraph' || query.tags.every(tag => row.tagNames.includes(tag))))
-    .sort((left, right) => left.kind.localeCompare(right.kind, 'en') || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)).slice(0, 200);
+    .sort((left, right) => left.kind.localeCompare(right.kind, 'en') || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
+    .slice(0, query.mode === 'knowledge' ? undefined : 200);
   return { knowledge: matched.filter(row => row.kind === 'knowledge').map(row => ({ body: row.body, source: row.source })),
     paragraphs: matched.filter(row => row.kind === 'paragraph').map(row => {
       const start = Math.max(0, normalize(row.body).indexOf(text) - 40);

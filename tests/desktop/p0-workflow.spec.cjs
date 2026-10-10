@@ -259,6 +259,8 @@ test('云端设置与发送范围预览可离线取消且不修改原稿', async
     const before = await currentWork(page, 'AI授权演练');
     await activate(page.getByRole('button', { name: 'AI 工具', exact: true }));
     await page.getByText('知识参考 · 作者选用', { exact: true }).press('Enter');
+    await page.getByRole('textbox', { name: '本机参考查询', exact: true }).fill('雨落');
+    await activate(page.getByRole('button', { name: '查找写作参考', exact: true }));
     await page.getByRole('checkbox', { name: '雨落在旧车站，路灯把人影拉长。', exact: true }).check();
     await activate(page.getByRole('button', { name: '预览 AI 请求', exact: true }));
     const confirmation = page.getByRole('dialog', { name: '确认云端 AI 操作', exact: true });
