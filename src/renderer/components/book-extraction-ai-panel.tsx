@@ -11,6 +11,7 @@ export interface BookExtractionAiPanelProps {
   work: WorkDetail; preview: BookExtractionPreview; api: BookExtractionAiApi; permission: boolean; disabled?: boolean;
   onUse: (suggestion: BookExtractionAiSuggestion, revalidate: () => Promise<boolean>) => void; onBusyChange: (busy: boolean) => void;
 }
+const suggestionEvidence = (item: BookExtractionAiSuggestion | undefined) => item && JSON.stringify([item.segmentId, item.excerpt, item.categoryId, item.tagIds, item.technique, item.usage, item.exercise]);
 export function BookExtractionAiPanel(props: BookExtractionAiPanelProps) {
   return <BookExtractionAiPanelContent key={`${props.work.id}:${props.preview.token}`} {...props} />;
 }
@@ -115,7 +116,7 @@ function BookExtractionAiPanelContent({ work, preview, api, permission, disabled
         invalid = '本机结果尚未完成或已被放弃，不能带入审核。';
         if (state.status === 'running') { active.current = requests.current.get(source.requestHash) ?? null; keepLocked = true; changeStatus('unknown'); }
       }
-      else if (state.result.workId !== source.workId || state.result.previewToken !== source.previewToken || state.result.requestHash !== source.requestHash || JSON.stringify(state.result.suggestions.find(suggestion => suggestion.segmentId === item.segmentId)) !== JSON.stringify(item)) invalid = '本机推荐回执与所选建议不匹配，不能带入审核。';
+      else if (state.result.workId !== source.workId || state.result.previewToken !== source.previewToken || state.result.requestHash !== source.requestHash || suggestionEvidence(state.result.suggestions.find(suggestion => suggestion.segmentId === item.segmentId)) !== suggestionEvidence(item)) invalid = '本机推荐回执与所选建议不匹配，不能带入审核。';
       else invalid = state.result.validationError ?? '';
       if (invalid) { const blocked = { ...source, validationError: invalid }; setResult(blocked); setRawResult(blocked); return false; }
       return !manualLock.current && allowed.current;

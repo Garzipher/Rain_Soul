@@ -82,6 +82,19 @@ it('推荐展示写法、场景、练习和分类标签，点击带入审核才�
   expect(api.executeBookExtractionAi).toHaveBeenCalledTimes(1);
   expect(api.executeBookExtractionAi).toHaveBeenCalledWith(expect.objectContaining({ confirmed: true }));
 });
+it('持久化规范字段顺序不同但证据相同的推荐允许带入，修改内容仍拒绝', async () => {
+  const { api, result, onUse } = setup();
+  const item = result.suggestions[0];
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'ready', result: { ...result, suggestions: [{ technique: item.technique, usage: item.usage, exercise: item.exercise, segmentId: item.segmentId, excerpt: item.excerpt, categoryId: item.categoryId, tagIds: item.tagIds }] } });
+  await execute(); await screen.findByRole('button', { name: '带入审核' });
+  fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
+  await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, expect.any(Function)));
+  onUse.mockClear();
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'ready', result: { ...result, suggestions: [{ ...item, exercise: '被替换的练习' }] } });
+  fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('不匹配');
+  expect(onUse).not.toHaveBeenCalled();
+});
 it('结构校验失败只展示可复制纯文本，含脚本字符串也不能带入审核', async () => {
   const { api, result, onUse } = setup();
   const rawText = '<script>window.bad = true</script>模型原始响应';
