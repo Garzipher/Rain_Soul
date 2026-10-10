@@ -103,9 +103,12 @@ test('P1本地拆书默认零选择，取消不写库，两段审核真实入库
     await expect(page.getByRole('button', { name: '确认入库（0）', exact: true })).toBeDisabled();
     await expect(page.getByRole('checkbox', { name: '审核通过段落 1', exact: true })).not.toBeChecked();
     await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
-    await activate(page.getByRole('dialog', { name: '放弃本次摘选？', exact: true }).getByRole('button', { name: '放弃摘选并返回', exact: true }));
+    await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true }));
     expect((await page.evaluate(id => window.rainSoul.openWork(id), id)).assets.knowledge).toHaveLength(0);
     await activate(page.getByRole('button', { name: '拆书工具', exact: true }));
+    await expect(page.getByRole('textbox', { name: '摘选内容 1', exact: true })).toHaveValue('细雨落在窗上，灯光被揉成柔软的金色。');
+    await activate(page.getByRole('button', { name: '更换素材', exact: true }));
+    await activate(page.getByRole('button', { name: '放弃草稿并更换', exact: true }));
     await activate(page.getByRole('button', { name: '选择 TXT / DOCX', exact: true }));
     await page.getByRole('textbox', { name: '来源作品名', exact: true }).fill('雨夜练习原作');
     await page.getByRole('textbox', { name: '来源作者', exact: true }).fill('合成测试作者');
@@ -116,6 +119,9 @@ test('P1本地拆书默认零选择，取消不写库，两段审核真实入库
     await page.getByRole('checkbox', { name: '确认有权使用摘选内容', exact: true }).check();
     await capture(page, 'p1-book-extraction-review');
     await activate(page.getByRole('button', { name: '确认入库（2）', exact: true }));
+    await expect(page.getByRole('checkbox', { name: '审核通过段落 1', exact: true })).toBeDisabled();
+    await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
+    await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true }));
     await expect(page.getByRole('article', { name: /^知识：/ })).toHaveCount(2);
     const first = page.getByRole('article', { name: /^知识：细雨落在窗上/ });
     await activate(first.getByRole('button', { name: /^展开知识：/ }));
