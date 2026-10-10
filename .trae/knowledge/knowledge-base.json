@@ -3,13 +3,13 @@
   "name": "Compound Engineering Knowledge Base",
   "description": "知识复利层 - 结构化沉淀开发经验，避免重复造轮子",
   "created_at": "2026-09-28",
-  "last_updated": "2026-10-09",
+  "last_updated": "2026-10-10",
   "stats": {
-    "total_entries": 64,
+    "total_entries": 65,
     "categories": {
       "architecture-patterns": 6,
       "best-practices": 11,
-      "bug-patterns": 5,
+      "bug-patterns": 6,
       "design-patterns": 36,
       "integration-solutions": 3,
       "performance-optimizations": 3
@@ -1484,6 +1484,28 @@
         "云端回复持久化",
         "写后刷新",
         "未知回执"
+      ]
+    },
+    {
+      "id": "rainsoul-ai-adoption-validation",
+      "title": "AI候选采纳的后验与解码边界",
+      "path": ".trae/knowledge/AI候选采纳的后验与解码边界.md",
+      "category": "bug-patterns",
+      "summary": "候选采纳和替换确认都后验；取消核对running；主进程检查JSON解码凭据并保障键盘授权审阅。",
+      "tags": [
+        "AI候选",
+        "授权",
+        "取消",
+        "JSON",
+        "可访问性"
+      ],
+      "date": "2026-10-10",
+      "source": "project-local",
+      "severity": "high",
+      "applies_when": [
+        "候选人工采纳",
+        "云请求取消",
+        "结构化模型回复"
       ]
     }
   ]
