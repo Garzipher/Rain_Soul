@@ -30,7 +30,19 @@ it('接收结果后再次核对作品修订和正文哈希，过期回执不交�
   const { commands, client, query, change } = setup(true);
   client.search.mockImplementationOnce(async () => { change(); return []; });
   await expect(commands.execute('queryKnowledge', query)).rejects.toThrow(/变化/);
-  expect(client.invalidateWork).toHaveBeenCalledWith(query.workId);
+  expect(client.invalidateWork).not.toHaveBeenCalled();
+});
+it('正文revision变化不重算知识向量，条目hash变化只调度增量新代',async()=>{
+  const {commands,client,query,change,knowledge}=setup(true);
+  await commands.execute('queryKnowledge',query);change();
+  await commands.execute('queryKnowledge',{...query,queryId:randomUUID()});expect(client.index).toHaveBeenCalledTimes(1);
+  knowledge.body='风吹过窗台';await commands.execute('queryKnowledge',{...query,queryId:randomUUID()});
+  expect(client.index).toHaveBeenCalledTimes(2);expect(client.invalidateWork).not.toHaveBeenCalled();
+});
+it('作者主动重建不先删除旧完整索引，重启首次查询交给Worker复用持久hash块',async()=>{
+  const {commands,client,query}=setup(true);
+  await commands.execute('rebuildKnowledgeIndex',{workId:query.workId});
+  expect(client.invalidateWork).not.toHaveBeenCalled();expect(client.index).toHaveBeenCalledTimes(1);
 });
 it('模型失败明确回退、分页保持来源，并拒绝取消后迟到结果', async () => {
   const { commands, client, query } = setup(true);

@@ -31,7 +31,8 @@ parentPort?.on('message', async (input: unknown) => {
       if (message.command === 'invalidate') engine.invalidateWork(message.payload as string);
       else if (message.command === 'search') data = await scheduler!.withQuery(id, () => engine!.search(message.payload as EngineQuery));
       else if (message.command === 'index') {
-        const operation = indexes.catch(() => {}).then(() => engine!.index(message.payload as IndexEntry[])); indexes = operation; await operation;
+        const request=message.payload as {entries:IndexEntry[];workIds:string[]};
+        const operation = indexes.catch(() => {}).then(() => engine!.index(request.entries,request.workIds)); indexes = operation; await operation;
       } else throw new Error('未知本机检索命令。');
     }
     parentPort!.postMessage({ id, ok: true, data });

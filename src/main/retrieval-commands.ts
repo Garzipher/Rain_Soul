@@ -14,7 +14,7 @@ interface Models {
 }
 interface Client {
   search(request: EngineQuery, directory: string, queryId: string): Promise<RetrievalHit[]>;
-  index(entries: IndexEntry[], directory: string): Promise<void>; close(): void;
+  index(entries: IndexEntry[], directory: string, workIds?:string[]): Promise<void>; close(): void;
   invalidateWork(workId: string): void; isIndexing(): boolean; cancel(queryId: string): void;
 }
 /** 只从可信作品库取正文，渲染层不能指定模型目录、向量或条目原文。 */
@@ -50,10 +50,10 @@ export class RetrievalCommands {
       const { workId } = z.object({ workId: z.uuid().nullable() }).strict().parse(value);
       const status = await this.models.getStatus();
       if (!status.qualified || status.state !== 'ready') throw new Error('本机模型尚未就绪，请使用关键词检索。');
-      const { entries } = await this.snapshot(workId), directory = await this.models.getActiveDirectory();
+      const { entries,workIds } = await this.snapshot(workId), directory = await this.models.getActiveDirectory();
       if (!directory) throw new Error('本机模型校验失败。');
-      for (const id of new Set(entries.map(entry => entry.workId))) { this.client.invalidateWork(id); this.indexed.delete(id); }
-      await this.client.index(entries, directory); return;
+      for (const id of workIds) this.indexed.delete(id);
+      await this.client.index(entries, directory,workIds); return;
     }
     throw new Error('未知检索命令。');
   }
@@ -79,8 +79,9 @@ export class RetrievalCommands {
     });
     const works = await this.store.execute('listWorks', {}) as WorkSummary[];
     const revisions = Object.fromEntries(Object.values(scope.entryOwners).map(owner => [owner.workId, owner.sourceRevision]));
+    const workIds=works.filter(work=>workId===null || work.id===workId).map(work=>work.id);
     const ledger = JSON.stringify(works.filter(work => workId === null || work.id === workId));
-    return { entries, scope, revisions, ledger };
+    return { entries, scope, revisions, ledger,workIds };
   }
   private async query(request: RetrievalQuery): Promise<RetrievalReply> {
     if (this.queries.has(request.queryId) || this.queries.size >= 100) throw new Error('检索请求重复或过多。');
@@ -107,11 +108,12 @@ export class RetrievalCommands {
         current();
         if (!directory) { status = 'fallback'; message = model.qualified ? '本机模型未就绪，当前显示关键词结果。' : '模型资格核验尚未完成，当前显示关键词结果。'; }
         else try {
-          for (const [workId, revision] of Object.entries(frozen.revisions)) {
-            const key = `${revision}/${model.fingerprint}`;
+          for (const workId of frozen.workIds) {
+            const entries=frozen.entries.filter(entry=>entry.workId===workId);
+            const key = `${model.fingerprint}/${JSON.stringify(entries.map(({entryId,bodyHash})=>[entryId,bodyHash]).sort((a,b)=>a[0].localeCompare(b[0])))}`;
             if (this.indexed.get(workId) !== key) {
-              this.client.invalidateWork(workId); this.indexed.set(workId, key);
-              void this.client.index(frozen.entries.filter(entry => entry.workId === workId), directory).catch(() => this.indexed.delete(workId));
+              this.indexed.set(workId, key);
+              void this.client.index(entries, directory,[workId]).catch(() => {if(this.indexed.get(workId)===key)this.indexed.delete(workId);});
             }
           }
           hits = await this.client.search(input, directory, request.queryId); current(); fingerprint = model.fingerprint;
@@ -132,7 +134,7 @@ export class RetrievalCommands {
         hits = keyword(); status = 'fallback'; fingerprint = null; message = '模型状态已变化，当前显示关键词结果。';
       }
       if (frozen.ledger !== verified.ledger || JSON.stringify(frozen.revisions) !== JSON.stringify(verified.revisions) || JSON.stringify(frozen.entries) !== JSON.stringify(verified.entries)) {
-        for (const id of Object.keys(frozen.revisions)) { this.client.invalidateWork(id); this.indexed.delete(id); }
+        for (const id of Object.keys(frozen.revisions)) this.indexed.delete(id);
         throw new Error('知识来源已变化，请重新检索。');
       }
       hits = hits.filter(hit => verified.entries.some(entry => entry.entryId === hit.entryId && entry.workId === hit.workId

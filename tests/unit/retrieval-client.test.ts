@@ -12,6 +12,11 @@ function setup(queryTimeout = 1000) {
   const client = new RetrievalClient('cache', { createWorker: () => worker, loadTimeout: 1000, queryTimeout, memoryLimit: 1000, rss: () => 0 });
   return { client, worker };
 }
+it('空作品索引清单穿过Worker边界，删除最后条目仍可原子清理旧块',async()=>{
+  const {client,worker}=setup();await client.index([],'fixed',['已清空作品']);
+  expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({command:'index',payload:{entries:[],workIds:['已清空作品']}}));
+  client.close();
+});
 it('查询超时终止Worker，晚回执不恢复任务，重启不复用旧请求', async () => {
   const { client, worker } = setup(20);
   await expect(client.search({} as never, 'fixed', 'query')).rejects.toThrow(/超时/);

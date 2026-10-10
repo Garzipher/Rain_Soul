@@ -49,5 +49,5 @@ it('未资格不能启用和重建；本地目录校验失败不启动索引；�
   await expect(commands.execute('rebuildKnowledgeIndex', { workId })).rejects.toThrow(/未就绪/);
   status.qualified = true; models.getActiveDirectory.mockResolvedValueOnce(null);
   await expect(commands.execute('rebuildKnowledgeIndex', { workId })).rejects.toThrow(/校验/); expect(client.index).not.toHaveBeenCalled();
-  await commands.execute('rebuildKnowledgeIndex', { workId }); expect(client.invalidateWork).toHaveBeenCalledWith(workId); expect(client.index).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ workId })]), 'trusted');
+  await commands.execute('rebuildKnowledgeIndex', { workId }); expect(client.invalidateWork).not.toHaveBeenCalled(); expect(client.index).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ workId })]), 'trusted',[workId]);
 });

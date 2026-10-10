@@ -68,9 +68,9 @@ export class RetrievalClient {
       return await this.send('search', request, this.dependencies.queryTimeout ?? 30000, queryId) as RetrievalHit[];
     } finally { if (this.activeQueries.get(queryId) === identity) this.activeQueries.delete(queryId); }
   }
-  async index(entries: IndexEntry[], directory: string): Promise<void> {
+  async index(entries: IndexEntry[], directory: string, workIds=[...new Set(entries.map(entry=>entry.workId))]): Promise<void> {
     await this.start(directory); this.indexing++;
-    try { await this.send('index', entries, 30 * 60 * 1000); } finally { this.indexing = Math.max(0, this.indexing - 1); }
+    try { await this.send('index', {entries,workIds}, 30 * 60 * 1000); } finally { this.indexing = Math.max(0, this.indexing - 1); }
   }
   isIndexing() { return this.indexing > 0; }
   invalidateWork(workId: string): void { this.worker?.postMessage({ id: randomUUID(), command: 'invalidate', payload: workId }); }
