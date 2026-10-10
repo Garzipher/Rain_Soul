@@ -57,11 +57,18 @@ export function commitSourceAssets(db: Database.Database, value: FrozenSourceDoc
 }
 
 /** 归档/快照消费者读取规范资产，损坏JSON或原文哈希不能静默放过。 */
-export function readSourceAssets(db: Database.Database): SourceAssets {
-  const documents = (db.prepare('SELECT * FROM source_document ORDER BY id').all() as DocumentRow[]).map(row => readDocument(db, row));
-  const links = (db.prepare('SELECT * FROM knowledge_source ORDER BY entry_id,source_id,segment_id').all() as { entry_id: string; source_id: string; segment_id: string }[])
+export function readSourceAssets(db: Database.Database, entryId?: string): SourceAssets {
+  if(entryId!==undefined) z.uuid().parse(entryId);
+  const documentRows=entryId===undefined ? db.prepare('SELECT * FROM source_document ORDER BY id').all()
+    : db.prepare('SELECT DISTINCT source_document.* FROM source_document JOIN knowledge_source ON knowledge_source.source_id=source_document.id WHERE knowledge_source.entry_id=? ORDER BY source_document.id').all(entryId);
+  const documents = (documentRows as DocumentRow[]).map(row => readDocument(db, row));
+  const linkRows=entryId===undefined ? db.prepare('SELECT * FROM knowledge_source ORDER BY entry_id,source_id,segment_id').all()
+    : db.prepare('SELECT * FROM knowledge_source WHERE entry_id=? ORDER BY source_id,segment_id').all(entryId);
+  const links = (linkRows as { entry_id: string; source_id: string; segment_id: string }[])
     .map(row => knowledgeSourceLinkSchema.parse({ entryId: row.entry_id, sourceId: row.source_id, segmentId: row.segment_id }));
-  const annotations = (db.prepare('SELECT * FROM learning_annotation ORDER BY id').all() as { id: string; entry_id: string; payload_json: string }[])
+  const annotationRows=entryId===undefined ? db.prepare('SELECT * FROM learning_annotation ORDER BY id').all()
+    : db.prepare('SELECT * FROM learning_annotation WHERE entry_id=? ORDER BY id').all(entryId);
+  const annotations = (annotationRows as { id: string; entry_id: string; payload_json: string }[])
     .map(row => learningAnnotationSchema.parse({ ...learningAnnotationPayloadSchema.parse(JSON.parse(row.payload_json)), id: row.id, entryId: row.entry_id }));
   return sourceAssetsSchema.parse({ documents, links, annotations });
 }

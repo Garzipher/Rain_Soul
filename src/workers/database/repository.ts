@@ -15,6 +15,8 @@ import type { AssetRequest, AssetQuery } from '../../shared/assets';
 import { knowledgeCopyRequestSchema, type KnowledgeCopyRequest } from '../../shared/knowledge-scope';
 import { knowledgeScope, assertGlobalKnowledgeQuery, scopeEntryId } from './knowledge-scope';
 import { copyKnowledge as insertKnowledgeCopy } from './assets-knowledge';
+import { readSourceAssets } from './source-document';
+import { copyKnowledgeSources } from './source-copy';
 import { createImportedProject } from './manuscript-import';
 import type { ManuscriptImportRequest } from '../../shared/manuscript-schema';
 import { exportProjectDatabase, importArchivedProject } from './archive-project';
@@ -310,12 +312,17 @@ export class WorkRepository {
       }
       const source = new Database(file, { readonly: true, fileMustExist: true });
       try {
-        this.checkMetadata(source, request.sourceWorkId); const meta = this.meta(source);
-        if (meta.deleted_at) throw new RepositoryError('NOT_FOUND', '来源作品已删除。');
-        if (meta.revision !== request.sourceExpectedRevision) throw new RepositoryError('REVISION_CONFLICT', '来源作品已变化，请重新查看后确认复制。');
-        const entry = readAssets(source).knowledge.find(item => item.id === request.sourceEntryId && !item.deletedAt);
-        if (!entry) throw new RepositoryError('NOT_FOUND', '来源知识已删除或不存在。');
-        insertKnowledgeCopy(target, { workId: meta.id, workTitle: meta.title, revision: meta.revision, entry }, request.categoryId, request.tagIds, revision);
+        // 来源版本、知识及原文证据从同一只读快照获取，不能跨读混入新版本。
+        source.transaction(() => {
+          this.checkMetadata(source, request.sourceWorkId); const meta = this.meta(source);
+          if (meta.deleted_at) throw new RepositoryError('NOT_FOUND', '来源作品已删除。');
+          if (meta.revision !== request.sourceExpectedRevision) throw new RepositoryError('REVISION_CONFLICT', '来源作品已变化，请重新查看后确认复制。');
+          const entry = readAssets(source).knowledge.find(item => item.id === request.sourceEntryId && !item.deletedAt);
+          if (!entry) throw new RepositoryError('NOT_FOUND', '来源知识已删除或不存在。');
+          const evidence = readSourceAssets(source, entry.id);
+          const entryId = insertKnowledgeCopy(target, { workId: meta.id, workTitle: meta.title, revision: meta.revision, entry }, request.categoryId, request.tagIds, revision);
+          copyKnowledgeSources(target, evidence, entry.id, entryId);
+        })();
         return { revision };
       } finally { source.close(); }
     });
