@@ -49,7 +49,7 @@ describe('v1 作品库的一致备份与前向迁移', () => {
       expect(JSON.parse((backup.prepare('SELECT document_json FROM chapter').get() as { document_json: string }).document_json)).toEqual(document);
       expect(backup.prepare('SELECT * FROM operation_log').all()).toHaveLength(1);
     } finally { backup.close(); }
-    expect(source.pragma('user_version', { simple: true })).toBe(5);
+    expect(source.pragma('user_version', { simple: true })).toBe(6);
     expect(source.prepare('SELECT COUNT(*) AS count FROM category').get()).toEqual({ count: 6 });
     expect(searchAssets(source, { text: '旧版', mode: 'all' })).toHaveLength(1);
     expect(readdirSync(projectDirectory).filter((name) => name.includes('v2-backup'))).toEqual([]);
