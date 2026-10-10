@@ -40,6 +40,11 @@ it('模型失败明确回退、分页保持来源，并拒绝取消后迟到结�
   await expect(commands.execute('queryKnowledge', query)).rejects.toThrow(/取消/);
   expect(client.cancel).toHaveBeenCalledWith(query.queryId);
 });
+it('查询超过模型窗口时保留关键词结果并明确提示缩小范围', async () => {
+  const { commands, client, query } = setup(true);
+  client.search.mockRejectedValueOnce(Object.assign(new Error('查询超过400 token'), { code: 'RETRIEVAL_QUERY_TOO_LONG' }));
+  expect(await commands.execute('queryKnowledge', query)).toMatchObject({ status: 'fallback', message: expect.stringMatching(/400 token.*缩小范围/) });
+});
 it('来源后验读取期间停用模型，最终回执只能显示关键词', async () => {
   const { commands, models, client, store, query } = setup(true);
   const original = store.execute.getMockImplementation()!; let reads = 0;

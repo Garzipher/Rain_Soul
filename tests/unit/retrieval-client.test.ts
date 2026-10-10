@@ -42,3 +42,12 @@ it('模型加载期间取消后不能启动查询，空Worker回执触发受控�
   await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ command: 'search' })));
   worker.emit('message', null); await failed; expect(worker.terminate).toHaveBeenCalled(); client.close();
 });
+it('受控查询长度错误穿过Worker边界，保留错误码供关键词回退解释', async () => {
+  const { client, worker } = setup();
+  const pending = client.search({} as never, 'fixed', 'query');
+  const rejected = expect(pending).rejects.toMatchObject({ code: 'RETRIEVAL_QUERY_TOO_LONG', message: '查询超过400 token' });
+  await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ command: 'search' })));
+  const request = worker.postMessage.mock.calls.find(([message]) => message.command === 'search')![0];
+  worker.emit('message', { id: request.id, ok: false, message: '查询超过400 token', code: 'RETRIEVAL_QUERY_TOO_LONG' });
+  await rejected; expect(worker.terminate).not.toHaveBeenCalled(); client.close();
+});

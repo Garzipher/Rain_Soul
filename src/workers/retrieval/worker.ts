@@ -35,5 +35,8 @@ parentPort?.on('message', async (input: unknown) => {
       } else throw new Error('未知本机检索命令。');
     }
     parentPort!.postMessage({ id, ok: true, data });
-  } catch { parentPort!.postMessage({ id, ok: false, message: '本机模型执行失败，请使用关键词检索。' }); }
+  } catch (error) {
+    const tooLong = error && typeof error === 'object' && 'code' in error && error.code === 'RETRIEVAL_QUERY_TOO_LONG';
+    parentPort!.postMessage({ id, ok: false, ...(tooLong ? { code: 'RETRIEVAL_QUERY_TOO_LONG', message: '查询超过400 token，请缩小范围。' } : { message: '本机模型执行失败，请使用关键词检索。' }) });
+  }
 });

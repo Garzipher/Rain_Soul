@@ -36,7 +36,7 @@ export class RetrievalEngine {
   }
   async search(request: EngineQuery): Promise<RankedHit[]> {
     if (this.closed) throw new Error('本机检索已关闭。');
-    if (request.mode !== 'keyword' && this.model.tokenize(request.text).length > 400) throw new Error('查询超过400 token，请缩小范围。');
+    if (request.mode !== 'keyword' && this.model.tokenize(request.text).length > 400) throw Object.assign(new Error('查询超过400 token，请缩小范围。'), { code: 'RETRIEVAL_QUERY_TOO_LONG' });
     const queryVector = request.mode === 'keyword' ? [] : (await this.model.embed([request.text], 'query'))[0];
     const workIds = [...new Set(request.entries.map(entry => entry.workId))];
     const chunks = workIds.flatMap(workId => this.cache.readWork(workId, request.entries.filter(entry => entry.workId === workId).map(({ entryId, bodyHash }) => ({ entryId, bodyHash })))

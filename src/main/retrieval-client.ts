@@ -30,14 +30,14 @@ export class RetrievalClient {
       workerData: { directory, cacheDirectory: this.cacheDirectory }, resourceLimits: { maxOldGenerationSizeMb: 384 },
     });
     this.worker = worker;
-    worker.on('message', ((reply: { id: string; ok: boolean; data?: unknown; message?: string } | null) => {
+    worker.on('message', ((reply: { id: string; ok: boolean; data?: unknown; message?: string; code?: string } | null) => {
       if (worker !== this.worker) return;
       if (!reply || typeof reply !== 'object' || typeof reply.id !== 'string' || typeof reply.ok !== 'boolean') {
         this.fail(new Error('本机检索回执无效。')); return;
       }
       const pending = this.pending.get(reply.id); if (!pending) return;
       clearTimeout(pending.timer); this.pending.delete(reply.id);
-      if (reply.ok) pending.resolve(reply.data); else pending.reject(new Error(reply.message ?? '本机模型执行失败。'));
+      if (reply.ok) pending.resolve(reply.data); else pending.reject(Object.assign(new Error(reply.message ?? '本机模型执行失败。'), { code: reply.code }));
     }));
     worker.on('error', ((error: Error) => { if (worker === this.worker) this.fail(error); }));
     worker.on('exit', (() => { if (worker === this.worker) this.fail(new Error('本机检索服务停止。')); }));

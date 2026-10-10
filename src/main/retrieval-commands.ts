@@ -103,7 +103,11 @@ export class RetrievalCommands {
             hits = keyword(); status = 'fallback'; fingerprint = null; message = '模型状态已变化，当前显示关键词结果。';
           }
           else if (this.client.isIndexing()) { status = 'indexing'; message = '本机索引正在更新，可稍后重试。'; }
-        } catch { current(); hits = keyword(); status = 'fallback'; message = '本机检索未完成，当前显示关键词结果。'; }
+        } catch (error) {
+          current(); hits = keyword(); status = 'fallback';
+          message = error && typeof error === 'object' && 'code' in error && error.code === 'RETRIEVAL_QUERY_TOO_LONG'
+            ? '查询超过400 token，请缩小范围；当前显示关键词结果。' : '本机检索未完成，当前显示关键词结果。';
+        }
       }
       const verified = await this.snapshot(request.workId); current();
       const finalModel = fingerprint ? await this.models.getStatus() : null; current();
