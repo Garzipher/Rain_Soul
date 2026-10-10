@@ -1,6 +1,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { afterEach, expect, it } from 'vitest';
 import { collectThirdPartyNotices } from '../../scripts/third-party-notices.mjs';
 
@@ -50,4 +51,23 @@ it('安装文件版本与锁文件不一致时拒绝打包声明', () => {
     'node_modules/alpha': { version: '1.0.1' }, 'node_modules/beta': { version: '1.0.0' }, 'node_modules/shared': { version: '1.0.0' },
   } }));
   expect(() => collectThirdPartyNotices(root)).toThrow(/锁定版本/);
+});
+it('只收集构建显式列出的已打包模块，不把未打包可选后端算入运行时', () => {
+  const root = fixture();
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ devDependencies: { alpha: '1', beta: '1' } }));
+  const result = collectThirdPartyNotices(root, { bundledDependencies: ['alpha'] });
+  expect(result).toContain('alpha@1.0.0');
+  expect(result).not.toContain('beta@1.0.0');
+  expect(result).not.toContain('shared@1.0.0');
+});
+it('额外上游NOTICE原文分片须完整且哈希正确，不能漏发或改写', () => {
+  const root = fixture(), directory = join(root, 'assets/third-party/alpha@1.0.0.notices');
+  mkdirSync(directory, { recursive: true });
+  const body = '上游版权第一部分\n第二部分';
+  writeFileSync(join(directory, 'part-001.txt'), '上游版权第一部分\n');
+  writeFileSync(join(directory, 'part-002.txt'), '第二部分');
+  writeFileSync(join(directory, 'manifest.json'), JSON.stringify({ bytes: Buffer.byteLength(body), sha256: createHash('sha256').update(body).digest('hex'), parts: ['part-001.txt', 'part-002.txt'] }));
+  expect(collectThirdPartyNotices(root)).toContain(body);
+  writeFileSync(join(directory, 'part-002.txt'), '错误改写');
+  expect(() => collectThirdPartyNotices(root)).toThrow(/NOTICE/);
 });

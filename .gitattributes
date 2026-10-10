@@ -1,0 +1,2 @@
+# 上游声明保持字节原文，避免Windows自动换行破坏SHA256。
+assets/third-party/*.notices/part-*.txt -text

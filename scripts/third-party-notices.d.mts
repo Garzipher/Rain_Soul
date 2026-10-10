@@ -1,1 +1,1 @@
-export function collectThirdPartyNotices(directory: string): string;
+export function collectThirdPartyNotices(directory: string, options?: { bundledDependencies?: string[] }): string;

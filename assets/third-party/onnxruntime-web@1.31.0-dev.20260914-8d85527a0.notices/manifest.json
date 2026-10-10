@@ -1,0 +1,22 @@
+{
+  "sourceUrl": "https://raw.githubusercontent.com/microsoft/onnxruntime/8d85527a010e294a26b274749f74294b2a32cec5/ThirdPartyNotices.txt",
+  "bytes": 338088,
+  "sha256": "143764b952fdb1a7c69ce653bfba74a7744d6a8a573bfb73e235fba356c83de3",
+  "parts": [
+    "part-001.txt",
+    "part-002.txt",
+    "part-003.txt",
+    "part-004.txt",
+    "part-005.txt",
+    "part-006.txt",
+    "part-007.txt",
+    "part-008.txt",
+    "part-009.txt",
+    "part-010.txt",
+    "part-011.txt",
+    "part-012.txt",
+    "part-013.txt",
+    "part-014.txt",
+    "part-015.txt"
+  ]
+}
