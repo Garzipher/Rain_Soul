@@ -21,6 +21,16 @@ function setup(options: Partial<React.ComponentProps<typeof KnowledgeWorkspace>>
   return { ...props, view: render(<KnowledgeWorkspace {...props} />) };
 }
 describe('知识卡片与搜索', () => {
+  it('当前作品知识卡可逐条选用和移除写作参考，跨作品必须先复制', () => {
+    const onToggleReference = vi.fn();
+    const { view, ...props } = setup({ onToggleReference, referenceIds: [] });
+    fireEvent.click(screen.getAllByRole('button', { name: '用于写作参考' })[0]);
+    expect(onToggleReference).toHaveBeenCalledWith('a');
+    view.rerender(<KnowledgeWorkspace {...props} referenceIds={['a']} />);
+    fireEvent.click(screen.getByRole('button', { name: '移除写作参考' })); expect(onToggleReference).toHaveBeenLastCalledWith('a');
+    view.rerender(<KnowledgeWorkspace {...props} scopeProps={{ works: [], scopeId: 'other', canEdit: false, onScopeChange: vi.fn() }} />);
+    expect(screen.queryByRole('button', { name: '用于写作参考' })).not.toBeInTheDocument();
+  });
   it('默认使用关键词检索，显示回退原因并按页请求本机知识', async () => {
     const replies: RetrievalReply[] = [{ queryId: 'q1', hits: [{ workId: 'work', entryId: 'a', bodyHash: 'hash', excerpt: '站台的雨水', source: '雨夜练习', matchedBy: ['keyword'], reliable: true }], total: 21, sourceRevisions: { a: 1 }, modelFingerprint: null, status: 'fallback', message: '本机模型未安装，已回退关键词' }, { queryId: 'q2', hits: [{ workId: 'work', entryId: 'b', bodyHash: 'hash', excerpt: '月光', source: '另一篇练习', matchedBy: ['keyword'], reliable: true }], total: 21, sourceRevisions: { b: 1 }, modelFingerprint: null, status: 'ready' }];
     const onRetrieve = vi.fn(async (request) => ({ ...replies.shift()!, queryId: request.queryId }));

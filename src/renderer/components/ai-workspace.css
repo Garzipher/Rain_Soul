@@ -10,6 +10,8 @@
 .ai-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; line-height: 1.8; }
 .ai-original, .ai-proposal { padding: 18px 0; border-top: 1px solid #edf1f4; }
 .ai-original h3, .ai-proposal h3 { font-size: 14px; color: #647e8c; }
+.ai-proposal del { color: #9c3645; background: #fff0f2; text-decoration: line-through; }
+.ai-proposal ins { color: #146297; background: #eaf5ff; text-decoration: underline; text-underline-offset: 3px; }
 .ai-send-preview { max-height: 380px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: 13px; line-height: 1.8; }
 .ai-settings-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .ai-analysis-finding { border-top: 1px solid #e1e9ef; padding: 18px 0; }

@@ -26,7 +26,7 @@ async function setup() {
   fireEvent.click(screen.getByRole('button', { name: 'AI 工具' }));
   fireEvent.click(await screen.findByRole('button', { name: '预览 AI 请求' }));
   fireEvent.click(within(await screen.findByRole('dialog', { name: '确认云端 AI 操作' })).getByRole('button', { name: '确认发送' }));
-  await screen.findByText('新的候选正文'); return adapter;
+  await screen.findByText('新的候选正文', { selector: 'pre[aria-label="候选全文"]' }); return adapter;
 }
 it('关闭工具后再次打开仍保留候选和对比状态', async () => {
   await setup();
@@ -34,7 +34,29 @@ it('关闭工具后再次打开仍保留候选和对比状态', async () => {
   await screen.findByLabelText('章节标题');
   await waitFor(() => expect(screen.getByRole('button', { name: 'AI 工具' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'AI 工具' }));
-  await waitFor(() => expect(screen.getByText('新的候选正文')).toBeVisible());
+  await waitFor(() => expect(screen.getByText('新的候选正文', { selector: 'pre[aria-label="候选全文"]' })).toBeVisible());
+});
+it('离开写作到知识库再返回保留候选，重新打开其他作品不能串候选', async () => {
+  const adapter = await setup();
+  fireEvent.click(screen.getByRole('button', { name: '关闭AI工具' }));
+  fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '知识库' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  await screen.findByRole('searchbox', { name: '模糊搜索知识与正文' });
+  fireEvent.click(screen.getByRole('button', { name: '返回写作' }));
+  await screen.findByLabelText('章节标题');
+  fireEvent.click(screen.getByRole('button', { name: 'AI 工具' }));
+  expect(await screen.findByText('新的候选正文', { selector: 'pre[aria-label="候选全文"]' })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: '关闭AI工具' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '返回作品集' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '返回作品集' }));
+  const other = await adapter.api.createWork('另一个作品');
+  await adapter.api.openWork(other.id);
+  fireEvent.click(screen.getByRole('button', { name: '作品集' }));
+  fireEvent.click(await screen.findByRole('button', { name: '打开作品：另一个作品' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'AI 工具' }));
+  await screen.findByRole('button', { name: '预览 AI 请求' });
+  expect(screen.queryByText('新的候选正文')).not.toBeInTheDocument();
 });
 it('版本明确冲突允许重新生成，回执未知保留原请求重试且不放开导航', async () => {
   const adapter = await setup();

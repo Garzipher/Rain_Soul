@@ -7,6 +7,9 @@ import { readableKnowledgeSource, replaceKnowledgeSource, splitKnowledgeSource }
 import { KnowledgeSourceAudit } from './knowledge-source-audit';
 import './knowledge-workspace.css';
 export interface KnowledgeWorkspaceProps {
+  referenceIds?: string[];
+  onToggleReference?: (entryId: string) => void;
+  onReturnWriting?: () => void;
   onRetrieve?: (query: RetrievalQuery) => Promise<RetrievalReply>;
   onBookExtraction?: () => void;
   selectedEntryId?: string | null;
@@ -146,7 +149,7 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
   function toggleTag(id: string) { setTags(previous => previous.includes(id) ? previous.filter(value => value !== id) : [...previous, id]); }
   const paragraphs = results.filter(row => row.kind === 'paragraph');
   return <section className="knowledge-workspace" aria-label="知识工作区">
-    <div className="knowledge-heading"><p>按分类、标签和来源整理作品素材。</p><div><button className="secondary" disabled={disabled || !!form} onClick={() => props.onBookExtraction ? props.onBookExtraction() : setSplitter(true)}>拆书工具</button><button className="primary" disabled={disabled || !canEdit || !!form || !categories.length} onClick={() => openForm()}>新增知识</button></div></div>
+    <div className="knowledge-heading"><p>按分类、标签和来源整理作品素材。</p><div>{props.onReturnWriting && <button className="secondary" disabled={disabled || !!form} onClick={props.onReturnWriting}>返回写作</button>}<button className="secondary" disabled={disabled || !!form} onClick={() => props.onBookExtraction ? props.onBookExtraction() : setSplitter(true)}>拆书工具</button><button className="primary" disabled={disabled || !canEdit || !!form || !categories.length} onClick={() => openForm()}>新增知识</button></div></div>
     {splitter ? <div className="knowledge-deferred" role="status"><h2>后续开发：本功能尚未交付</h2><p>素材拆文会将参考作品中的描写与写法整理入知识库，保留出处供学习与创作参考。当前阶段：知识库与手工条目。</p><button className="secondary" onClick={() => setSplitter(false)}>返回知识库</button></div> : <div className={`knowledge-layout ${collapsed ? 'is-collapsed' : ''}`}>
       {!collapsed && <nav className="knowledge-categories" aria-label="知识分类"><div><strong>分类</strong><button className="secondary" aria-expanded="true" onClick={() => setCollapsed(true)}>收起分类</button></div>
         <button aria-pressed={categoryId === null} onClick={() => setCategory(null)}>全部知识</button>
@@ -179,6 +182,7 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
         {reply && <small>{reply.hits.find(hit => hit.entryId === (props.scopeProps?.entryOwners?.[entry.id]?.sourceEntryId ?? entry.id) && hit.workId === (props.scopeProps?.entryOwners?.[entry.id]?.workId ?? props.work.id))?.matchedBy.map(value => value === 'keyword' ? '关键词命中' : '语义相关').join(' · ')}</small>}
         <div className="knowledge-entry-bottom"><div>{canEdit ? <><button disabled={disabled || !!form} onClick={() => openForm(entry)}>编辑知识</button><button disabled={disabled || !!form} onClick={() => setDialog({ heading: '删除知识', description: '将删除这条知识。历史内容与引用追溯仍保留，不会删除正文。', submitLabel: '确认删除', onSubmit: () => operate(() => props.onAction({ type: 'deleteKnowledge', id: entry.id })) })}>删除知识</button></> : props.scopeProps?.entryOwners?.[entry.id]?.workId === props.work.id ? <span>已在当前作品</span> : props.scopeProps?.onCopy && <button disabled={disabled} onClick={() => { void operate(() => props.scopeProps!.onCopy!(entry.id)); }}>复制到当前作品</button>}</div>
           <div className="knowledge-source">{props.scopeProps?.entryOwners?.[entry.id] && <span>{props.scopeProps.entryOwners[entry.id].workTitle}</span>}<span>{source.readable || '未注明出处'}</span>{entry.origin && <small>来源作品：{entry.origin.workTitle}</small>}</div></div>
+        {canEdit && props.onToggleReference && <button className="secondary" aria-pressed={props.referenceIds?.includes(entry.id) ?? false} disabled={disabled || !!form || (!props.referenceIds?.includes(entry.id) && (props.referenceIds?.length ?? 0) >= 5)} onClick={() => props.onToggleReference!(entry.id)}>{props.referenceIds?.includes(entry.id) ? '移除写作参考' : '用于写作参考'}</button>}
         <KnowledgeSourceAudit records={source.records} />
       </article>; })}</div>
       {paragraphs.map(row => <article className="knowledge-paragraph-result" key={row.id}><small>正文 · {row.source}</small><p>{row.snippet}</p><button className="secondary" disabled={!row.chapterId || disabled} aria-label={`定位正文：${row.title}`} onClick={() => { if (row.chapterId) props.onLocate(row.chapterId, row.paragraphId ?? undefined); }}>{row.title}</button></article>)}

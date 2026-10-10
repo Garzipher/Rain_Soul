@@ -11,6 +11,23 @@ import { emptyDocument } from '../../src/shared/document';
 import type { WorkDetail } from '../../src/shared/contracts';
 import type { AiCandidate, AiPreparedRequest } from '../../src/shared/ai';
 afterEach(cleanup);
+it('候选差异可阅读，返回工具时恢复原文与候选，过期版本禁止写入', async () => {
+  const { props, view } = setup();
+  const onReviewChange = vi.fn();
+  view.rerender(<AiWorkspace {...props} onReviewChange={onReviewChange} />);
+  fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
+  await screen.findByText('润色候选', { selector: 'pre[aria-label="候选全文"]' });
+  expect(screen.getByLabelText('增删差异')).toHaveTextContent('原文雨夜');
+  expect(screen.getByLabelText('增删差异').querySelector('del')).not.toBeNull();
+  expect(screen.getByLabelText('增删差异').querySelector('ins')).not.toBeNull();
+  await waitFor(() => expect(onReviewChange).toHaveBeenLastCalledWith(expect.objectContaining({ candidate: expect.objectContaining({ id: 'candidate' }), original: '原文雨夜' })));
+  const review = onReviewChange.mock.calls.at(-1)![0]; view.unmount();
+  render(<AiWorkspace {...props} work={{ ...props.work, revision: 4 }} initialReview={review} />);
+  expect(screen.getByText('润色候选', { selector: 'pre[aria-label="候选全文"]' })).toBeVisible();
+  expect(screen.getByLabelText('原文对比')).toHaveTextContent('原文雨夜');
+  expect(screen.getByRole('button', { name: '确认写入正文' })).toBeDisabled();
+});
 it('正文右键带入重复单句真实选区，预览发送目标偏移且不自动联网', async () => {
   const { props, view } = setup();
   props.work.chapters[0].document.content[0].content = [{ type: 'text', text: '雨落。雨落。' }];
@@ -38,13 +55,13 @@ it('同章前插重复句后从右上重开清除旧偏移，候选和原文仍�
   view.rerender(<AiWorkspace {...props} entryToken={1} selectionRequest={{ operation: 'sentencePolish', token: 1, paragraphIds: [props.work.chapters[0].document.content[0].attrs.id], text: '雨落。', sentenceFrom: 3 }} />);
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
-  await screen.findByText('润色候选');
+  await screen.findByText('润色候选', { selector: 'pre[aria-label="候选全文"]' });
   const work = structuredClone(props.work); work.revision++;
   work.chapters[0].document.content[0].content = [{ type: 'text', text: '雨落。雨落。雨落。' }];
   view.rerender(<AiWorkspace {...props} work={work} entryToken={2} />);
   await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveValue('paragraphPolish'));
   expect(screen.queryByLabelText('目标单句')).toBeNull();
-  expect(screen.getByText('润色候选')).toBeVisible();
+  expect(screen.getByText('润色候选', { selector: 'pre[aria-label="候选全文"]' })).toBeVisible();
   expect(screen.getByLabelText('原文对比')).toHaveTextContent('雨落。');
   expect(screen.getByText(/结果已过期/)).toBeVisible();
 });
@@ -65,13 +82,13 @@ it('预览完整发送范围与计费后明确确认才执行，候选必须再�
   expect(within(dialog).getByRole('button', { name: '确认发送' })).toHaveClass('primary');
   expect(props.onExecute).not.toHaveBeenCalled();
   fireEvent.click(within(dialog).getByRole('button', { name: '确认发送' }));
-  expect(await screen.findByText('润色候选')).toBeInTheDocument();
+  expect(await screen.findByText('润色候选', { selector: 'pre[aria-label="候选全文"]' })).toBeInTheDocument();
   expect(props.onApply).not.toHaveBeenCalled();
   expect(screen.getByLabelText('原文对比')).toHaveTextContent('原文雨夜');
   props.onApply.mockResolvedValueOnce(false);
   fireEvent.click(screen.getByRole('button', { name: '确认写入正文' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/变化|未写入/);
-  expect(screen.getByText('润色候选')).toBeInTheDocument();
+  expect(screen.getByText('润色候选', { selector: 'pre[aria-label="候选全文"]' })).toBeInTheDocument();
 });
 it('知识参考显示内容出处，作者逐条选用后才进入请求', async () => {
   const { props, view } = setup();
@@ -106,7 +123,7 @@ it('新的预览取消或发送失败时，旧候选仍与生成时的原文正�
   const { props, view } = setup();
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
-  await screen.findByText('润色候选');
+  await screen.findByText('润色候选', { selector: 'pre[aria-label="候选全文"]' });
   const changed = structuredClone(props.work); changed.revision++; changed.chapters[0].document.content[0].content = [{ type: 'text', text: '后来修改的正文' }];
   view.rerender(<AiWorkspace {...props} work={changed} />);
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
@@ -117,7 +134,7 @@ it('新的预览取消或发送失败时，旧候选仍与生成时的原文正�
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
   await screen.findByText('额度不足'); expect(screen.getByLabelText('原文对比')).toHaveTextContent('原文雨夜');
-  expect(screen.getByText('润色候选')).toBeInTheDocument();
+  expect(screen.getByText('润色候选', { selector: 'pre[aria-label="候选全文"]' })).toBeInTheDocument();
   props.onPrepare.mockRejectedValueOnce(new Error('预览失败'));
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   await screen.findByText('预览失败'); expect(screen.getByLabelText('原文对比')).toHaveTextContent('原文雨夜');
