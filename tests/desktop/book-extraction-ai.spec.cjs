@@ -152,7 +152,8 @@ test('AI拆书真实IPC逐次授权、独立原文范围、审核后原子入库
     await expect(page.getByRole('textbox', { name: '摘选内容 1', exact: true })).toHaveValue(original);
     await activate(results.getByRole('button', { name: '带入审核', exact: true }));
     const review = page.getByRole('textbox', { name: '摘选内容 1', exact: true });
-    await expect(review).toHaveValue(/写作手法/);
+    await expect(review).toHaveValue(original);
+    await expect(page.getByRole('textbox', { name: '写作手法 1', exact: true })).toHaveValue('用具体光影和比喻营造场景。');
     const approved = page.getByRole('checkbox', { name: '审核通过段落 1', exact: true });
     await expect(approved).not.toBeChecked(); expect((await readWork(page, id)).assets.knowledge).toHaveLength(0);
     await approved.check(); await review.fill('作者手工整理的学习笔记。'); await expect(approved).not.toBeChecked();
@@ -166,14 +167,20 @@ test('AI拆书真实IPC逐次授权、独立原文范围、审核后原子入库
     await expect(approved).not.toBeChecked(); await approved.check();
     await expect(page.getByRole('checkbox', { name: '审核通过段落 2', exact: true })).not.toBeChecked();
     await activate(page.getByRole('button', { name: '确认入库（1）', exact: true }));
-    await expect(page.getByRole('article', { name: /^知识：/ })).toHaveCount(1);
+    await expect(page.getByRole('checkbox', { name: '审核通过段落 1', exact: true })).toBeDisabled();
+    await expect(page.getByRole('textbox', { name: '摘选内容 2', exact: true })).toBeEnabled();
     const committed = await readWork(page, id), entry = committed.assets.knowledge[0];
-    expect(entry.body).toContain(original); expect(entry.body).toContain('仿写练习');
+    expect(entry.body).toBe(original); expect(entry.body).not.toContain('仿写练习');
+    const draft = await page.evaluate(id => window.rainSoul.readExtractionDraft(id), id);
+    expect(draft.draft.reviews[0].annotation.exercise).toBe('用声音描写改写一个合成场景。');
     expect(entry.source).toContain('合成测试作者'); expect(entry.source).toContain('雨夜合成素材.txt');
     expect(entry.source).toContain('第1段');
     expect(entry.source).toContain(createHash('sha256').update(source).digest('hex'));
     expect(entry.source).toContain(createHash('sha256').update(original).digest('hex'));
     expect(await count(application)).toBe(1); expect(errors).toEqual([]);
+    await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
+    await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true }));
+    await expect(page.getByRole('article', { name: /^知识：/ })).toHaveCount(1);
     await closeNormally(application); application = await launch(directory); page = await offlineWindow(application);
     await installTransport(application);
     await activate(page.getByRole('button', { name: '打开作品：AI拆书学习练习', exact: true })); await sidebar(page, '知识库');
@@ -217,7 +224,7 @@ test('无云配置仍可手工摘选，坏模型摘录整批禁止应用且请�
     await expect(page.getByRole('button', { name: '准备 AI 推荐', exact: true })).toBeEnabled();
     expect(await count(application)).toBe(2); await expect(raw).toContainText('伪造且不存在的摘录');
     await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
-    await activate(page.getByRole('button', { name: '放弃摘选并返回', exact: true }));
+    await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true }));
     await expect(page.getByRole('article', { name: /^知识：/ })).toHaveCount(0);
     await closeNormally(application);
   } finally { await cleanup(application, directory); }
