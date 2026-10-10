@@ -8,8 +8,8 @@ import type { BookExtractionPreview } from '../../src/shared/book-extraction';
 import type { AiPreparedRequest } from '../../src/shared/ai';
 import type { BookExtractionAiApi, BookExtractionAiResult } from '../../src/shared/book-extraction-ai';
 
-afterEach(cleanup);
-function setup(permission = true, count = 2) {
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+function setup(permission = true, count = 2, disabled = false) {
   const categoryId = crypto.randomUUID(), tagId = crypto.randomUUID();
   const work: WorkDetail = { id: crypto.randomUUID(), title: '当前作品', revision: 1, chapters: [], volumes: [], deletedItems: [], assets: {
     categories: [{ id: categoryId, name: '景物描写', parentId: null, sortOrder: 0, systemKey: null, deletedAt: null }],
@@ -24,7 +24,7 @@ function setup(permission = true, count = 2) {
   const api: BookExtractionAiApi = { prepareBookExtractionAi: vi.fn(async () => prepared), executeBookExtractionAi: vi.fn(async () => result),
     getBookExtractionAiResult: vi.fn(async () => ({ status: 'ready' as const, result })), cancelBookExtractionAi: vi.fn(async () => {}) };
   const onUse = vi.fn(), onBusyChange = vi.fn();
-  const props = { work, preview, api, permission, onUse, onBusyChange };
+  const props = { work, preview, api, permission, disabled, onUse, onBusyChange };
   const view = render(<BookExtractionAiPanel {...props} />);
   return { ...props, prepared, result, view };
 }
@@ -161,4 +161,84 @@ it('准备期间同步上报退出保护；卸载后的准备晚回执立即取�
   expect(onBusyChange).toHaveBeenLastCalledWith(true);
   view.unmount(); await act(async () => resolve(prepared));
   expect(api.cancelBookExtractionAi).toHaveBeenCalledWith(prepared.confirmationToken); expect(api.executeBookExtractionAi).not.toHaveBeenCalled();
+});
+it('父工作区手动提交或关闭期间不能准备、改变分析选择或采纳推荐', async () => {
+  const context = setup(true, 2, true), { api, view, onUse } = context;
+  fireEvent.click(screen.getByRole('checkbox', { name: 'AI 分析段落 1' }));
+  expect(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })).not.toBeChecked();
+  expect(screen.getByRole('button', { name: '准备 AI 推荐' })).toBeDisabled(); expect(api.prepareBookExtractionAi).not.toHaveBeenCalled();
+  view.rerender(<BookExtractionAiPanel {...context} disabled={false} />);
+  await execute(); await screen.findByText('用声音刻画雨景');
+  view.rerender(<BookExtractionAiPanel {...context} disabled />);
+  expect(screen.getByRole('button', { name: '带入审核' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '带入审核' })); expect(onUse).not.toHaveBeenCalled();
+});
+it('发送前授权已经过期时不执行，保留选择供取消后重新准备', async () => {
+  const { api, prepared } = setup(); const dialog = await prepare();
+  vi.spyOn(Date, 'now').mockReturnValue(prepared.expiresAt + 1);
+  fireEvent.click(within(dialog).getByRole('button', { name: '确认发送' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('授权预览已过期'); expect(api.executeBookExtractionAi).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); expect(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })).toBeChecked();
+});
+it('准备返回前撤销许可，取消失败仍保留保护和取消凭证', async () => {
+  const context = setup(), { api, prepared, view, onBusyChange } = context;
+  let resolve!: (value: AiPreparedRequest) => void;
+  vi.mocked(api.prepareBookExtractionAi).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  vi.mocked(api.cancelBookExtractionAi).mockRejectedValueOnce(new Error('无法确认取消'));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })); fireEvent.click(screen.getByRole('button', { name: '准备 AI 推荐' }));
+  view.rerender(<BookExtractionAiPanel {...context} permission={false} />);
+  await act(async () => resolve(prepared));
+  expect(onBusyChange).toHaveBeenLastCalledWith(true);
+  expect(screen.getByRole('button', { name: '取消本次 AI 请求' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: '取消本次 AI 请求' }));
+  await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false)); expect(api.executeBookExtractionAi).not.toHaveBeenCalled();
+});
+it('父渲染更换API对象引用不会作废进行中的准备', async () => {
+  const context = setup(), { api, prepared, view } = context;
+  let resolve!: (value: AiPreparedRequest) => void;
+  vi.mocked(api.prepareBookExtractionAi).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })); fireEvent.click(screen.getByRole('button', { name: '准备 AI 推荐' }));
+  view.rerender(<BookExtractionAiPanel {...context} api={{ ...api }} />);
+  await act(async () => resolve(prepared));
+  expect(screen.getByRole('dialog', { name: '确认 AI 辅助拆书' })).toBeVisible(); expect(api.cancelBookExtractionAi).not.toHaveBeenCalled();
+});
+it('新响应未通过校验时保留旧成功推荐，复制失败提示手工复制', async () => {
+  const { api, result } = setup(); await execute(); await screen.findByText('用声音刻画雨景');
+  vi.mocked(api.executeBookExtractionAi).mockResolvedValueOnce({ ...result, validationError: '原文摘录不符', rawText: '无法采纳的原始材料' });
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn(async () => { throw new Error('拒绝访问剪贴板'); }) } });
+  await execute(); expect(await screen.findByText('无法采纳的原始材料')).toBeVisible(); expect(screen.getByText('用声音刻画雨景')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: '复制原始响应' })); expect(await screen.findByText('复制失败，请选择原始响应手动复制。')).toBeVisible();
+});
+it('准备失败保留选择；授权取消失败保留模态框供重试', async () => {
+  const { api } = setup(); vi.mocked(api.prepareBookExtractionAi).mockRejectedValueOnce(new Error('请配置服务'));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })); fireEvent.click(screen.getByRole('button', { name: '准备 AI 推荐' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('请配置服务'); expect(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })).toBeChecked();
+  const dialog = await prepare(); vi.mocked(api.cancelBookExtractionAi).mockRejectedValueOnce(new Error('取消失败'));
+  fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: '取消' })).toBeEnabled());
+  expect(dialog).toBeVisible(); fireEvent.click(within(dialog).getByRole('button', { name: '取消' })); await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+});
+it('核对失败或跨作品回执都维持保护，之后只重试本机核对', async () => {
+  const { api, result, onBusyChange } = setup(); vi.mocked(api.executeBookExtractionAi).mockRejectedValueOnce(new Error('IPC断开'));
+  vi.mocked(api.getBookExtractionAiResult).mockRejectedValueOnce(new Error('本机读取失败')).mockResolvedValueOnce({ status: 'ready', result: { ...result, workId: crypto.randomUUID() } });
+  await execute(); await screen.findByRole('button', { name: '核对本机结果' });
+  fireEvent.click(screen.getByRole('button', { name: '核对本机结果' })); expect(await screen.findByRole('alert')).toHaveTextContent('本机读取失败');
+  fireEvent.click(screen.getByRole('button', { name: '核对本机结果' })); expect(await screen.findByRole('alert')).toHaveTextContent('推荐回执不匹配');
+  expect(onBusyChange).toHaveBeenLastCalledWith(true); expect(screen.queryByText('用声音刻画雨景')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '核对本机结果' })); await screen.findByText('用声音刻画雨景'); expect(api.executeBookExtractionAi).toHaveBeenCalledTimes(1);
+});
+it('更换原文预览后清空选择和推荐，旧发送晚回执不进入新预览', async () => {
+  const context = setup(), { api, result, view, preview } = context;
+  let resolve!: (value: BookExtractionAiResult) => void;
+  vi.mocked(api.executeBookExtractionAi).mockReturnValueOnce(new Promise(done => { resolve = done; })); await execute();
+  view.rerender(<BookExtractionAiPanel {...context} preview={{ ...preview, token: crypto.randomUUID() }} />);
+  await act(async () => resolve(result));
+  expect(screen.queryByText('用声音刻画雨景')).toBeNull(); expect(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })).not.toBeChecked();
+});
+it('授权模态框Tab与ShiftTab保持焦点边界，取消不改变已有分析范围', async () => {
+  setup(); const dialog = await prepare(), cancel = within(dialog).getByRole('button', { name: '取消' }), submit = within(dialog).getByRole('button', { name: '确认发送' });
+  expect(cancel).toHaveFocus(); fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true }); expect(submit).toHaveFocus();
+  fireEvent.keyDown(dialog, { key: 'Tab' }); expect(cancel).toHaveFocus(); fireEvent.click(cancel);
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); expect(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })).toBeChecked();
 });
