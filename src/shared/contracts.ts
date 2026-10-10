@@ -39,7 +39,7 @@ export type StructureAction =
 export interface StructureRequest { workId: string; expectedRevision: number; operationId: string; action: StructureAction }
 export interface SaveResult { revision: number; wordCount: number; assets?: AssetState }
 export interface RuntimeInfo { version: string; dataDirectory: string }
-export interface DesktopApi {
+export interface DesktopApi extends BookExtractionAiApi {
   listConversations(workId: string): Promise<ConversationSummary[]>;
   readConversation(workId: string, conversationId: string, beforeMessageId?: string): Promise<ConversationDetail>;
   manageConversation(request: ConversationRequest): Promise<ConversationDetail | null>;
@@ -98,3 +98,4 @@ import type { SnapshotSummary, SnapshotPreview, SnapshotCreateRequest, SnapshotR
 import type { ConversationSummary, ConversationDetail, ConversationRequest } from './conversations';
 import type { ConversationAiPrepareRequest, PendingConversationReply } from './conversation-ai';
 import type { BookExtractionPreview, BookExtractionConfirmation } from './book-extraction';
+import type { BookExtractionAiApi } from './book-extraction-ai';
