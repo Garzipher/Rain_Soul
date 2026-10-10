@@ -1,11 +1,26 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import App from '../../src/renderer/App';
 import { createStructureAdapter } from './renderer-structure-adapter';
 const adapters: ReturnType<typeof createStructureAdapter>[] = [];
 afterEach(() => { cleanup(); adapters.splice(0).forEach(adapter => adapter.dispose()); });
+it('知识库读取失败就地重试，加载时不展示后置功能占位', async () => {
+  const adapter = createStructureAdapter(); adapters.push(adapter);
+  await adapter.api.createWork('知识加载验收');
+  const original = adapter.api.readKnowledgeScope.bind(adapter.api);
+  adapter.api.readKnowledgeScope = vi.fn().mockRejectedValueOnce(new Error('暂时读取失败')).mockImplementation(original);
+  render(<App api={adapter.api} />);
+  fireEvent.click(await screen.findByRole('button', { name: '打开作品：知识加载验收' }));
+  await screen.findByLabelText('章节标题');
+  await waitFor(() => expect(screen.getByRole('button', { name: '知识库' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  fireEvent.click(await screen.findByRole('button', { name: '重新加载知识库' }));
+  expect(screen.queryByText(/本功能尚未交付/)).not.toBeInTheDocument();
+  await screen.findByRole('searchbox', { name: '模糊搜索知识与正文' });
+  expect(adapter.api.readKnowledgeScope).toHaveBeenCalledTimes(2);
+});
 it('全局知识只读，复制保留源作品且目标独立，范围查看不改变当前作品', async () => {
   const adapter = createStructureAdapter(); adapters.push(adapter);
   const source = await adapter.api.createWork('参考作品');
