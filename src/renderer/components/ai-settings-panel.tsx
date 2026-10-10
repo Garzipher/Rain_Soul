@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AiProvider } from '../../shared/ai';
 import './ai-workspace.css';
 export interface AiSettingsPanelProps { value: { provider: AiProvider | null; hasCredential: boolean }; onSave: (provider: AiProvider, key?: string) => Promise<void>; onClear: () => Promise<void>; busy: boolean; onDirtyChange?: (dirty: boolean) => void }
@@ -8,7 +8,8 @@ export function AiSettingsPanel(props: AiSettingsPanelProps) {
   const [baseline, setBaseline] = useState(() => JSON.stringify(provider));
   const dirtyCallback = useRef(props.onDirtyChange); dirtyCallback.current = props.onDirtyChange;
   const dirty = pending || !!key || JSON.stringify(provider) !== baseline;
-  useEffect(() => { dirtyCallback.current?.(dirty); }, [dirty]);
+  // 在成功提示可交互前同步离开门禁，避免被上一帧的保存状态误拦。
+  useLayoutEffect(() => { dirtyCallback.current?.(dirty); }, [dirty]);
   useEffect(() => () => dirtyCallback.current?.(false), []);
   const lock = useRef(false), disabled = props.busy || pending;
   async function execute(clear = false) {

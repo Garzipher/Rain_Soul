@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
+import { Profiler } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AiWorkspace } from '../../src/renderer/components/ai-workspace';
@@ -133,6 +134,19 @@ it('云模型设置报告草稿与异步保存中的离开保护，失败后保�
   expect(onDirtyChange).toHaveBeenLastCalledWith(true); expect(screen.getByLabelText('API Key')).toHaveValue('new-secret');
   fireEvent.click(screen.getByRole('button', { name: '放弃模型设置更改' }));
   expect(onDirtyChange).toHaveBeenLastCalledWith(false); expect(screen.getByLabelText('API Key')).toHaveValue('');
+});
+it('保存成功提示可见的同一提交阶段已解除设置离开保护', async () => {
+  let blocked = false;
+  const observations: boolean[] = [];
+  render(<Profiler id="settings" onRender={() => {
+    if (document.querySelector('[role="status"]')?.textContent?.includes('云端模型配置已保存')) observations.push(blocked);
+  }}><AiSettingsPanel value={{ provider: { id: 'cloud', name: '作者云', baseUrl: 'https://api.example.com/v1', model: 'model' }, hasCredential: true }} onSave={async () => undefined} onClear={async () => undefined} onDirtyChange={value => { blocked = value; }} busy={false} /></Profiler>);
+  fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'synthetic-test-key' } });
+  expect(blocked).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: '保存云端模型配置' }));
+  await screen.findByText('云端模型配置已保存，密钥不会在界面回显。');
+  expect(observations.length).toBeGreaterThan(0);
+  expect(observations).not.toContain(true);
 });
 it('设置页待保存密钥及失败草稿阻止页面离开，作者放弃后恢复导航', async () => {
   const adapter = createStructureAdapter(); let fail!: (reason: Error) => void;
