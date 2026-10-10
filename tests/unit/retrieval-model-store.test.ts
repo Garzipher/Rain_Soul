@@ -112,3 +112,22 @@ it('安装进度绑定操作身份与准确字节，可取消本地导入，未�
   expect(store.getProgress()).toBeNull();
   await expect(store.setEnabled(true)).rejects.toThrow(/资格/); expect(await store.getActiveDirectory()).toBeNull();
 });
+it('旧激活记录声称启用但资格未通过时，状态与模型目录仍保持停用', async () => {
+  const { manifest, source, target } = fixture(false), store = new RetrievalModelStore(target, { manifest });
+  await store.install({ operationId: randomUUID(), source: 'local', directory: source });
+  const pointer = JSON.parse(readFileSync(join(target, 'active.json'), 'utf8')); pointer.enabled = true;
+  writeFileSync(join(target, 'active.json'), JSON.stringify(pointer));
+  expect(await store.getStatus()).toMatchObject({ installed: true, state: 'disabled', qualified: false });
+  expect(await store.getActiveDirectory()).toBeNull();
+});
+it('分块下载报告已写入字节且状态副本不能篡改安装进度', async () => {
+  const { manifest, target } = fixture(), operationId = randomUUID(); let resume!: () => void;
+  const store = new RetrievalModelStore(target, { manifest, download: async function* () {
+    yield bytes.subarray(0, 3); await new Promise<void>(resolve => { resume = resolve; }); yield bytes.subarray(3);
+  } });
+  const pending = store.install({ operationId, source: 'download' });
+  while (!resume) await new Promise(resolve => setTimeout(resolve, 1));
+  const status = await store.getStatus(); expect(status).toMatchObject({ state: 'installing', progress: { operationId, phase: 'downloading', receivedBytes: 3, totalBytes: bytes.length } });
+  status.progress!.receivedBytes = 999; expect(store.getProgress()?.receivedBytes).toBe(3);
+  resume(); await pending; expect(store.getProgress()).toBeNull();
+});

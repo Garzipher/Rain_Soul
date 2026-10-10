@@ -96,7 +96,7 @@ export class RetrievalModelStore {
     try {
       const pointer = await this.pointer();
       if (pointer) await validateModelDirectory(join(this.root, pointer.generation), this.manifest);
-      return { ...base, installed: !!pointer, state: this.installing ? 'installing' : !pointer ? 'absent' : pointer.enabled ? 'ready' : 'disabled' };
+      return { ...base, installed: !!pointer, state: this.installing ? 'installing' : !pointer ? 'absent' : pointer.enabled && base.qualified ? 'ready' : 'disabled' };
     } catch { return { ...base, installed: false, state: 'error', message: '本机模型校验失败，原文件保留；关键词仍可使用。' }; }
   }
   async getActiveDirectory(): Promise<string | null> {
