@@ -9,8 +9,9 @@ import { fixedManifest, modelFingerprint, retrievalModelManifestSchema } from '.
 const roots: string[] = [];
 const directory = () => { const value = mkdtempSync(join(tmpdir(), 'rainsoul-model-')); roots.push(value); return value; };
 const bytes = Buffer.from('公开测试权重');
-function fixture() {
+function fixture(qualified = true) {
   const manifest = structuredClone(fixedManifest);
+  if (qualified) for (const key of Object.keys(manifest.qualification) as (keyof typeof manifest.qualification)[]) manifest.qualification[key] = true;
   manifest.files = [{ path: 'onnx/model_quantized.onnx', bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }];
   const source = directory(); mkdirSync(join(source, 'onnx')); writeFileSync(join(source, manifest.files[0].path), bytes);
   return { manifest, source, target: directory() };
@@ -23,12 +24,12 @@ it('固定清单拒绝未知字段、穿越/重复/容量；指纹包含tokenize
   const altered = structuredClone(fixedManifest); altered.files[1].sha256 = 'a'.repeat(64);
   expect(modelFingerprint(altered)).not.toBe(modelFingerprint());
 });
-it('离线校验安装原子激活、重启读取、禁用仍保留文件，资格未通过不能声称可用', async () => {
+it('离线校验安装原子激活、重启读取、禁用仍保留文件，资格通过后可用', async () => {
   const { manifest, source, target } = fixture();
   const store = new RetrievalModelStore(target, { manifest });
   expect((await store.getStatus()).state).toBe('absent');
   await store.install({ operationId: randomUUID(), source: 'local', directory: source });
-  expect(await store.getStatus()).toMatchObject({ state: 'ready', installed: true, qualified: false, bytes: bytes.length });
+  expect(await store.getStatus()).toMatchObject({ state: 'ready', installed: true, qualified: true, bytes: bytes.length });
   const active = await store.getActiveDirectory(); expect(active).toBeTruthy();
   expect(readFileSync(join(active!, manifest.files[0].path))).toEqual(bytes);
   expect((await new RetrievalModelStore(target, { manifest }).getStatus()).installed).toBe(true);
@@ -62,14 +63,13 @@ it('取消下载保留旧模型，下载URL仅来自固定HTTPS修订清单，�
   expect(urls).toEqual([`https://huggingface.co/${manifest.repository}/resolve/${manifest.revision}/${manifest.files[0].path}`]);
   expect(await store.getActiveDirectory()).toBe(active);
 });
-it('超限流、已取消、无受信下载器、非法身份与作品目录拒绝，原文件保持', async () => {
+it('超限流、已取消、非法身份与作品目录拒绝，原文件保持', async () => {
   const { manifest, source, target } = fixture();
   const store = new RetrievalModelStore(target, { manifest, download: async function* () { yield Buffer.alloc(bytes.length + 1); } });
   await expect(store.install({ operationId: randomUUID(), source: 'download' })).rejects.toThrow(/大小/);
   const aborted = new AbortController(); aborted.abort();
   await expect(store.install({ operationId: randomUUID(), source: 'local', directory: source }, aborted.signal)).rejects.toThrow(/取消/);
   await expect(store.install({ operationId: '../outside', source: 'local', directory: source })).rejects.toThrow();
-  await expect(new RetrievalModelStore(target, { manifest }).install({ operationId: randomUUID(), source: 'download' })).rejects.toThrow(/下载/);
   expect(() => new RetrievalModelStore(join(target, 'Projects'), { manifest })).toThrow(/作品/);
 });
 it('外部篡改激活身份或权重时状态失败并保留原文件，不向模型加载器暴露路径', async () => {
@@ -97,4 +97,18 @@ it('受信下载器停滞时取消立即结束，不等待下一块响应', asyn
   const pending = store.install({ operationId: randomUUID(), source: 'download' }, controller.signal);
   setTimeout(() => controller.abort(), 20);
   await expect(Promise.race([pending, new Promise((_, reject) => setTimeout(() => reject(new Error('取消未及时结束')), 2000))])).rejects.toThrow('模型安装已取消');
+});
+it('预检可用空间不足时不访问下载器、不替换旧模型，状态说明所需空间', async () => {
+  const { manifest, target } = fixture(); let attempts = 0;
+  const store = new RetrievalModelStore(target, { manifest, freeSpace: async () => 1, download: async function* () { attempts++; yield bytes; } });
+  await expect(store.install({ operationId: randomUUID(), source: 'download' })).rejects.toThrow(/空间不足/);
+  expect(attempts).toBe(0); expect(await store.getStatus()).toMatchObject({ installed: false, availableSpaceBytes: 1 });
+});
+it('安装进度绑定操作身份与准确字节，可取消本地导入，未资格新模型默认停用', async () => {
+  const { manifest, source, target } = fixture(false), operationId = randomUUID();
+  const store = new RetrievalModelStore(target, { manifest });
+  await store.install({ operationId, source: 'local', directory: source });
+  expect(await store.getStatus()).toMatchObject({ state: 'disabled', installed: true, qualified: false });
+  expect(store.getProgress()).toBeNull();
+  await expect(store.setEnabled(true)).rejects.toThrow(/资格/); expect(await store.getActiveDirectory()).toBeNull();
 });

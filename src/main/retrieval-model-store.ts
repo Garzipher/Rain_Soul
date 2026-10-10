@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, lstatSync, mkdirSync, readdirSync } from 'node:fs';
-import { lstat, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, rename, rm, statfs } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
-import { fixedManifest, modelFingerprint, retrievalModelManifestSchema, type RetrievalModelManifest, type RetrievalModelStatus } from '../shared/retrieval-model';
+import { fixedManifest, modelFingerprint, retrievalModelManifestSchema, type RetrievalModelManifest, type RetrievalModelStatus, type RetrievalModelInstallProgress } from '../shared/retrieval-model';
+import { createTrustedModelDownloader } from './retrieval-model-download';
 
 function safePath(path: string): void {
   let current = resolve(path);
@@ -53,14 +54,24 @@ export async function validateModelDirectory(directory: string, manifest: Retrie
 const pointerSchema = z.object({ generation: z.uuid(), fingerprint: z.string().max(20000), enabled: z.boolean() }).strict();
 const localRequest = z.object({ operationId: z.uuid(), source: z.literal('local'), directory: z.string().min(1) }).strict();
 const downloadRequest = z.object({ operationId: z.uuid(), source: z.literal('download') }).strict();
-interface Dependencies { manifest?: RetrievalModelManifest; download?: (url: string, signal?: AbortSignal) => AsyncIterable<Uint8Array> }
+interface Dependencies { manifest?: RetrievalModelManifest; download?: (url: string, signal?: AbortSignal) => AsyncIterable<Uint8Array>; freeSpace?: (directory: string) => Promise<number> }
 export class RetrievalModelStore {
   private readonly root: string;
   private readonly manifest: RetrievalModelManifest;
   private installing = false;
+  private progress: RetrievalModelInstallProgress | null = null;
   constructor(directory: string, private readonly dependencies: Dependencies = {}) {
     this.root = resolve(directory); safePath(this.root);
     this.manifest = retrievalModelManifestSchema.parse(dependencies.manifest ?? fixedManifest);
+  }
+  getProgress() { return this.progress ? { ...this.progress } : null; }
+  private requiredSpace() { return this.manifest.files.reduce((sum, file) => sum + file.bytes, 0) + 8 * 1024 ** 2; }
+  private async availableSpace() {
+    let existing = this.root;
+    while (!lstatSync(existing, { throwIfNoEntry: false })) { const parent = dirname(existing); if (parent === existing) throw new Error('无法确认模型安装磁盘空间。'); existing = parent; }
+    safePath(existing);
+    const bytes = this.dependencies.freeSpace ? await this.dependencies.freeSpace(existing) : await statfs(existing, { bigint: true }).then(stat => Number(stat.bavail * stat.bsize));
+    if (!Number.isFinite(bytes) || bytes < 0) throw new Error('无法确认模型安装磁盘空间。'); return bytes;
   }
   private async pointer() {
     const path = join(this.root, 'active.json'); safePath(path);
@@ -81,7 +92,7 @@ export class RetrievalModelStore {
     } finally { await rm(temporary, { force: true }); }
   }
   async getStatus(): Promise<RetrievalModelStatus> {
-    const base = { modelId: this.manifest.modelId, fingerprint: modelFingerprint(this.manifest), bytes: this.manifest.files.reduce((sum, file) => sum + file.bytes, 0), qualified: Object.values(this.manifest.qualification).every(Boolean) };
+    const base = { modelId: this.manifest.modelId, fingerprint: modelFingerprint(this.manifest), bytes: this.manifest.files.reduce((sum, file) => sum + file.bytes, 0), qualified: Object.values(this.manifest.qualification).every(Boolean), requiredSpaceBytes: this.requiredSpace(), availableSpaceBytes: await this.availableSpace().catch(() => undefined), progress: this.getProgress() };
     try {
       const pointer = await this.pointer();
       if (pointer) await validateModelDirectory(join(this.root, pointer.generation), this.manifest);
@@ -90,27 +101,31 @@ export class RetrievalModelStore {
   }
   async getActiveDirectory(): Promise<string | null> {
     try {
-      const pointer = await this.pointer(); if (!pointer?.enabled) return null;
+      const pointer = await this.pointer(); if (!pointer?.enabled || !Object.values(this.manifest.qualification).every(Boolean)) return null;
       const directory = join(this.root, pointer.generation); await validateModelDirectory(directory, this.manifest); return directory;
     } catch { return null; }
   }
   async setEnabled(enabled: boolean): Promise<void> {
     z.boolean().parse(enabled); if (this.installing) throw new Error('模型安装正在进行，请稍后重试。');
+    if (enabled && !Object.values(this.manifest.qualification).every(Boolean)) throw new Error('模型资格核验尚未完成，关键词检索仍可使用。');
     const pointer = await this.pointer(); if (pointer) await this.writePointer({ ...pointer, enabled });
   }
   async install(value: { operationId: string; source: 'local' | 'download'; directory?: string }, signal?: AbortSignal): Promise<void> {
     const request = z.discriminatedUnion('source', [localRequest, downloadRequest]).parse(value);
     if (this.installing) throw new Error('模型安装正在进行，请勿重复安装。');
     this.installing = true;
+    this.progress = { operationId: request.operationId, source: request.source, phase: 'checking-space', receivedBytes: 0, totalBytes: this.manifest.files.reduce((sum, file) => sum + file.bytes, 0) };
     const generation = randomUUID(), stage = join(this.root, `.stage-${generation}`), destination = join(this.root, generation);
     let activated = false;
     try {
-      cancelled(signal); safePath(this.root); mkdirSync(this.root, { recursive: true }); safePath(this.root);
+      cancelled(signal); if (await this.availableSpace() < this.requiredSpace()) throw new Error('模型安装磁盘空间不足，原模型保持。'); cancelled(signal);
+      safePath(this.root); mkdirSync(this.root, { recursive: true }); safePath(this.root);
       await mkdir(stage); safePath(stage);
       if (request.source === 'local') await validateModelDirectory(request.directory, this.manifest);
-      else if (!this.dependencies.download) throw new Error('固定模型下载服务尚未接入，请使用受支持的离线目录。');
+      const download = this.dependencies.download ?? createTrustedModelDownloader();
       for (const file of this.manifest.files) {
         cancelled(signal);
+        this.progress.phase = request.source === 'local' ? 'copying' : 'downloading'; this.progress.file = file.path;
         const path = join(stage, file.path); await mkdir(dirname(path), { recursive: true }); safePath(path);
         const handle = await open(path, 'wx', 0o600);
         try {
@@ -118,7 +133,7 @@ export class RetrievalModelStore {
           if (source) safePath(source);
           const stream = source ? createReadStream(source) : null;
           const url = `https://huggingface.co/${this.manifest.repository}/resolve/${this.manifest.revision}/${file.path}`;
-          const iterator = (stream ?? this.dependencies.download!(url, signal))[Symbol.asyncIterator]();
+          const iterator = (stream ?? download(url, signal))[Symbol.asyncIterator]();
           let length = 0;
           try {
             while (true) {
@@ -126,16 +141,19 @@ export class RetrievalModelStore {
               const chunk = item.value; cancelled(signal); length += chunk.byteLength;
               if (length > file.bytes) throw new Error('模型下载大小超过清单上限。');
               await handle.writeFile(chunk);
+              this.progress.receivedBytes += chunk.byteLength;
             }
           } finally { stream?.destroy(); void iterator.return?.().catch(() => undefined); }
           await handle.sync();
         } finally { await handle.close(); }
       }
-      cancelled(signal); await validateModelDirectory(stage, this.manifest); cancelled(signal);
+      cancelled(signal); this.progress.phase = 'verifying'; await validateModelDirectory(stage, this.manifest); cancelled(signal);
       safePath(destination); await rename(stage, destination); cancelled(signal);
-      await this.writePointer({ generation, fingerprint: modelFingerprint(this.manifest), enabled: true }, signal); activated = true;
+      this.progress.phase = 'activating';
+      await this.writePointer({ generation, fingerprint: modelFingerprint(this.manifest), enabled: Object.values(this.manifest.qualification).every(Boolean) }, signal); activated = true;
     } finally {
       this.installing = false;
+      this.progress = null;
       const cleanup = async (path: string) => {
         const child = relative(this.root, resolve(path));
         if (!child || child.startsWith('..') || isAbsolute(child)) throw new Error('模型临时清理路径越界。');

@@ -10,7 +10,7 @@ import { rankKnowledge } from '../workers/retrieval/ranking';
 interface Store { execute(command: string, payload: unknown): Promise<unknown> }
 interface Models {
   getStatus(): Promise<RetrievalModelStatus>; getActiveDirectory(): Promise<string | null>;
-  setEnabled(enabled: boolean): Promise<void>; install(request: { operationId: string; source: 'local'; directory: string }): Promise<void>;
+  setEnabled(enabled: boolean): Promise<void>; install(request: { operationId: string; source: 'local' | 'download'; directory?: string }, signal?: AbortSignal): Promise<void>;
 }
 interface Client {
   search(request: EngineQuery, directory: string, queryId: string): Promise<RetrievalHit[]>;
@@ -22,9 +22,10 @@ export class RetrievalCommands {
   private readonly queries = new Map<string, object>();
   private readonly indexed = new Map<string, string>();
   private modelGeneration = 0;
+  private installation: { operationId: string; controller: AbortController } | null = null;
   constructor(private readonly store: Store, private readonly models: Models, private readonly client: Client,
     private readonly chooseDirectory: () => Promise<string | null>) {}
-  accepts(command: string) { return ['queryKnowledge', 'cancelKnowledgeQuery', 'getRetrievalModelStatus', 'importRetrievalModel', 'setRetrievalModelEnabled', 'rebuildKnowledgeIndex'].includes(command); }
+  accepts(command: string) { return ['queryKnowledge', 'cancelKnowledgeQuery', 'getRetrievalModelStatus', 'importRetrievalModel', 'downloadRetrievalModel', 'cancelRetrievalModelInstall', 'setRetrievalModelEnabled', 'rebuildKnowledgeIndex'].includes(command); }
   async execute(command: string, value: unknown): Promise<unknown> {
     if (command === 'queryKnowledge') return this.query(retrievalQuerySchema.parse(value));
     if (command === 'cancelKnowledgeQuery') {
@@ -32,10 +33,13 @@ export class RetrievalCommands {
       this.queries.delete(queryId); this.client.cancel(queryId); return;
     }
     if (command === 'getRetrievalModelStatus') { z.object({}).strict().parse(value); return this.models.getStatus(); }
-    if (command === 'importRetrievalModel') {
-      z.object({}).strict().parse(value); const directory = await this.chooseDirectory();
-      if (directory) { this.modelGeneration++; this.client.close(); this.indexed.clear(); await this.models.install({ operationId: randomUUID(), source: 'local', directory }); }
-      return this.models.getStatus();
+    if (command === 'cancelRetrievalModelInstall') {
+      const { operationId } = z.object({ operationId: z.uuid() }).strict().parse(value);
+      if (this.installation?.operationId === operationId) this.installation.controller.abort(); return;
+    }
+    if (command === 'importRetrievalModel' || command === 'downloadRetrievalModel') {
+      const { operationId } = (command === 'importRetrievalModel' ? z.object({ operationId: z.uuid().optional() }).strict() : z.object({ operationId: z.uuid() }).strict()).parse(value);
+      return this.install(command === 'importRetrievalModel' ? 'local' : 'download', operationId ?? randomUUID());
     }
     if (command === 'setRetrievalModelEnabled') {
       const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(value), status = await this.models.getStatus();
@@ -52,6 +56,19 @@ export class RetrievalCommands {
       await this.client.index(entries, directory); return;
     }
     throw new Error('未知检索命令。');
+  }
+  private async install(source: 'local' | 'download', operationId: string) {
+    if (this.installation) throw new Error('模型安装正在进行，请勿重复安装。');
+    const installation = { operationId, controller: new AbortController() }; this.installation = installation;
+    const signal = installation.controller.signal;
+    try {
+      const directory = source === 'local' ? await this.chooseDirectory() : undefined;
+      if (signal.aborted) throw new Error('模型安装已取消，原模型保持。');
+      if (source === 'local' && !directory) return this.models.getStatus();
+      this.modelGeneration++; this.client.close(); this.indexed.clear();
+      await this.models.install({ operationId, source, ...(directory ? { directory } : {}) }, signal);
+      return this.models.getStatus();
+    } finally { if (this.installation === installation) this.installation = null; }
   }
   private async snapshot(workId: string | null) {
     const scope = await this.store.execute('readKnowledgeScope', { scopeId: workId }) as KnowledgeScope;

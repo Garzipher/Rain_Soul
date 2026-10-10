@@ -20,7 +20,9 @@ export interface RetrievalApi {
   queryKnowledge?(request: RetrievalQuery): Promise<RetrievalReply>;
   cancelKnowledgeQuery?(queryId: string): Promise<void>;
   getRetrievalModelStatus?(): Promise<RetrievalModelStatus>;
-  importRetrievalModel?(): Promise<RetrievalModelStatus>;
+  importRetrievalModel?(request?: { operationId: string }): Promise<RetrievalModelStatus>;
+  downloadRetrievalModel?(request: { operationId: string }): Promise<RetrievalModelStatus>;
+  cancelRetrievalModelInstall?(request: { operationId: string }): Promise<void>;
   setRetrievalModelEnabled?(enabled: boolean): Promise<RetrievalModelStatus>;
   rebuildKnowledgeIndex?(workId: string | null): Promise<void>;
 }

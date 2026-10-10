@@ -13,6 +13,10 @@ it('本机检索桥接仅发送查询与受限安装命令，不接受模型路�
   expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'cancelKnowledgeQuery', { queryId: query.queryId });
   await api.getRetrievalModelStatus(); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'getRetrievalModelStatus', {});
   await api.importRetrievalModel(); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'importRetrievalModel', {});
+  const operation = { operationId: randomUUID() };
+  await api.importRetrievalModel(operation); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'importRetrievalModel', operation);
+  await api.downloadRetrievalModel(operation); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'downloadRetrievalModel', operation);
+  await api.cancelRetrievalModelInstall(operation); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'cancelRetrievalModelInstall', operation);
   await api.setRetrievalModelEnabled(false); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'setRetrievalModelEnabled', { enabled: false });
   await api.rebuildKnowledgeIndex(query.workId); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'rebuildKnowledgeIndex', { workId: query.workId });
   bridge.invoke.mockResolvedValue({ ok: false, message: '本机模型未就绪' });
