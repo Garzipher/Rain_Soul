@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "modelId": "bge-small-zh-v1.5-q8",
+  "repository": "Xenova/bge-small-zh-v1.5",
+  "revision": "75c43b069aac4d136ba6bc1122f995fedcfd2781",
+  "upstreamRepository": "BAAI/bge-small-zh-v1.5",
+  "upstreamReferenceRevision": "7999e1d3359715c523056ef9478215996d62a620",
+  "license": "MIT",
+  "licenseUrl": "https://github.com/FlagOpen/FlagEmbedding/blob/fd1a2bdf69488ffebe0327999d4400d8c8058a0b/LICENSE",
+  "runtime": {
+    "transformers": "4.3.1",
+    "onnxruntime": "1.30.0"
+  },
+  "dimensions": 512,
+  "windowTokens": 512,
+  "textTokens": 400,
+  "chunkOverlap": 50,
+  "chunkerVersion": 1,
+  "dtype": "q8",
+  "pooling": "cls",
+  "normalize": true,
+  "queryPrefix": "为这个句子生成表示以用于检索相关文章：",
+  "qualification": {
+    "officialSourceVerified": false,
+    "conversionRevisionVerified": false,
+    "networkAuditPassed": false,
+    "packagedRuntimePassed": false,
+    "qualityCalibrated": false
+  },
+  "files": [
+    {
+      "path": "config.json",
+      "bytes": 716,
+      "sha256": "d4193ead3a810fd694fa8a31d7fc72fbaebc0668b603e398734bf2f6538ff42f"
+    },
+    {
+      "path": "tokenizer.json",
+      "bytes": 439125,
+      "sha256": "48cea5d44424912a6fd1ea647bf4fe50b55ab8b1e5879c3275f80e339e8fae26"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "bytes": 367,
+      "sha256": "e6f3b96db926a37d4039995fbf5ad17de158dfb8f6343d607e4dbaad18d75f5a"
+    },
+    {
+      "path": "special_tokens_map.json",
+      "bytes": 125,
+      "sha256": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3"
+    },
+    {
+      "path": "onnx/model_quantized.onnx",
+      "bytes": 24010842,
+      "sha256": "15b717c382bcb518ba457b93ea6850ede7f4f1cd8937454aa06972366cd19bcc"
+    }
+  ],
+  "licenseText": "MIT License\n\nCopyright (c) 2022 staoxiao\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+}
