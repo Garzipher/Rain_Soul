@@ -1,0 +1,72 @@
+import { useEffect, useRef, useState } from 'react';
+import type { AiPreparedRequest } from '../../shared/ai';
+import type { WorkDetail } from '../../shared/contracts';
+import type { BookExtractionPreview } from '../../shared/book-extraction';
+import type { BookExtractionAiApi, BookExtractionAiResult, BookExtractionAiSuggestion } from '../../shared/book-extraction-ai';
+import { extractionCategoryPath } from '../../shared/ai-extraction';
+import { StructureDialog } from './structure-dialog';
+import './book-extraction-ai-panel.css';
+
+export interface BookExtractionAiPanelProps {
+  work: WorkDetail; preview: BookExtractionPreview; api: BookExtractionAiApi; permission: boolean;
+  onUse: (suggestion: BookExtractionAiSuggestion) => void; onBusyChange: (busy: boolean) => void;
+}
+export function BookExtractionAiPanel({ work, preview, api, permission, onUse, onBusyChange }: BookExtractionAiPanelProps) {
+  const [selected, setSelected] = useState<string[]>([]), [page, setPage] = useState(0);
+  const [prepared, setPrepared] = useState<AiPreparedRequest | null>(null), [result, setResult] = useState<BookExtractionAiResult | null>(null);
+  const [status, setStatus] = useState<'idle' | 'preparing' | 'prepared' | 'sending' | 'cancelling'>('idle'), [error, setError] = useState('');
+  const phase = useRef(status), tokens = useRef(new Set<string>()), alive = useRef(true);
+  const busyCallback = useRef(onBusyChange); busyCallback.current = onBusyChange;
+  const busy = status !== 'idle';
+  const categories = work.assets?.categories.filter(item => !item.deletedAt) ?? [], tags = work.assets?.tags.filter(item => !item.deletedAt) ?? [];
+  function changeStatus(value: typeof status) { phase.current = value; busyCallback.current(value !== 'idle'); setStatus(value); }
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; for (const token of tokens.current) void api.cancelBookExtractionAi(token).catch(() => undefined); busyCallback.current(false); };
+  }, [api, work.id, preview.token]);
+  async function prepare() {
+    if (phase.current !== 'idle' || !permission || preview.workId !== work.id || !selected.length || selected.length > 20) return;
+    changeStatus('preparing'); setError('');
+    try {
+      const value = await api.prepareBookExtractionAi({ workId: work.id, token: preview.token, segmentIds: preview.segments.filter(segment => selected.includes(segment.id)).map(segment => segment.id), permissionConfirmed: true });
+      if (!alive.current) { await api.cancelBookExtractionAi(value.confirmationToken); return; }
+      tokens.current.add(value.confirmationToken); setPrepared(value); changeStatus('prepared');
+    } catch (failure) { if (alive.current) { setError(failure instanceof Error ? failure.message : '无法准备 AI 推荐。'); changeStatus('idle'); } }
+  }
+  async function cancel() {
+    if (!prepared || phase.current !== 'prepared') return;
+    changeStatus('cancelling');
+    try { await api.cancelBookExtractionAi(prepared.confirmationToken); tokens.current.delete(prepared.confirmationToken); setPrepared(null); changeStatus('idle'); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : '取消失败，请重试。'); changeStatus('prepared'); }
+  }
+  async function execute() {
+    if (!prepared || phase.current !== 'prepared' || !permission) return false;
+    const request = prepared; changeStatus('sending'); setPrepared(null); setError('');
+    try {
+      const value = await api.executeBookExtractionAi({ confirmationToken: request.confirmationToken, requestHash: request.requestHash, confirmed: true });
+      if (alive.current) setResult(value);
+    } catch (failure) { if (alive.current) setError(failure instanceof Error ? failure.message : 'AI 推荐失败，已有推荐已保留。'); }
+    finally { if (alive.current) changeStatus('idle'); }
+    return false;
+  }
+  return <section className="book-extraction-ai" aria-label="AI 辅助拆书" aria-busy={busy}>
+    <h2>AI 辅助拆书</h2><p>单独选择原文段落进行分析，每次最多 20 段。推荐带入后仍需人工审核。</p>
+    {!permission && <p role="status">请先确认有权使用摘选内容，再准备 AI 推荐。</p>}
+    {error && <p role="alert">{error}</p>}
+    <div className="book-extraction-ai-selection" role="group" aria-label="AI 分析原文范围">{preview.segments.slice(page * 20, (page + 1) * 20).map((segment, index) => <label key={segment.id}>
+      <input type="checkbox" aria-label={`AI 分析段落 ${page * 20 + index + 1}`} checked={selected.includes(segment.id)} disabled={busy || (!selected.includes(segment.id) && selected.length >= 20)} onChange={event => setSelected(current => event.target.checked ? [...current, segment.id] : current.filter(id => id !== segment.id))} />
+      <span>{segment.chapterTitle} · 第 {segment.paragraphIndex} 段<span className="book-extraction-ai-original">{segment.text}</span></span>
+    </label>)}</div>
+    <div className="book-extraction-ai-actions"><button disabled={busy || !page} onClick={() => setPage(page - 1)}>AI 上一页</button><span>第 {page + 1} / {Math.ceil(preview.segments.length / 20)} 页 · 已选 {selected.length} / 20 段</span><button disabled={busy || (page + 1) * 20 >= preview.segments.length} onClick={() => setPage(page + 1)}>AI 下一页</button><button className="primary" disabled={busy || !permission || !selected.length || preview.workId !== work.id} onClick={() => void prepare()}>准备 AI 推荐</button></div>
+    {status === 'sending' && <p role="status">正在生成 AI 推荐…</p>}
+    {result && <div className="book-extraction-ai-results" aria-label="AI 推荐结果">{result.suggestions.map(item => <article key={item.segmentId}>
+      <h3>第 {(preview.segments.findIndex(segment => segment.id === item.segmentId)) + 1} 段推荐</h3><dl>
+        <dt>原文摘录</dt><dd>{item.excerpt}</dd><dt>写作手法</dt><dd>{item.technique}</dd><dt>适用场景</dt><dd>{item.usage}</dd><dt>仿写练习</dt><dd>{item.exercise}</dd>
+        <dt>主分类</dt><dd>{extractionCategoryPath(categories, item.categoryId)}</dd><dt>标签</dt><dd>{item.tagIds.map(id => tags.find(tag => tag.id === id)?.name ?? '标签已删除').join('、') || '无'}</dd>
+      </dl><button disabled={busy || !!result.validationError} onClick={() => onUse(item)}>带入审核</button>
+    </article>)}</div>}
+    {prepared && <StructureDialog busy={status !== 'prepared'} onClose={() => void cancel()} state={{ heading: '确认 AI 辅助拆书', description: `${prepared.service} · ${prepared.model} · ${prepared.scopeLabel}`, submitLabel: '确认发送', submitTone: 'primary', onSubmit: execute }}>
+      <p>{prepared.billingHint}</p><p>预计输入 {prepared.estimatedInputTokens} token；输出上限 {prepared.maxOutputTokens} token。</p><details open><summary>完整发送内容</summary><pre className="book-extraction-ai-preview">{prepared.previewText}</pre></details>
+    </StructureDialog>}
+  </section>;
+}
