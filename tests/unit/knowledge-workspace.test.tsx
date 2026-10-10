@@ -21,6 +21,20 @@ function setup(options: Partial<React.ComponentProps<typeof KnowledgeWorkspace>>
   return { ...props, view: render(<KnowledgeWorkspace {...props} />) };
 }
 describe('知识卡片与搜索', () => {
+  it('空库引导导入素材，过滤空态可清除，检索空态可改写查询', async () => {
+    const onBookExtraction = vi.fn();
+    const { view, ...props } = setup({ onBookExtraction, assets: { ...assets, knowledge: [] } });
+    expect(screen.getByText('还没有知识储备')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '导入参考素材' })); expect(onBookExtraction).toHaveBeenCalled();
+    view.rerender(<KnowledgeWorkspace {...props} assets={assets} />);
+    fireEvent.click(screen.getByRole('button', { name: '未分类' }));
+    fireEvent.click(within(screen.getByRole('group', { name: '标签筛选' })).getByRole('button', { name: '城市' }));
+    expect(screen.getByText('当前分类或标签没有匹配内容')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '清除筛选' })); expect(screen.getAllByRole('article')).toHaveLength(2);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '不存在' } });
+    expect(await screen.findByText('没有匹配的知识或正文内容')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '改写查询' })); expect(screen.getByRole('searchbox')).toHaveFocus();
+  });
   it('当前作品知识卡可逐条选用和移除写作参考，跨作品必须先复制', () => {
     const onToggleReference = vi.fn();
     const { view, ...props } = setup({ onToggleReference, referenceIds: [] });
