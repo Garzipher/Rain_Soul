@@ -6,6 +6,53 @@ import App from '../../src/renderer/App';
 import { createStructureAdapter } from './renderer-structure-adapter';
 const adapters: ReturnType<typeof createStructureAdapter>[] = [];
 afterEach(() => { cleanup(); adapters.splice(0).forEach(adapter => adapter.dispose()); });
+it('删除已选知识释放参考额度，AI 只预览有效条目且不跨作品沿用', async () => {
+  const adapter = createStructureAdapter(); adapters.push(adapter);
+  let work = await adapter.api.createWork('参考额度验收');
+  const other = await adapter.api.createWork('参考隔离验收');
+  await adapter.api.openWork(work.id);
+  adapter.api.queryKnowledge = vi.fn(async request => ({ queryId: request.queryId, hits: [], total: 0, sourceRevisions: {}, modelFingerprint: null, status: 'fallback' as const }));
+  for (let index = 1; index <= 6; index++) {
+    work = await adapter.api.manageAssets({ workId: work.id, expectedRevision: work.revision, operationId: crypto.randomUUID(), action: { type: 'createKnowledge', body: `参考内容${index}`, source: '原创参考', categoryId: work.assets!.categories[0].id, tagIds: [] } });
+  }
+  adapter.api.prepareAi = vi.fn(async () => ({ confirmationToken: 'test', requestHash: 'a'.repeat(64), expiresAt: Date.now() + 60000, service: '测试服务', model: 'test', scopeLabel: '本章', previewText: '原文', paragraphIds: [work.chapters[0].document.content[0].attrs.id], billingHint: '模拟', estimatedInputTokens: 10, maxOutputTokens: 20 }));
+  render(<App api={adapter.api} />);
+  fireEvent.click(await screen.findByRole('button', { name: '打开作品：参考额度验收' }));
+  await screen.findByLabelText('章节标题');
+  await waitFor(() => expect(screen.getByRole('button', { name: '知识库' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  for (let index = 1; index <= 5; index++) {
+    fireEvent.click(within(await screen.findByRole('article', { name: `知识：参考内容${index}` })).getByRole('button', { name: '用于写作参考' }));
+  }
+  expect(within(screen.getByRole('article', { name: '知识：参考内容6' })).getByRole('button', { name: '用于写作参考' })).toBeDisabled();
+  for (let index = 1; index <= 5; index++) {
+    const card = screen.getByRole('article', { name: `知识：参考内容${index}` });
+    fireEvent.click(within(card).getByRole('button', { name: '删除知识' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确认删除' }));
+    await waitFor(() => expect(screen.queryByRole('article', { name: `知识：参考内容${index}` })).not.toBeInTheDocument());
+  }
+  const remaining = within(screen.getByRole('article', { name: '知识：参考内容6' })).getByRole('button', { name: '用于写作参考' });
+  expect(remaining).toBeEnabled();
+  fireEvent.click(remaining);
+  expect(within(screen.getByRole('article', { name: '知识：参考内容6' })).getByRole('button', { name: '移除写作参考' })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: '返回写作' }));
+  await screen.findByLabelText('章节标题');
+  fireEvent.click(screen.getByRole('button', { name: 'AI 工具' }));
+  fireEvent.click(await screen.findByRole('button', { name: '预览 AI 请求' }));
+  await screen.findByRole('dialog', { name: '确认云端 AI 操作' });
+  expect(adapter.api.prepareAi).toHaveBeenLastCalledWith(expect.objectContaining({ workId: work.id, referenceKnowledgeIds: [work.assets!.knowledge.find(entry => entry.body === '参考内容6')!.id] }));
+  fireEvent.click(screen.getByRole('button', { name: '取消' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '关闭AI工具' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '关闭AI工具' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '返回作品集' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '返回作品集' }));
+  fireEvent.click(await screen.findByRole('button', { name: '打开作品：参考隔离验收' }));
+  await screen.findByLabelText('章节标题');
+  fireEvent.click(screen.getByRole('button', { name: 'AI 工具' }));
+  fireEvent.click(await screen.findByRole('button', { name: '预览 AI 请求' }));
+  await screen.findByRole('dialog', { name: '确认云端 AI 操作' });
+  expect(adapter.api.prepareAi).toHaveBeenLastCalledWith(expect.objectContaining({ workId: other.id, referenceKnowledgeIds: [] }));
+}, 30000);
 it('知识库读取失败就地重试，加载时不展示后置功能占位', async () => {
   const adapter = createStructureAdapter(); adapters.push(adapter);
   await adapter.api.createWork('知识加载验收');
