@@ -8,7 +8,7 @@ import type { BookExtractionAiApi } from '../../src/shared/book-extraction-ai';
 import { freezeSource } from '../../src/main/freeze-source';
 import type { ExtractionDraftRecovery } from '../../src/shared/extraction-draft';
 afterEach(cleanup);
-function setup(extraSegments = 0, restore: boolean | 'broken' = false) {
+function setup(extraSegments = 0, restore: boolean | 'broken' | 'batches' = false) {
   const categoryId = crypto.randomUUID(), work: WorkDetail = { id: crypto.randomUUID(), title: '当前作品', revision: 1, chapters: [], volumes: [], deletedItems: [],
     assets: { categories: [{ id: categoryId, name: '景物描写', parentId: null, sortOrder: 0, systemKey: null, deletedAt: null }], tags: [], knowledge: [], outlines: [], foreshadows: [], evidence: [], styleProfiles: [], chapterStyles: [], defaultStyleId: null } };
   const preview: BookExtractionPreview = { token: crypto.randomUUID(), workId: work.id, filename: '优秀作品.txt', fileHash: 'a'.repeat(64), format: 'txt', warnings: [], segments: [
@@ -29,7 +29,7 @@ function setup(extraSegments = 0, restore: boolean | 'broken' = false) {
   if (restore) {
     const source = freezeSource({ kind: 'txt', title: preview.filename, rawBytes: Buffer.from('原稿'), segments: preview.segments.map(segment => ({ text: segment.text })) });
     source.segments.forEach((segment, index) => { segment.id = preview.segments[index].id; });
-    api.readExtractionDraft = vi.fn(async (): Promise<ExtractionDraftRecovery> => ({ preview, draft: { schemaVersion: 1, taskId: crypto.randomUUID(), workId: work.id, previewToken: preview.token, source, batches: [], committing: null,
+    api.readExtractionDraft = vi.fn(async (): Promise<ExtractionDraftRecovery> => ({ preview, draft: { schemaVersion: 1, taskId: crypto.randomUUID(), workId: work.id, previewToken: preview.token, source, batches: restore === 'batches' ? [{ id: crypto.randomUUID(), requestHash: aiResult.requestHash, segmentIds: [preview.segments[0].id], status: 'ready', categoryIds: [categoryId], tagIds: [], suggestions: aiResult.suggestions, rawText: aiResult.rawText }] : [], committing: null,
       reviews: [{ segmentId: preview.segments[0].id, body: '已入库摘录', categoryId, tagIds: [], status: 'committed', annotation: { technique: '旧写法', usage: '', exercise: '' } },
         { segmentId: preview.segments[1].id, body: '尚未入库的审核草稿', categoryId, tagIds: [], status: 'approved' }] } }));
     api.saveExtractionReview = vi.fn(async () => (await api.readExtractionDraft!(work.id))!.draft);
@@ -67,6 +67,14 @@ it('本机恢复审核草稿和已入库状态，不恢复发送授权；修改�
   fireEvent.change(screen.getByRole('textbox', { name: '写作手法 2' }), { target: { value: '作者补充的写法' } });
   await waitFor(() => expect(api.saveExtractionReview).toHaveBeenCalledWith(expect.objectContaining({ reviews: expect.arrayContaining([expect.objectContaining({ status: 'pending', annotation: { technique: '作者补充的写法', usage: '', exercise: '' } })]) })));
   expect(api.fetchWebExtraction).not.toHaveBeenCalled(); expect(api.prepareBookExtractionAi).not.toHaveBeenCalled();
+});
+it('草稿工作区提供已完成AI批次恢复入口，读取本机建议不触发云请求', async () => {
+  const { api } = setup(0, 'batches');
+  fireEvent.click(await screen.findByRole('button', { name: '查看已保存 AI 批次 1' }));
+  expect(await screen.findByText('声音与景物结合')).not.toBeNull();
+  expect(screen.getByRole('checkbox', { name: '确认有权使用摘选内容' })).toHaveProperty('checked', false);
+  expect(screen.getByRole('button', { name: '带入审核' })).toHaveProperty('disabled', true);
+  expect(api.executeBookExtractionAi).not.toHaveBeenCalled(); expect(api.confirmBookExtraction).not.toHaveBeenCalled();
 });
 it('恢复损坏草稿不会自动覆盖，保存失败阻止返回以保护编辑内容', async () => {
   const broken = setup(0, 'broken');

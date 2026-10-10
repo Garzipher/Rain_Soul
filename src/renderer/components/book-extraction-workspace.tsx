@@ -14,6 +14,7 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
   work: WorkDetail; api: BookExtractionApi & BookExtractionAiApi & Pick<DesktopApi, 'fetchWebExtraction' | 'cancelWebExtraction' | 'previewPastedExtraction'> & { discardExtractionDraft?: (workId: string, token: string) => Promise<void> }; onClose: () => void; onCommitted: (work: WorkDetail) => void; onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [preview, setPreview] = useState<BookExtractionPreview | null>(null), [reviews, setReviews] = useState<Record<string, Review>>({});
+  const [recoveredBatches, setRecoveredBatches] = useState<{ requestHash: string }[]>([]);
   const [encoding, setEncoding] = useState<'utf-8' | 'gb18030'>('utf-8'), [sourceTitle, setSourceTitle] = useState(''), [sourceAuthor, setSourceAuthor] = useState('');
   const [permission, setPermission] = useState(false), [fileBusy, setBusy] = useState(false), [aiBusy, setAiBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
   const [replacement, setReplacement] = useState<{ suggestion: BookExtractionAiSuggestion; revalidate: () => Promise<boolean> } | null>(null);
@@ -40,6 +41,7 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
     void api.readExtractionDraft(work.id).then(result => {
       if (!active || !result) return;
       acceptPreview(result.preview);
+      setRecoveredBatches(result.draft.batches.filter(batch => batch.status === 'ready').map(batch => ({ requestHash: batch.requestHash })));
       const saved = new Map(result.draft.reviews.map(review => [review.segmentId, review]));
       setReviews(current => Object.fromEntries(Object.entries(current).map(([id, review]) => {
         const item = saved.get(id);
@@ -86,6 +88,7 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
     if (result.workId !== work.id) throw new Error('素材不属于当前作品，请重新选择。');
     const categoryId = categories.find(item => item.systemKey === 'uncategorized')?.id ?? categories[0]?.id ?? '';
     setPreview(result); setReviews(Object.fromEntries(result.segments.map(segment => [segment.id, { body: segment.text, categoryId, tagIds: [], checked: false, annotation: { technique: '', usage: '', exercise: '' } }])));
+    setRecoveredBatches([]);
     setSourceTitle(result.source?.title ?? result.filename.replace(/\.[^.]+$/, '')); setSourceAuthor(''); setPermission(false); setPage(0); setReaderPage(0); setMessage(''); attempt.current = null;
   }
   function useSuggestion(suggestion: BookExtractionAiSuggestion, revalidate: () => Promise<boolean>) {
@@ -200,7 +203,7 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
       <label>来源作者<input aria-label="来源作者" value={sourceAuthor} maxLength={200} disabled={busy} onChange={event => setSourceAuthor(event.target.value)} placeholder="未知可留空" /></label>
       <label><input type="checkbox" aria-label="确认有权使用摘选内容" checked={permission} disabled={busy} onChange={event => setPermission(event.target.checked)} />我确认有权使用这些摘选内容；仅整理已审核的写作参考。</label>
       {preview.warnings.map((warning, index) => <p role="status" key={index}>{warning.message}</p>)}
-    </div><div className="book-extraction-columns"><section className="book-extraction-reader" aria-label="原文阅读"><header><h2>原文阅读</h2><span>{preview.segments.length} 段</span></header><div className="book-extraction-reader-scroll">{preview.segments.slice(readerPage * 20, (readerPage + 1) * 20).map(segment => <article key={segment.id}><small>{segment.chapterTitle} · 第 {segment.paragraphIndex} 段</small><p>{segment.text}</p></article>)}</div><nav aria-label="原文分页"><button disabled={busy || !readerPage} onClick={() => setReaderPage(readerPage - 1)}>原文上一页</button><span>第 {readerPage + 1} / {Math.ceil(preview.segments.length / 20)} 页</span><button disabled={busy || (readerPage + 1) * 20 >= preview.segments.length} onClick={() => setReaderPage(readerPage + 1)}>原文下一页</button></nav></section><section className="book-extraction-review" aria-label="摘选审核"><header><h2>摘选与审核</h2><span>入库需逐段确认</span></header><div className="book-extraction-review-scroll"><div inert={fileBusy}><BookExtractionAiPanel work={work} preview={preview} api={api} permission={permission} disabled={fileBusy} onUse={useSuggestion} onBusyChange={changeAiBusy} /></div><div className="book-extraction-segments">{preview.segments.slice(page * 20, (page + 1) * 20).map((segment, index) => {
+    </div><div className="book-extraction-columns"><section className="book-extraction-reader" aria-label="原文阅读"><header><h2>原文阅读</h2><span>{preview.segments.length} 段</span></header><div className="book-extraction-reader-scroll">{preview.segments.slice(readerPage * 20, (readerPage + 1) * 20).map(segment => <article key={segment.id}><small>{segment.chapterTitle} · 第 {segment.paragraphIndex} 段</small><p>{segment.text}</p></article>)}</div><nav aria-label="原文分页"><button disabled={busy || !readerPage} onClick={() => setReaderPage(readerPage - 1)}>原文上一页</button><span>第 {readerPage + 1} / {Math.ceil(preview.segments.length / 20)} 页</span><button disabled={busy || (readerPage + 1) * 20 >= preview.segments.length} onClick={() => setReaderPage(readerPage + 1)}>原文下一页</button></nav></section><section className="book-extraction-review" aria-label="摘选审核"><header><h2>摘选与审核</h2><span>入库需逐段确认</span></header><div className="book-extraction-review-scroll"><div inert={fileBusy}><BookExtractionAiPanel work={work} preview={preview} api={api} permission={permission} disabled={fileBusy} onUse={useSuggestion} onBusyChange={changeAiBusy} recoveredBatches={recoveredBatches} /></div><div className="book-extraction-segments">{preview.segments.slice(page * 20, (page + 1) * 20).map((segment, index) => {
       const item = reviews[segment.id], number = page * 20 + index + 1;
       return <fieldset key={segment.id} disabled={busy || item.committed}><legend>{segment.chapterTitle} · 第 {segment.paragraphIndex} 段{item.committed ? ' · 已入库' : ''}</legend>
         <details><summary>查看原文</summary><p>{segment.text}</p></details>

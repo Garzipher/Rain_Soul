@@ -45,6 +45,31 @@ it('未确认原文使用许可或未选择段落时禁止准备，AI选择默�
   expect(screen.getByRole('button', { name: '准备 AI 推荐' })).toHaveProperty('disabled', true);
   expect(api.prepareBookExtractionAi).not.toHaveBeenCalled(); expect(api.executeBookExtractionAi).not.toHaveBeenCalled();
 });
+it('恢复已完成批次只核对本机结果，不恢复云授权或默认审核，仍能逐条采用', async () => {
+  const { view, work, preview, api, onUse, onBusyChange, result } = setup(false);
+  const recoveredBatches = [{ requestHash: result.requestHash }];
+  view.rerender(<BookExtractionAiPanel work={work} preview={preview} api={api} permission={false} onUse={onUse} onBusyChange={onBusyChange} recoveredBatches={recoveredBatches} />);
+  fireEvent.click(screen.getByRole('button', { name: '查看已保存 AI 批次 1' }));
+  expect(await screen.findByText('用声音刻画雨景')).toBeVisible();
+  expect(api.getBookExtractionAiResult).toHaveBeenCalledWith({ workId: work.id, previewToken: preview.token, requestHash: result.requestHash });
+  expect(api.prepareBookExtractionAi).not.toHaveBeenCalled(); expect(api.executeBookExtractionAi).not.toHaveBeenCalled();
+  expect(screen.getByRole('checkbox', { name: 'AI 分析段落 1' })).not.toBeChecked();
+  expect(screen.getByRole('button', { name: '带入审核' })).toBeDisabled();
+  view.rerender(<BookExtractionAiPanel work={work} preview={preview} api={api} permission onUse={onUse} onBusyChange={onBusyChange} recoveredBatches={recoveredBatches} />);
+  fireEvent.click(screen.getByRole('button', { name: '带入审核' }));
+  await waitFor(() => expect(onUse).toHaveBeenCalledWith(result.suggestions[0], expect.any(Function)));
+});
+it('旧批次缺失或原文身份不匹配禁止恢复，不发送云请求', async () => {
+  const { view, work, preview, api, onUse, onBusyChange, result } = setup();
+  view.rerender(<BookExtractionAiPanel work={work} preview={preview} api={api} permission onUse={onUse} onBusyChange={onBusyChange} recoveredBatches={[{ requestHash: result.requestHash }]} />);
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'missing' }).mockResolvedValueOnce({ status: 'ready', result: { ...result, previewToken: crypto.randomUUID() } });
+  fireEvent.click(screen.getByRole('button', { name: '查看已保存 AI 批次 1' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('没有可恢复');
+  fireEvent.click(screen.getByRole('button', { name: '查看已保存 AI 批次 1' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('不匹配');
+  expect(screen.queryByRole('button', { name: '带入审核' })).not.toBeInTheDocument();
+  expect(api.executeBookExtractionAi).not.toHaveBeenCalled();
+});
 it('发送前显示服务、范围、完整材料和费用；Escape取消授权并恢复焦点，零云执行', async () => {
   const { api, preview, work, onBusyChange } = setup();
   const dialog = await prepare();

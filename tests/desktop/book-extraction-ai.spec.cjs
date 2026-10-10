@@ -229,3 +229,50 @@ test('无云配置仍可手工摘选，坏模型摘录整批禁止应用且请�
     await closeNormally(application);
   } finally { await cleanup(application, directory); }
 });
+
+test('已完成但未采用的AI拆书批次重启可恢复，零云重发且须重新审核', async () => {
+  const directory = await temporaryDirectory(); let application;
+  const filename = path.join(directory, '批次恢复演练.txt');
+  await writeFile(filename, `第一章 雨夜\n${original}\n第二章 重逢\n${original}`, 'utf8');
+  try {
+    application = await launch(directory); let page = await offlineWindow(application);
+    await installTransport(application); await createWork(page, 'AI批次重启恢复');
+    const id = await page.evaluate(async () => (await window.rainSoul.listWorks()).find(work => work.title === 'AI批次重启恢复').id);
+    await configure(page); await openSource(page, application, filename);
+    await page.getByRole('checkbox', { name: 'AI 分析段落 2', exact: true }).check();
+    const dialog = await prepare(page); await activate(dialog.getByRole('button', { name: '确认发送', exact: true }));
+    await expect(page.locator('[aria-label="AI 推荐结果"]')).toContainText('用具体光影和比喻营造场景。');
+    expect(await count(application)).toBe(1); expect((await readWork(page, id)).assets.knowledge).toHaveLength(0);
+    await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
+    await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true }));
+    await expect(page.getByRole('button', { name: '拆书工具', exact: true })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await closeNormally(application); application = await launch(directory); page = await offlineWindow(application);
+    await installTransport(application);
+    await activate(page.getByRole('button', { name: '打开作品：AI批次重启恢复', exact: true }));
+    await sidebar(page, '知识库'); await activate(page.getByRole('button', { name: '拆书工具', exact: true }));
+    await activate(page.getByRole('button', { name: '查看已保存 AI 批次 1', exact: true }));
+    const results = page.locator('[aria-label="AI 推荐结果"]');
+    await expect(results).toContainText('用具体光影和比喻营造场景。');
+    await expect(results.getByRole('button', { name: '带入审核', exact: true })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'AI 分析段落 1', exact: true })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: '审核通过段落 2', exact: true })).not.toBeChecked();
+    expect(await count(application)).toBe(0);
+    await page.getByRole('checkbox', { name: '确认有权使用摘选内容', exact: true }).check();
+    await activate(results.getByRole('button', { name: '带入审核', exact: true }));
+    await expect(page.getByRole('textbox', { name: '写作手法 2', exact: true })).toHaveValue('用具体光影和比喻营造场景。');
+    await expect(page.getByRole('checkbox', { name: '审核通过段落 2', exact: true })).not.toBeChecked();
+    expect((await readWork(page, id)).assets.knowledge).toHaveLength(0); expect(await count(application)).toBe(0);
+    const recovered = await page.evaluate(id => window.rainSoul.readExtractionDraft(id), id);
+    expect(recovered.preview.segments[1]).toMatchObject({ chapterIndex: 2, paragraphIndex: 1 });
+    await page.getByRole('checkbox', { name: '审核通过段落 2', exact: true }).check();
+    await activate(page.getByRole('button', { name: '确认入库（1）', exact: true }));
+    await expect.poll(async () => (await readWork(page, id)).assets.knowledge.length).toBe(1);
+    expect((await readWork(page, id)).assets.knowledge[0].source).toContain('第2章 第二章 重逢 第1段');
+    await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
+    await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true }));
+    await expect(page.getByRole('button', { name: '拆书工具', exact: true })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await closeNormally(application);
+  } finally { await cleanup(application, directory); }
+});

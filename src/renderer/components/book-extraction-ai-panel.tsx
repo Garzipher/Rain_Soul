@@ -10,12 +10,13 @@ import './book-extraction-ai-panel.css';
 export interface BookExtractionAiPanelProps {
   work: WorkDetail; preview: BookExtractionPreview; api: BookExtractionAiApi; permission: boolean; disabled?: boolean;
   onUse: (suggestion: BookExtractionAiSuggestion, revalidate: () => Promise<boolean>) => void; onBusyChange: (busy: boolean) => void;
+  recoveredBatches?: readonly { requestHash: string }[];
 }
 const suggestionEvidence = (item: BookExtractionAiSuggestion | undefined) => item && JSON.stringify([item.segmentId, item.excerpt, item.categoryId, item.tagIds, item.technique, item.usage, item.exercise]);
 export function BookExtractionAiPanel(props: BookExtractionAiPanelProps) {
   return <BookExtractionAiPanelContent key={`${props.work.id}:${props.preview.token}`} {...props} />;
 }
-function BookExtractionAiPanelContent({ work, preview, api, permission, disabled = false, onUse, onBusyChange }: BookExtractionAiPanelProps) {
+function BookExtractionAiPanelContent({ work, preview, api, permission, disabled = false, onUse, onBusyChange, recoveredBatches = [] }: BookExtractionAiPanelProps) {
   const [selected, setSelected] = useState<string[]>([]), [page, setPage] = useState(0);
   const [prepared, setPrepared] = useState<AiPreparedRequest | null>(null), [result, setResult] = useState<BookExtractionAiResult | null>(null);
   const [rawResult, setRawResult] = useState<BookExtractionAiResult | null>(null), [notice, setNotice] = useState('');
@@ -36,11 +37,21 @@ function BookExtractionAiPanelContent({ work, preview, api, permission, disabled
   }, []);
   useEffect(() => { if (!permission && active.current && phase.current !== 'idle') void cancel(); }, [permission]);
   useEffect(() => { if (status === 'idle' && restoreFocus.current) { restoreFocus.current = false; prepareButton.current?.focus(); } }, [status]);
-  function accept(value: BookExtractionAiResult, request: AiPreparedRequest) {
+  function accept(value: BookExtractionAiResult, request: Pick<AiPreparedRequest, 'requestHash'>) {
     if (value.workId !== work.id || value.previewToken !== preview.token || value.requestHash !== request.requestHash) throw new Error('推荐回执不匹配本次原文，请核对本机结果。');
     if (value.validationError) setRawResult(value);
     else { setResult(value); setRawResult(null); }
     active.current = null; setError(''); setNotice(''); changeStatus('idle');
+  }
+  async function restoreBatch(requestHash: string) {
+    if (manualLock.current || phase.current !== 'idle') return;
+    const serial = ++epoch.current; changeStatus('checking'); setError('');
+    try {
+      const value = await api.getBookExtractionAiResult({ workId: work.id, previewToken: preview.token, requestHash });
+      if (!alive.current || serial !== epoch.current) return;
+      if (value.status !== 'ready') throw new Error('本机没有可恢复的已完成批次，已有审核内容仍保留。');
+      accept(value.result, { requestHash }); setNotice('已恢复本机 AI 建议；未恢复发送授权，带入后仍需逐条审核。');
+    } catch (failure) { if (alive.current && serial === epoch.current) { setError(failure instanceof Error ? failure.message : '无法读取已保存批次，请手动重试。'); changeStatus('idle'); } }
   }
   async function prepare() {
     if (manualLock.current || phase.current !== 'idle' || !permission || preview.workId !== work.id || !selected.length || selected.length > 20) return;
@@ -131,6 +142,7 @@ function BookExtractionAiPanelContent({ work, preview, api, permission, disabled
     <h2>AI 辅助拆书</h2><p>单独选择原文段落进行分析，每次最多 20 段。推荐带入后仍需人工审核。</p>
     {!permission && <p role="status">请先确认有权使用摘选内容，再准备 AI 推荐。</p>}
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
+    {recoveredBatches.length > 0 && <div className="book-extraction-ai-actions" aria-label="已保存 AI 批次"><span>本机保留 {recoveredBatches.length} 个已完成批次</span>{recoveredBatches.map((batch, index) => <button key={batch.requestHash} disabled={disabled || busy} onClick={() => void restoreBatch(batch.requestHash)}>查看已保存 AI 批次 {index + 1}</button>)}</div>}
     <div className="book-extraction-ai-selection" role="group" aria-label="AI 分析原文范围">{preview.segments.slice(page * 20, (page + 1) * 20).map((segment, index) => <label key={segment.id}>
       <input type="checkbox" aria-label={`AI 分析段落 ${page * 20 + index + 1}`} checked={selected.includes(segment.id)} disabled={disabled || busy || (!selected.includes(segment.id) && selected.length >= 20)} onChange={event => { if (manualLock.current || phase.current !== 'idle') return; const checked = event.target.checked; setSelected(current => checked ? current.includes(segment.id) || current.length >= 20 ? current : [...current, segment.id] : current.filter(id => id !== segment.id)); }} />
       <span>{segment.chapterTitle} · 第 {segment.paragraphIndex} 段<span className="book-extraction-ai-original">{segment.text}</span></span>
