@@ -21,7 +21,7 @@ describe('快照正式迁移与仓储链路', () => {
   it('v3在备份后原子迁移v4，保留资产与作品版本；v4重启不再备份', () => {
     const db = legacy();
     try {
-      initializeSchema(db, 'project'); expect(db.pragma('user_version', { simple: true })).toBe(5);
+      initializeSchema(db, 'project'); expect(db.pragma('user_version', { simple: true })).toBe(6);
       expect(db.prepare('SELECT name FROM sqlite_master WHERE name=?').get('snapshot')).toBeDefined();
       expect(db.prepare('SELECT revision FROM work_meta').get()).toEqual({ revision: 7 });
       const backups = readdirSync(directory).filter(name => name.includes('v3-backup')); expect(backups).toHaveLength(1);
