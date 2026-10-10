@@ -76,11 +76,11 @@ it('发送前显示服务、范围、完整材料和费用；Escape取消授权�
   for (const text of ['自选云服务 · 写作模型 · 仅所选原文第1段', '完整发送内容：原文第1段', '本次按服务商价格计费', '预计输入 80 token；输出上限 2048 token。']) expect(within(dialog).getByText(text)).toBeVisible();
   expect(api.prepareBookExtractionAi).toHaveBeenCalledWith({ workId: work.id, token: preview.token, segmentIds: [preview.segments[0].id], permissionConfirmed: true });
   expect(api.executeBookExtractionAi).not.toHaveBeenCalled(); expect(onBusyChange).toHaveBeenCalledWith(true);
-  expect(within(dialog).getByRole('button', { name: '取消' })).toHaveFocus();
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: '取消' })).toHaveFocus());
   fireEvent.keyDown(dialog, { key: 'Escape' });
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(api.cancelBookExtractionAi).toHaveBeenCalledTimes(1); expect(api.executeBookExtractionAi).not.toHaveBeenCalled();
-  expect(screen.getByRole('button', { name: '准备 AI 推荐' })).toHaveFocus(); expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  await waitFor(() => expect(screen.getByRole('button', { name: '准备 AI 推荐' })).toHaveFocus()); expect(onBusyChange).toHaveBeenLastCalledWith(false);
 });
 it('跨页保持独立分析选择且最多20段，发送原文范围与顺序明确', async () => {
   const { api, preview } = setup(true, 21);
