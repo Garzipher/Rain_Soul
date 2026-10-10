@@ -18,7 +18,14 @@ export function StructureDialog({ state, busy, onClose, children, submitDisabled
   function key(event: KeyboardEvent<HTMLDialogElement>) {
     if (event.key === 'Escape' && !busy) { event.preventDefault(); onClose(); }
     if (event.key !== 'Tab') return;
-    const items = Array.from(dialog.current?.querySelectorAll<HTMLElement>('input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled)') ?? []);
+    const items = Array.from(dialog.current?.querySelectorAll<HTMLElement>('input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), summary, a[href], [tabindex]') ?? []).filter(element => {
+      if (element.matches(':disabled') || element.closest('[hidden], [inert]') || element.hasAttribute('tabindex') && element.tabIndex < 0) return false;
+      // 收起的材料只有summary可访问，隐藏正文不能成为焦点边界。
+      for (let parent = element.parentElement; parent && parent !== dialog.current; parent = parent.parentElement) {
+        if (parent instanceof HTMLDetailsElement && !parent.open && !parent.querySelector(':scope > summary')?.contains(element)) return false;
+      }
+      return true;
+    });
     const first = items[0]; const last = items[items.length - 1];
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
