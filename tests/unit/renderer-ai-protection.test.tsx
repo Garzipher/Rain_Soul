@@ -54,6 +54,7 @@ it('离开写作到知识库再返回保留候选，重新打开其他作品不�
   await adapter.api.openWork(other.id);
   fireEvent.click(screen.getByRole('button', { name: '作品集' }));
   fireEvent.click(await screen.findByRole('button', { name: '打开作品：另一个作品' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'AI 工具' })).toBeEnabled());
   fireEvent.click(await screen.findByRole('button', { name: 'AI 工具' }));
   await screen.findByRole('button', { name: '预览 AI 请求' });
   expect(screen.queryByText('新的候选正文')).not.toBeInTheDocument();
