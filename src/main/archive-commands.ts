@@ -32,7 +32,7 @@ export class ArchiveCommands {
       const request = schemas.exportProjectArchive.parse(payload);
       const work = await this.store.execute('freezeWork', request) as WorkDetail;
       const database = Buffer.from(await this.store.execute('exportProject', { workId: work.id, expectedRevision: work.revision }) as Uint8Array);
-      const bytes = await createProjectArchive(database, { projectId: work.id, schemaVersion: 5 });
+      const bytes = await createProjectArchive(database, { projectId: work.id, schemaVersion: 6 });
       return this.files.save(`${work.title.replace(/[<>:"/\\|?*]/g, '_')}.rainsoul`, bytes);
     });
     this.queue = operation.catch(() => {}); return operation;

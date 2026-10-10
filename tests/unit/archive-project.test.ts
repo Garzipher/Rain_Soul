@@ -21,7 +21,7 @@ function setup() {
   source.prepare('UPDATE chapter SET document_json=?,word_count=6').run(JSON.stringify(document));
   return { directory, projects, source, work, document };
 }
-const archive = (workId: string, database: Buffer): ParsedProjectArchive => ({ manifest: { formatVersion: 1, projectId: workId, schemaVersion: 5, databaseSha256: sha(database) }, database });
+const archive = (workId: string, database: Buffer): ParsedProjectArchive => ({ manifest: { formatVersion: 1, projectId: workId, schemaVersion: 6, databaseSha256: sha(database) }, database });
 function changed(input: ParsedProjectArchive, callback: (db: Database.Database) => void): ParsedProjectArchive {
   const directory = mkdtempSync(join(tmpdir(), 'rainsoul-archive-change-')); directories.push(directory);
   const path = join(directory, 'source.sqlite'); writeFileSync(path, input.database);
@@ -121,9 +121,10 @@ describe('归档数据库隔离重建', () => {
     source.prepare('INSERT INTO learning_seed VALUES (?,?)').run('课程第一章', work.chapters[0].id); createSnapshot(source, '课程原稿');
     const input = archive(work.id, await exportProjectDatabase(projects, work.id, 1)), id = importArchivedProject(projects, input, randomUUID());
     const db = new Database(join(projects, id, 'project.sqlite')); databases.push(db);
-    expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'learning_%'").all()).toEqual([]);
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name IN ('learning_course','learning_volume','learning_seed')").all()).toEqual([]);
     const snapshot = db.prepare('SELECT payload_json FROM snapshot').get() as { payload_json: string };
-    expect(snapshot.payload_json).not.toContain('learning_');
+    const payload = JSON.parse(snapshot.payload_json);
+    expect(['learning_course', 'learning_volume', 'learning_seed'].some(key => Object.hasOwn(payload, key))).toBe(false);
     expect(db.prepare('SELECT * FROM chapter').all()).toHaveLength(1);
   });
   it('重算hash仍不能掩盖快照关系损坏、非法历史JSON、缺失表和重复段落', async () => {
