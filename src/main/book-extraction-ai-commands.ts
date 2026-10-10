@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AiSettings } from './ai-settings';
 import type { AiExecuteRequest, AiPreparedRequest } from '../shared/ai';
@@ -6,6 +6,8 @@ import type { WorkDetail } from '../shared/contracts';
 import type { BookExtractionPreview } from '../shared/book-extraction';
 import { bookExtractionAiLookupSchema, bookExtractionAiPrepareRequestSchema, type BookExtractionAiPrepareRequest, type BookExtractionAiResult, type BookExtractionAiStatus } from '../shared/book-extraction-ai';
 import type { BookExtractionAiInput, BookExtractionAiService } from './book-extraction-ai-service';
+import type { ExtractionDraftCoordinator } from './extraction-draft-coordinator';
+import type { ExtractionDraft } from '../shared/extraction-draft';
 
 const schemas = {
   prepareBookExtractionAi: bookExtractionAiPrepareRequestSchema,
@@ -13,7 +15,7 @@ const schemas = {
   getBookExtractionAiResult: bookExtractionAiLookupSchema,
   cancelBookExtractionAi: z.object({ confirmationToken: z.string().min(1).max(200) }).strict(),
 };
-interface Frozen { request: BookExtractionAiPrepareRequest; prepared: AiPreparedRequest; baselineRevision: number; providerHash: string; previewHash: string; dictionaryHash: string }
+interface Frozen { request: BookExtractionAiPrepareRequest; prepared: AiPreparedRequest; baselineRevision: number; providerHash: string; previewHash: string; dictionaryHash: string; categoryIds: string[]; tagIds: string[] }
 interface Entry { frozen: Frozen; controller?: AbortController; result?: BookExtractionAiResult }
 const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const dictionaries = (work: WorkDetail) => ({
@@ -28,7 +30,7 @@ export class BookExtractionAiCommands {
   private readonly tokenHashes = new Map<string, string>();
   private readonly attemptedHashes = new Set<string>();
   private readonly running = new Set<Promise<unknown>>();
-  constructor(private readonly store: { execute: (command: string, payload: unknown) => Promise<unknown> }, private readonly settings: { get: () => AiSettings }, private readonly previews: { getPreview: (workId: string, token: string) => BookExtractionPreview }, private readonly service: BookExtractionAiService) {}
+  constructor(private readonly store: { execute: (command: string, payload: unknown) => Promise<unknown> }, private readonly settings: { get: () => AiSettings }, private readonly previews: { getPreview: (workId: string, token: string) => BookExtractionPreview }, private readonly service: BookExtractionAiService, private readonly draftCoordinator?: ExtractionDraftCoordinator) {}
   accepts(command: string): boolean { return Object.hasOwn(schemas, command); }
   execute(command: string, payload: unknown): Promise<unknown> {
     const operation = this.run(command, payload); this.running.add(operation);
@@ -53,13 +55,13 @@ export class BookExtractionAiCommands {
     try { return await Promise.race([operation, cancelled]); }
     finally { signal.removeEventListener('abort', abort); }
   }
-  private async validate(frozen: Frozen, signal: AbortSignal): Promise<void> {
+  private async validate(frozen: Frozen, signal: AbortSignal, requireRevision=true): Promise<void> {
     signal.throwIfAborted();
     const settings = this.settings.get();
     if (!settings.hasCredential || fingerprint(settings.provider) !== frozen.providerHash) throw new Error('模型配置已变化，请重新预览确认。');
     if (fingerprint(this.preview(frozen.request)) !== frozen.previewHash) throw new Error('拆书预览已变化，请重新选择。');
     const work = await this.interruptible(this.work(frozen.request.workId), signal); signal.throwIfAborted();
-    if (work.revision !== frozen.baselineRevision || fingerprint(dictionaries(work)) !== frozen.dictionaryHash) throw new Error('作品或分类标签已变化，请重新预览确认。');
+    if (requireRevision && work.revision !== frozen.baselineRevision || fingerprint(dictionaries(work)) !== frozen.dictionaryHash) throw new Error('作品或分类标签已变化，请重新预览确认。');
     if (!this.settings.get().hasCredential || fingerprint(this.settings.get().provider) !== frozen.providerHash || fingerprint(this.preview(frozen.request)) !== frozen.previewHash) throw new Error('拆书预览或模型配置已变化，请重新确认。');
   }
   private async prepare(request: BookExtractionAiPrepareRequest): Promise<AiPreparedRequest> {
@@ -76,7 +78,7 @@ export class BookExtractionAiCommands {
     if (this.entries.has(prepared.requestHash) || this.attemptedHashes.has(prepared.requestHash)) { this.service.cancel(prepared.confirmationToken); throw new Error('此拆书请求已执行或正在进行，请核对已有结果，禁止重复联网。'); }
     for (const [token, frozen] of this.confirmations) if (frozen.prepared.expiresAt <= Date.now()) { this.service.cancel(token); this.confirmations.delete(token); }
     if (this.confirmations.size >= 100) { this.service.cancel(prepared.confirmationToken); throw new Error('待确认拆书请求过多，请先取消旧请求。'); }
-    this.confirmations.set(prepared.confirmationToken, { request, prepared: structuredClone(prepared), baselineRevision: work.revision, providerHash: fingerprint(settings.provider), previewHash, dictionaryHash: fingerprint(dictionary) });
+    this.confirmations.set(prepared.confirmationToken, { request, prepared: structuredClone(prepared), baselineRevision: work.revision, providerHash: fingerprint(settings.provider), previewHash, dictionaryHash: fingerprint(dictionary), categoryIds: dictionary.categories.map(item=>item.id), tagIds: dictionary.tags.map(item=>item.id) });
     return prepared;
   }
   private async run(command: string, payload: unknown): Promise<unknown> {
@@ -85,13 +87,30 @@ export class BookExtractionAiCommands {
       const { confirmationToken } = schemas.cancelBookExtractionAi.parse(payload), hash = this.tokenHashes.get(confirmationToken), entry = hash ? this.entries.get(hash) : undefined;
       this.confirmations.delete(confirmationToken); this.service.cancel(confirmationToken);
       if (entry?.controller) entry.controller.abort();
-      else if (hash) { this.entries.delete(hash); this.tokenHashes.delete(confirmationToken); }
+      else if (hash && !this.draftCoordinator) { this.entries.delete(hash); this.tokenHashes.delete(confirmationToken); }
       return;
     }
     if (command === 'prepareBookExtractionAi') return this.prepare(schemas.prepareBookExtractionAi.parse(payload));
     if (command === 'getBookExtractionAiResult') {
-      const lookup = schemas.getBookExtractionAiResult.parse(payload); await this.work(lookup.workId);
+      const lookup = schemas.getBookExtractionAiResult.parse(payload), work = await this.work(lookup.workId);
       const entry = this.entries.get(lookup.requestHash);
+      if (this.draftCoordinator) {
+        if (entry?.controller && entry.frozen.request.workId===lookup.workId && entry.frozen.request.token===lookup.previewToken) return { status:'running' } satisfies BookExtractionAiStatus;
+        const draft=await this.draftCoordinator.read(lookup.workId);
+        const batch=draft?.previewToken===lookup.previewToken ? draft.batches.find(item=>item.requestHash===lookup.requestHash && item.status==='ready') : undefined;
+        if(batch) {
+          const result:BookExtractionAiResult={...lookup,suggestions:structuredClone(batch.suggestions),rawText:batch.rawText??'',...(batch.validationError?{validationError:batch.validationError}:{})};
+          try {
+            const preview=this.previews.getPreview(lookup.workId,lookup.previewToken);
+            if(preview.workId!==lookup.workId || preview.token!==lookup.previewToken || fingerprint(preview.source)!==fingerprint(draft!.source)
+              || preview.segments.length!==draft!.source.segments.length || preview.segments.some(segment=>!draft!.source.segments.some(original=>original.id===segment.id && original.text===segment.text))
+              || batch.dictionaryHash!==fingerprint(dictionaries(work))) throw new Error('冻结证据变化');
+          } catch { result.validationError??='完整回答已保留，但原文预览或分类标签已变化；禁止应用，请核对原始回答。'; }
+          return {status:'ready',result} satisfies BookExtractionAiStatus;
+        }
+        if(entry?.result && entry.frozen.request.workId===lookup.workId && entry.frozen.request.token===lookup.previewToken) return {status:'ready',result:{...structuredClone(entry.result),validationError:entry.result.validationError??'完整回答仅保留在内存，原任务已替换或落盘失败；禁止应用，请核对并复制原始回答。'}} satisfies BookExtractionAiStatus;
+        return {status:'missing'} satisfies BookExtractionAiStatus;
+      }
       if (!entry || entry.frozen.request.workId !== lookup.workId || entry.frozen.request.token !== lookup.previewToken) return { status: 'missing' } satisfies BookExtractionAiStatus;
       if (entry.controller) return { status: 'running' } satisfies BookExtractionAiStatus;
       try { await this.validate(entry.frozen, new AbortController().signal); }
@@ -108,18 +127,29 @@ export class BookExtractionAiCommands {
     if (this.entries.size >= 100) throw new Error('待审核拆书回答过多，请先核对或明确放弃已有结果。');
     this.confirmations.delete(request.confirmationToken);
     const controller = new AbortController(), entry: Entry = { frozen, controller };
+    const batch:ExtractionDraft['batches'][number]={id:randomUUID(),requestHash:request.requestHash,segmentIds:frozen.request.segmentIds,
+      status:'running',categoryIds:frozen.categoryIds,tagIds:frozen.tagIds,dictionaryHash:frozen.dictionaryHash,suggestions:[],rawText:''};
+    let recorded=false;
     this.entries.set(request.requestHash, entry); this.tokenHashes.set(request.confirmationToken, request.requestHash);
     try {
       await this.validate(frozen, controller.signal);
       const result = await this.service.execute(request, { signal: controller.signal, beforeSend: async () => {
         await this.validate(frozen, controller.signal);
         if (this.attemptedHashes.size >= 1000) throw new Error('拆书请求记录已达上限，请先完成核对。');
+        if(this.draftCoordinator) { await this.draftCoordinator.recordBatch(frozen.request.workId,frozen.request.token,batch); recorded=true; await this.validate(frozen,controller.signal); }
         this.attemptedHashes.add(request.requestHash);
       } });
       entry.result = structuredClone(result);
-      try { await this.validate(frozen, controller.signal); }
+      try { await this.validate(frozen, controller.signal,!this.draftCoordinator); }
       catch { entry.result.validationError = '完整回答已保留，但作品、预览、配置或后验检查已变化；禁止应用，请核对原始回答，未自动重新联网。'; }
+      if(this.draftCoordinator) {
+        try { await this.draftCoordinator.recordBatch(frozen.request.workId,frozen.request.token,{...batch,status:'ready',suggestions:entry.result.suggestions,rawText:entry.result.rawText,...(entry.result.validationError?{validationError:entry.result.validationError}:{})}); }
+        catch { entry.result.validationError??='完整回答仍在内存，但任务已替换或候选落盘失败；禁止应用，请核对并复制原始回答。'; }
+      }
       return structuredClone(entry.result);
+    } catch(error) {
+      if(recorded && this.draftCoordinator) await this.draftCoordinator.recordBatch(frozen.request.workId,frozen.request.token,{...batch,status:controller.signal.aborted?'cancelled':'failed'}).catch(()=>{});
+      throw error;
     } finally {
       this.service.cancel(request.confirmationToken); entry.controller = undefined;
       if (!entry.result) { this.entries.delete(request.requestHash); this.tokenHashes.delete(request.confirmationToken); }

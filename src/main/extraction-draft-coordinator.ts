@@ -30,6 +30,22 @@ export class ExtractionDraftCoordinator {
         batches: [], reviews: [], committing: null } });
   }
   async read(workId: string) { return this.drafts.readExtractionDraft(workId); }
+  /** 主进程只能追加或完成同一批次，不能改写来源、审核内容及提交请求。 */
+  async recordBatch(workId:string,previewToken:string,value:ExtractionDraft['batches'][number]):Promise<ExtractionDraft> {
+    return this.serial(workId,async()=> {
+      const draft=await this.drafts.readExtractionDraft(workId);
+      if(!draft || draft.previewToken!==previewToken) throw new Error('拆文预览已失效，不能保存到新任务。');
+      const batch=extractionDraftSchema.shape.batches.element.parse(value);
+      const previous=draft.batches.find(item=>item.id===batch.id || item.requestHash===batch.requestHash);
+      if(previous) {
+        const evidence=(item:typeof batch)=>[item.id,item.requestHash,item.segmentIds,item.categoryIds,item.tagIds,item.dictionaryHash];
+        if(JSON.stringify(evidence(previous))!==JSON.stringify(evidence(batch))) throw new Error('批次冻结证据不能改写。');
+        if(previous.status==='ready' && JSON.stringify(previous)!==JSON.stringify(batch)) throw new Error('完成批次只读，不能覆盖已有回答。');
+      } else if(batch.status!=='running') throw new Error('新批次必须先保存发送状态。');
+      return this.drafts.saveExtractionDraft({expectedTaskId:draft.taskId,draft:{...draft,
+        batches:previous?draft.batches.map(item=>item.id===batch.id?batch:item):[...draft.batches,batch]}});
+    });
+  }
   async saveReviews(workId:string,previewToken:string,values:ExtractionDraft['reviews']):Promise<ExtractionDraft> {
     return this.serial(workId,async()=> {
       const draft=await this.drafts.readExtractionDraft(workId);
