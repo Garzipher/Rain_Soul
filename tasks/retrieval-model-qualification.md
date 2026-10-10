@@ -103,3 +103,13 @@ HF官方API两次连接超时；固定修订文件通过hf-mirror.com读取。�
 失败q3（潜台词）、q6（转场）和q28（阑尾炎麻醉误匹配写作呼吸节奏）。数值达到约定目标，但真人相关性审核、官方固定原站核验、精确转换源、系统网络审计和打包运行门禁未全部通过。清单只记录阈值，五资格旗标维持false。
 
 TDD覆盖adapter/runtime/安装存储/许可收集共26专项测试通过；运行库两模块覆盖Statements96.26%、Branches95.52%、Functions92.30%、Lines100%。专项ESLint、构建和diff检查通过。主任务进行完整测试/静态/实际包门禁与规范提交，临时权重/运行库/日志不提交。
+
+## Worker边界、取消与ASAR独立验收
+
+实际编译`retrieval-worker.cjs`复制到没有推理库的独立目录，以不存在的模型目录发送load/reload/search/index。资格旗标false时全部拒绝；在线程中记录fs异步入口、HTTP/socket/DNS/fetch和运行库require，模型读取/缓存创建/网络尝试/推理库加载均0。null、数组、数字和未知命令同样拒绝，之后线程仍能接收load，没有未处理异常退出。
+
+可取消调度通过请求ID和AsyncLocalStorage隔离查询；查询优先排队文档。取消立即拒绝排队或当前查询等待者，当前不可中断CPU单条推理完成后丢弃回执；文档继续运行。先写失败TDD后实现，4专项测试通过，调度器Statements/Functions/Lines100%、Branches86.66%。
+
+另用`@electron/asar`在研究目录创建实际ASAR：两个生产JS文件进入`app.asar/dist/desktop`，factory/WASM按相同布局解包。真实Electron44.7主进程加载ASAR内运行库并读取固定公开模型成功，输出[2,512]，跨批向量差0，fetch尝试0。此证据确认`app.asar`到`app.asar.unpacked`的本地factory/WASM路径与ES模块加载有效；报告保存于研究目录`asar-runtime-validation/report.json`，没有修改产品资格开关。
+
+完整electron-builder受控pack尝试在并行项目测试重建期间失败：扫描时renderer旧hash文件`ai-workspace-DElEGS8n.js`已被其他构建删除，报ENOENT。该产物不能视为完成，完整EXE、干净机器、系统级网络审计仍须在最终稳定构建后串行验收；隔离ASAR成功不能替代这些门禁。
