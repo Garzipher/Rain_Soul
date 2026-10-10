@@ -23,6 +23,9 @@ import { BookExtractionAiCommands } from './book-extraction-ai-commands';
 import { BookExtractionAiService } from './book-extraction-ai-service';
 import { ExtractionDraftStore } from './extraction-draft-store';
 import { ExtractionDraftCoordinator } from './extraction-draft-coordinator';
+import { RetrievalModelStore } from './retrieval-model-store';
+import { RetrievalClient } from './retrieval-client';
+import { RetrievalCommands } from './retrieval-commands';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'rainsoul', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const testDirectory = !app.isPackaged ? process.env.RAINSOUL_TEST_DIRECTORY : undefined;
@@ -31,6 +34,7 @@ const cleanupMode = process.argv.includes('--rainsoul-uninstall-cleanup');
 const hasLock = app.requestSingleInstanceLock({ cleanupMode });
 let window: BrowserWindow | null = null;
 let database: DatabaseClient | null = null;
+let retrievalClient: RetrievalClient | null = null;
 let allowClose = false;
 let closeToken: string | null = null;
 if (!hasLock) { if (cleanupMode) app.exit(2); else app.quit(); }
@@ -55,6 +59,11 @@ else {
     const directory = testDirectory ?? join(process.env.LOCALAPPDATA ?? app.getPath('userData'), 'RainSoul');
     database = new DatabaseClient(directory);
     const store = new StoreService((command, payload) => database!.request(command, payload));
+    retrievalClient = new RetrievalClient(join(directory, 'RetrievalCache'));
+    const retrieval = new RetrievalCommands(store, new RetrievalModelStore(join(directory, 'RetrievalModels')), retrievalClient, async () => {
+      const selection = await dialog.showOpenDialog(window!, { title: '选择固定本机模型目录', properties: ['openDirectory'] });
+      return selection.canceled ? null : selection.filePaths[0] ?? null;
+    });
     const manuscripts = new ManuscriptCommands(store, {
       choose: () => chooseLocalManuscript(() => dialog.showOpenDialog(window!, { title: '导入手稿', properties: ['openFile'], filters: [{ name: 'TXT / DOCX 手稿', extensions: ['txt', 'docx'] }] })),
       save: (name, bytes) => saveLocalExport(() => dialog.showSaveDialog(window!, { title: '导出手稿', defaultPath: name, filters: [{ name: '手稿', extensions: [name.endsWith('.docx') ? 'docx' : 'txt'] }] }), bytes),
@@ -93,6 +102,7 @@ else {
         if (command === 'runtimeInfo') return { ok: true, data: { version: app.getVersion(), dataDirectory: join(directory, 'Projects') } };
         if (typeof command !== 'string') throw new Error('存储命令无效');
         assertPublicP1Command(command, payload);
+        if (retrieval.accepts(command)) return { ok: true, data: await retrieval.execute(command, payload) };
         if (profiles.accepts(command)) return { ok: true, data: await profiles.execute(command, payload) };
         if (manuscripts.accepts(command)) return { ok: true, data: await manuscripts.execute(command, payload) };
         if (archives.accepts(command)) return { ok: true, data: await archives.execute(command, payload) };
@@ -121,5 +131,5 @@ else {
     await window.loadURL('rainsoul://app/');
   }).catch(error => { console.error('桌面初始化失败', error instanceof Error ? error.name : 'Unknown'); app.exit(1); });
   app.on('window-all-closed', () => app.quit());
-  app.on('before-quit', () => { if (allowClose) database?.close(); });
+  app.on('before-quit', () => { if (allowClose) { retrievalClient?.close(); database?.close(); } });
 }

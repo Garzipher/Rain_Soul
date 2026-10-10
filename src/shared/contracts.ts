@@ -39,7 +39,7 @@ export type StructureAction =
 export interface StructureRequest { workId: string; expectedRevision: number; operationId: string; action: StructureAction }
 export interface SaveResult { revision: number; wordCount: number; assets?: AssetState }
 export interface RuntimeInfo { version: string; dataDirectory: string }
-export interface DesktopApi extends BookExtractionAiApi {
+export interface DesktopApi extends BookExtractionAiApi, RetrievalApi {
   readExtractionDraft?(workId: string): Promise<ExtractionDraftRecovery | null>;
   discardExtractionDraft?(workId: string, token: string): Promise<void>;
   saveExtractionReview?(request: ExtractionReviewRequest): Promise<ExtractionDraft>;
@@ -106,3 +106,4 @@ import type { ConversationAiPrepareRequest, PendingConversationReply } from './c
 import type { BookExtractionPreview, BookExtractionConfirmation, WebImportRequest, PastedImportRequest } from './book-extraction';
 import type { BookExtractionAiApi } from './book-extraction-ai';
 import type { ExtractionDraft, ExtractionDraftRecovery, ExtractionReviewRequest } from './extraction-draft';
+import type { RetrievalApi } from './retrieval';

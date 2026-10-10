@@ -1,0 +1,20 @@
+import { randomUUID } from 'node:crypto';
+import { expect, it, vi } from 'vitest';
+const bridge = vi.hoisted(() => ({ expose: vi.fn(), invoke: vi.fn() }));
+vi.mock('electron', () => ({ contextBridge: { exposeInMainWorld: bridge.expose }, ipcRenderer: { invoke: bridge.invoke } }));
+it('本机检索桥接仅发送查询与受限安装命令，不接受模型路径', async () => {
+  await import('../../src/preload/index');
+  const api = bridge.expose.mock.calls[0][1];
+  const query = { workId: randomUUID(), queryId: randomUUID(), query: '雨声', mode: 'keyword', tagIds: [], page: 1, pageSize: 20 };
+  bridge.invoke.mockResolvedValue({ ok: true, data: 'reply' });
+  expect(await api.queryKnowledge(query)).toBe('reply');
+  expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'queryKnowledge', query);
+  await api.cancelKnowledgeQuery(query.queryId);
+  expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'cancelKnowledgeQuery', { queryId: query.queryId });
+  await api.getRetrievalModelStatus(); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'getRetrievalModelStatus', {});
+  await api.importRetrievalModel(); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'importRetrievalModel', {});
+  await api.setRetrievalModelEnabled(false); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'setRetrievalModelEnabled', { enabled: false });
+  await api.rebuildKnowledgeIndex(query.workId); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'rebuildKnowledgeIndex', { workId: query.workId });
+  bridge.invoke.mockResolvedValue({ ok: false, message: '本机模型未就绪' });
+  await expect(api.queryKnowledge(query)).rejects.toThrow('未就绪');
+});

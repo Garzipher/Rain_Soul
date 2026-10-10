@@ -8,6 +8,12 @@ const invoke = async <T>(command: string, payload: unknown): Promise<T> => {
   return reply.data;
 };
 const api: DesktopApi = {
+  queryKnowledge: request => invoke('queryKnowledge', request),
+  cancelKnowledgeQuery: queryId => invoke('cancelKnowledgeQuery', { queryId }),
+  getRetrievalModelStatus: () => invoke('getRetrievalModelStatus', {}),
+  importRetrievalModel: () => invoke('importRetrievalModel', {}),
+  setRetrievalModelEnabled: enabled => invoke('setRetrievalModelEnabled', { enabled }),
+  rebuildKnowledgeIndex: workId => invoke('rebuildKnowledgeIndex', { workId }),
   readExtractionDraft: workId => invoke('readExtractionDraft', { workId }),
   discardExtractionDraft: (workId, token) => invoke('discardExtractionDraft', { workId, token }),
   saveExtractionReview: request => invoke('saveExtractionReview', request),
