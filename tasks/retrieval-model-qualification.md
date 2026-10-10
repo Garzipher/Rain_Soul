@@ -113,3 +113,21 @@ TDD覆盖adapter/runtime/安装存储/许可收集共26专项测试通过；运�
 另用`@electron/asar`在研究目录创建实际ASAR：两个生产JS文件进入`app.asar/dist/desktop`，factory/WASM按相同布局解包。真实Electron44.7主进程加载ASAR内运行库并读取固定公开模型成功，输出[2,512]，跨批向量差0，fetch尝试0。此证据确认`app.asar`到`app.asar.unpacked`的本地factory/WASM路径与ES模块加载有效；报告保存于研究目录`asar-runtime-validation/report.json`，没有修改产品资格开关。
 
 完整electron-builder受控pack尝试在并行项目测试重建期间失败：扫描时renderer旧hash文件`ai-workspace-DElEGS8n.js`已被其他构建删除，报ENOENT。该产物不能视为完成，完整EXE、干净机器、系统级网络审计仍须在最终稳定构建后串行验收；隔离ASAR成功不能替代这些门禁。
+
+## 千条索引、二百查询与并行保存实测
+
+运行`scripts/qualify-retrieval-performance.mjs`，真实生产WASM适配器、实际engine/cache/scheduler在独立检索Worker中工作；实际`database-worker.cjs`同时写入隔离新作品。1000条原创合成写作知识（84–99codepoint，中位92，每条单chunk）、200个固定查询（30个质量夹具查询循环，按次数采样）分别运行混合和关键词模式。fixtureHash `fe9b597bcae079fedfe2d11ef72bac13c7085eb45cf7ee593d1bc763411d8f63`，使用真实固定权重与哈希，不使用随机向量，不读作者库，不修改资格旗标。
+
+| 指标 | 本次实际结果 | 门槛 |
+| --- | ---: | ---: |
+| 模型初始化 | 3780.56ms | ≤30000ms |
+| 1000条首次索引 | 156534.49ms | 单列记录 |
+| 200次混合P95 / 最大 | 284.06 / 583.52ms | P95≤1000ms |
+| 200次关键词P95 / 最大 | 174.21 / 540.30ms | P95≤1000ms |
+| 索引同时30次保存P95 / 最大 | 595.78 / 2079.49ms | 最大≤5000ms |
+| 宿主与Worker合计RSS增量峰值 | 474578944字节 | ≤1.5GiB |
+| CPU user / system / 总墙时间 | 173110 / 3172 / 214922ms | 单列记录 |
+
+保存每次约18000字富文本文档，使用revision CAS与独立operationId。完成后重新创建实际数据库Worker读回revision31，确认含第30次保存内容；不把仅收到响应当持久化证明。网络JS入口实际0；全部数值门槛通过，完整JSON保存在研究目录`retrieval-performance-report.json`。
+
+局限：单机i5-4460四核/约8GiB、Node24.16，文件缓存可能预热，CPU与RSS包含两个Worker；受主机其他测试进程竞争，未获取独立系统CPU占用/系统抓包。查询样本200次由30类固定文本循环构成，未证明200种独立文本分布；合成条目均单chunk且短于400token，不能替代长知识多chunk、完整生产EXE、干净机器与真实作者数据规模验收。质量正确性仍以独立的100知识/30查询评估与尚未完成的真人审核为准；本次性能通过不改变五资格旗标。
