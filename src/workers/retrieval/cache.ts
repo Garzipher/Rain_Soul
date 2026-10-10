@@ -59,6 +59,8 @@ export class RetrievalCache {
       const version=db.pragma('user_version',{simple:true});
       if(version===0) db.transaction(()=>{db.exec(schema);db.pragma('user_version=1');})();
       else if(version!==1 || db.pragma('quick_check',{simple:true})!=='ok')throw new Error('派生缓存损坏。');
+      db.exec('CREATE TABLE IF NOT EXISTS cache_stage(work_id TEXT PRIMARY KEY,generation TEXT NOT NULL,fingerprint TEXT NOT NULL,work_generation INTEGER NOT NULL,expected_json TEXT NOT NULL)');
+      db.exec('CREATE TABLE IF NOT EXISTS cache_epoch(work_id TEXT PRIMARY KEY,generation INTEGER NOT NULL)');
       db.prepare('SELECT * FROM cache_model').all();db.prepare('SELECT * FROM cache_work').all();db.prepare('SELECT * FROM embedding_chunk LIMIT 0').all();
       return db;
     } catch(error) {db.close();throw error;}
@@ -74,7 +76,7 @@ export class RetrievalCache {
     const parsed=fingerprint.parse(value),prior=this.db.prepare('SELECT generation,fingerprint FROM cache_model').get() as {generation:string;fingerprint:string}|undefined;
     if(prior?.fingerprint===parsed && !force)return identity.parse(prior.generation);
     const generation=randomUUID();
-    this.db.transaction(()=> {this.db.prepare('INSERT OR REPLACE INTO cache_model VALUES(1,?,?)').run(generation,parsed);this.db.exec('DELETE FROM embedding_chunk;DELETE FROM cache_work;');})();
+    this.db.transaction(()=> {this.db.prepare('INSERT OR REPLACE INTO cache_model VALUES(1,?,?)').run(generation,parsed);this.db.exec('DELETE FROM embedding_chunk;DELETE FROM cache_work;DELETE FROM cache_stage;DELETE FROM cache_epoch;');})();
     return generation;
   }
   getWorkToken(workId:string):CacheToken {
@@ -85,17 +87,76 @@ export class RetrievalCache {
   }
   invalidateWork(workId:string):void {
     identity.parse(workId);this.db.transaction(()=> {
-      this.db.prepare('INSERT INTO cache_work VALUES(?,1) ON CONFLICT(work_id) DO UPDATE SET generation=generation+1').run(workId);
+      const current=this.getWorkToken(workId),counter=this.db.prepare('SELECT generation FROM cache_epoch WHERE work_id=?').get(workId) as {generation:number}|undefined;
+      const next=Math.max(current.workGeneration,counter?.generation??0)+1;
+      this.db.prepare('INSERT OR REPLACE INTO cache_work VALUES(?,?)').run(workId,next);
+      this.db.prepare('INSERT OR REPLACE INTO cache_epoch VALUES(?,?)').run(workId,next);
       this.db.prepare('DELETE FROM embedding_chunk WHERE work_id=?').run(workId);
+      this.db.prepare('DELETE FROM cache_stage WHERE work_id=?').run(workId);
     })();
   }
+  /** 新代先复制正文hash未变的块；未完成代可在重启后继续，不暴露给查询。 */
+  stageWork(workId:string,values:{entryId:string;bodyHash:string}[]):CacheToken {
+    const sources=z.array(sourceSchema).parse(values),active=this.getWorkToken(workId);
+    if(new Set(sources.map(item=>item.entryId)).size!==sources.length)throw new Error('索引条目身份重复。');
+    return this.db.transaction(()=> {
+      const prior=this.db.prepare('SELECT generation FROM cache_epoch WHERE work_id=?').get(workId) as {generation:number}|undefined;
+      const next={...active,workGeneration:Math.max(active.workGeneration,prior?.generation??0)+1};
+      this.db.prepare('INSERT OR REPLACE INTO cache_epoch VALUES(?,?)').run(workId,next.workGeneration);
+      for(const source of sources) this.db.prepare(`INSERT INTO embedding_chunk
+        SELECT generation,fingerprint,work_id,?,entry_id,body_hash,chunk_index,start_offset,end_offset,text,token_count,dimensions,vector
+        FROM embedding_chunk WHERE work_id=? AND generation=? AND fingerprint=? AND entry_id=? AND body_hash=? AND work_generation=?`)
+        .run(next.workGeneration,workId,active.generation,active.fingerprint,source.entryId,source.bodyHash,
+          (this.db.prepare('SELECT MAX(work_generation) AS value FROM embedding_chunk WHERE work_id=? AND generation=? AND fingerprint=? AND entry_id=? AND body_hash=?')
+            .get(workId,active.generation,active.fingerprint,source.entryId,source.bodyHash) as {value:number|null}).value ?? -1);
+      this.db.prepare('INSERT OR REPLACE INTO cache_stage VALUES(?,?,?,?,?)').run(workId,next.generation,next.fingerprint,next.workGeneration,JSON.stringify(sources));
+      this.db.prepare('DELETE FROM embedding_chunk WHERE work_id=? AND work_generation NOT IN (?,?)').run(workId,active.workGeneration,next.workGeneration);
+      return next;
+    })();
+  }
+  private stageCurrent(token:CacheToken):boolean {
+    const current=this.db.prepare('SELECT generation,fingerprint,work_generation FROM cache_stage WHERE work_id=?').get(token.workId) as {generation:string;fingerprint:string;work_generation:number}|undefined;
+    const active=this.getWorkToken(token.workId);
+    return !!current && current.generation===token.generation && current.fingerprint===token.fingerprint && current.work_generation===token.workGeneration
+      && active.generation===token.generation && active.fingerprint===token.fingerprint;
+  }
+  readStaged(token:CacheToken,values:{entryId:string;bodyHash:string}[]):CachedChunk[] {
+    tokenSchema.parse(token);return this.stageCurrent(token)?this.readToken(token,values):[];
+  }
+  writeStagedCAS(token:CacheToken,value:CacheEntry):boolean {return this.write(token,value,true);}
+  activateStage(token:CacheToken):boolean {
+    tokenSchema.parse(token);
+    return this.db.transaction(()=> {
+      if(!this.stageCurrent(token))return false;
+      const row=this.db.prepare('SELECT expected_json FROM cache_stage WHERE work_id=?').get(token.workId) as {expected_json:string};
+      const expected=z.array(sourceSchema).parse(JSON.parse(row.expected_json));
+      const present=new Set(this.readStaged(token,expected).map(chunk=>chunk.entryId));
+      if(expected.some(entry=>!present.has(entry.entryId)))return false;
+      this.db.prepare('INSERT OR REPLACE INTO cache_work VALUES(?,?)').run(token.workId,token.workGeneration);
+      this.db.prepare('DELETE FROM cache_stage WHERE work_id=?').run(token.workId);
+      this.db.prepare('DELETE FROM embedding_chunk WHERE work_id=? AND work_generation<>?').run(token.workId,token.workGeneration);
+      return true;
+    })();
+  }
+  discardStage(token:CacheToken):void {
+    tokenSchema.parse(token);if(!this.stageCurrent(token))return;
+    this.db.transaction(()=> {this.db.prepare('DELETE FROM cache_stage WHERE work_id=?').run(token.workId);
+      this.db.prepare('DELETE FROM embedding_chunk WHERE work_id=? AND work_generation=?').run(token.workId,token.workGeneration);})();
+  }
   writeCAS(token:CacheToken,value:CacheEntry):boolean {
+    return this.write(token,value,false);
+  }
+  private write(token:CacheToken,value:CacheEntry,staged:boolean):boolean {
     const checked=tokenSchema.parse(token),entry=entrySchema.parse(value);
     validChunkSequence(entry.chunks);for(const chunk of entry.chunks)validVector(chunk.vector);
     return this.db.transaction(()=> {
       let current:CacheToken;try{current=this.getWorkToken(checked.workId);}catch{return false;}
-      if(JSON.stringify(current)!==JSON.stringify(checked))return false;
-      this.db.prepare('DELETE FROM embedding_chunk WHERE work_id=? AND entry_id=?').run(checked.workId,entry.entryId);
+      if(staged?!this.stageCurrent(checked):JSON.stringify(current)!==JSON.stringify(checked))return false;
+      if(staged) {
+        const row=this.db.prepare('SELECT expected_json FROM cache_stage WHERE work_id=?').get(checked.workId) as {expected_json:string};
+        if(!(JSON.parse(row.expected_json) as {entryId:string;bodyHash:string}[]).some(item=>item.entryId===entry.entryId && item.bodyHash===entry.bodyHash))return false;
+      }
+      this.db.prepare('DELETE FROM embedding_chunk WHERE work_id=? AND entry_id=? AND work_generation=?').run(checked.workId,entry.entryId,checked.workGeneration);
       const insert=this.db.prepare('INSERT INTO embedding_chunk VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)');
       for(const chunk of entry.chunks) {
         const vector=Buffer.alloc(512*4);for(let index=0;index<512;index++)vector.writeFloatLE(chunk.vector[index],index*4);
@@ -105,10 +166,12 @@ export class RetrievalCache {
     })();
   }
   readWork(workId:string,values:{entryId:string;bodyHash:string}[]):CachedChunk[] {
-    identity.parse(workId);const sources=z.array(sourceSchema).parse(values);
+    identity.parse(workId);return this.readToken(this.getWorkToken(workId),values);
+  }
+  private readToken(token:CacheToken,values:{entryId:string;bodyHash:string}[]):CachedChunk[] {
+    const workId=token.workId,sources=z.array(sourceSchema).parse(values);
     const allowed=new Map(sources.map(item=>[item.entryId,item.bodyHash]));
     try {
-      const token=this.getWorkToken(workId);
       const rows=this.db.prepare('SELECT * FROM embedding_chunk WHERE work_id=? AND generation=? AND fingerprint=? AND work_generation=? ORDER BY entry_id,chunk_index')
         .all(workId,token.generation,token.fingerprint,token.workGeneration) as ChunkRow[];
       const result:CachedChunk[]=[];

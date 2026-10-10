@@ -10,7 +10,40 @@ const roots:string[]=[], caches:RetrievalCache[]=[];
 function setup() {const root=mkdtempSync(join(tmpdir(),'rainsoul-cache-')); roots.push(root);const cache=new RetrievalCache(root); caches.push(cache); return {root,cache};}
 afterEach(()=>{for(const cache of caches.splice(0)) cache.close(); for(const root of roots.splice(0)) rmSync(root,{recursive:true,force:true});});
 const vector=()=>{const value=new Float32Array(512);value[0]=1;return value;};
+const source=(value:{entryId:string;bodyHash:string})=>({entryId:value.entryId,bodyHash:value.bodyHash});
 const entry=()=>({entryId:randomUUID(),bodyHash:'a'.repeat(64),chunks:[{index:0,start:0,end:2,text:'原文',tokenCount:2,vector:vector()}]});
+it('新代完整激活前保留旧代，失败可丢弃，新任务拒绝旧代晚提交',()=>{
+  const {cache}=setup(),workId=randomUUID(),data=entry();cache.beginGeneration('模型');cache.writeCAS(cache.getWorkToken(workId),data);
+  const changed={...data,bodyHash:'b'.repeat(64)};
+  const first=cache.stageWork(workId,[source(changed)]);
+  expect(cache.writeStagedCAS(first,entry())).toBe(false);
+  expect(cache.readWork(workId,[source(data)])).toHaveLength(1);
+  expect(cache.writeStagedCAS(first,changed)).toBe(true);
+  expect(cache.readWork(workId,[source(changed)])).toEqual([]);
+  const second=cache.stageWork(workId,[source(changed)]);
+  expect(cache.writeStagedCAS(first,changed)).toBe(false);expect(cache.activateStage(first)).toBe(false);
+  cache.discardStage(second);expect(cache.readWork(workId,[source(data)])).toHaveLength(1);
+  const complete=cache.stageWork(workId,[source(changed)]);cache.writeStagedCAS(complete,changed);
+  expect(cache.writeStagedCAS(first,changed)).toBe(false);
+  expect(cache.activateStage(complete)).toBe(true);expect(cache.readWork(workId,[source(changed)])).toHaveLength(1);
+  expect(cache.readWork(workId,[source(data)])).toEqual([]);
+});
+it('未完成代跨重启复用已完成块且缺失条目不得提前激活',()=>{
+  const {cache,root}=setup(),workId=randomUUID(),one=entry(),two=entry();cache.beginGeneration('模型');
+  const pending=cache.stageWork(workId,[source(one),source(two)]);cache.writeStagedCAS(pending,one);
+  expect(cache.activateStage(pending)).toBe(false);cache.close();
+  const reopened=new RetrievalCache(root);caches.push(reopened);const continued=reopened.stageWork(workId,[source(one),source(two)]);
+  expect(reopened.readStaged(continued,[source(one)])).toHaveLength(1);
+  expect(reopened.writeStagedCAS(pending,two)).toBe(false);reopened.writeStagedCAS(continued,two);
+  expect(reopened.activateStage(continued)).toBe(true);
+});
+it('增量新代复用未变条目并剔除删除项，重启保留上次完整激活代',()=>{
+  const {cache,root}=setup(),workId=randomUUID(),one=entry(),two=entry();cache.beginGeneration('模型');
+  cache.writeCAS(cache.getWorkToken(workId),one);cache.writeCAS(cache.getWorkToken(workId),two);
+  const stage=cache.stageWork(workId,[source(one)]);expect(cache.readStaged(stage,[source(one)])).toHaveLength(1);
+  expect(cache.activateStage(stage)).toBe(true);cache.close();const reopened=new RetrievalCache(root);caches.push(reopened);
+  expect(reopened.readWork(workId,[source(one),source(two)])).toHaveLength(1);
+});
 it('Float32向量/原textoffset按完整指纹与hash往返，重启继续读当前代',()=>{
   const {root,cache}=setup(),workId=randomUUID(),data=entry();const generation=cache.beginGeneration('固定模型完整指纹');
   const token=cache.getWorkToken(workId);expect(cache.writeCAS(token,data)).toBe(true);
