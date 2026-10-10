@@ -9,15 +9,16 @@ export function LocalReferencePanel(props: {
   const [text, setText] = useState(''), [results, setResults] = useState<KnowledgeEntry[]>([]);
   const [selected, setSelected] = useState<string[]>([]), [pending, setPending] = useState(false), [message, setMessage] = useState('');
   const epoch = useRef(0), select = useRef(props.onSelect); select.current = props.onSelect;
-  useEffect(() => { epoch.current++; setResults([]); setSelected([]); setPending(false); select.current([]); }, [props.workId, props.revision]);
+  useEffect(() => { epoch.current++; setResults([]); setSelected([]); setMessage(''); setPending(false); select.current([]); }, [props.workId, props.revision]);
   useEffect(() => () => { epoch.current++; }, []);
   async function search() {
     if (pending || props.busy || !text.trim()) return;
-    const generation = ++epoch.current; setPending(true); setMessage(''); setSelected([]); select.current([]);
+    const generation = ++epoch.current, queryId = crypto.randomUUID(); setPending(true); setMessage(''); setResults([]); setSelected([]); select.current([]);
     try {
-      const reply = await props.onRetrieve({ workId: props.workId, queryId: crypto.randomUUID(), query: text,
+      const reply = await props.onRetrieve({ workId: props.workId, queryId, query: text,
         mode: 'hybrid', tagIds: [], page: 1, pageSize: 5 });
       if (epoch.current !== generation) return;
+      if (reply.queryId !== queryId) throw new Error('检索回执不匹配，请重新查找。');
       setResults(reply.hits.filter(hit => hit.workId === props.workId && hit.reliable).flatMap(hit => {
         const entry = props.entries.find(entry => entry.id === hit.entryId && !entry.deletedAt); return entry ? [entry] : [];
       }));
