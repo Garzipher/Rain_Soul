@@ -1,11 +1,22 @@
 import { Schema } from '@tiptap/pm/model';
 import { expect, it } from 'vitest';
-import { captureWritingSelection } from '../../src/renderer/lib/writing-ai-selection';
+import { captureWritingSelection, restoreWritingRequest } from '../../src/renderer/lib/writing-ai-selection';
+import { emptyDocument } from '../../src/shared/document';
 const schema = new Schema({ nodes: {
   doc: { content: 'paragraph+' }, paragraph: { content: 'inline*', attrs: { id: { default: '' } } }, text: { group: 'inline' },
   bookmark: { inline: true, group: 'inline', atom: true }, hardBreak: { inline: true, group: 'inline' },
 } });
 const paragraph = (id: string, text: string) => schema.node('paragraph', { id }, text ? [schema.text(text)] : []);
+it('导航恢复只保留同章同正文的原选区，前插重复句或改章后拒绝旧偏移', () => {
+  const document = emptyDocument(); document.content[0].content = [{ type: 'text', text: '雨落。雨落。' }];
+  const chapter = { id: 'chapter', document }, request = { token: 1, operation: 'sentencePolish' as const, paragraphIds: [document.content[0].attrs.id], text: '雨落。', sentenceFrom: 3 };
+  const saved = { chapterId: chapter.id, document: JSON.stringify(document), request };
+  expect(restoreWritingRequest(saved, chapter)).toEqual(request);
+  expect(restoreWritingRequest(saved, { ...chapter, id: 'other' })).toBeUndefined();
+  const modified = structuredClone(document); modified.content[0].content = [{ type: 'text', text: '雨落。雨落。雨落。' }];
+  expect(restoreWritingRequest(saved, { ...chapter, document: modified })).toBeUndefined();
+  expect(restoreWritingRequest(undefined, chapter)).toBeUndefined();
+});
 it('选中第二个重复句保留真实偏移；空光标和边界无效不抢占原生右键', () => {
   const doc = schema.node('doc', null, [paragraph('p1', '雨落。雨落。')]);
   expect(captureWritingSelection(doc, 4, 7)).toEqual({ paragraphIds: ['p1'], text: '雨落。', sentenceFrom: 3 });

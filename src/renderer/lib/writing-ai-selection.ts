@@ -1,8 +1,14 @@
 import type { Node } from '@tiptap/pm/model';
 import type { AiOperation } from '../../shared/ai';
+import type { WritingDocument } from '../../shared/contracts';
 
 export interface WritingAiSelection { paragraphIds: string[]; text: string; sentenceFrom?: number }
 export interface WritingAiRequest extends WritingAiSelection { operation: AiOperation; token: number }
+export interface SavedWritingRequest { chapterId: string; document: string; request: WritingAiRequest }
+/** 导航保留选择但不跨正文版本复用偏移。 */
+export function restoreWritingRequest(saved: SavedWritingRequest | undefined, chapter: { id: string; document: WritingDocument } | null): WritingAiRequest | undefined {
+  return saved && chapter?.id === saved.chapterId && JSON.stringify(chapter.document) === saved.document ? saved.request : undefined;
+}
 const leafText = (node: Node) => node.type.name === 'hardBreak' ? '\n' : '';
 
 /** 右键抢走焦点之前，冻结正文选区身份；书签不参与正文偏移。 */

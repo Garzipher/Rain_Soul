@@ -14,7 +14,7 @@ import { ForeshadowWorkspace } from './foreshadow-workspace';
 import type { SnapshotPanelProps } from './snapshot-panel';
 import type { AiWorkspaceProps } from './ai-workspace';
 import { WorkspaceToolDialog } from './workspace-tool-dialog';
-import type { WritingAiRequest } from '../lib/writing-ai-selection';
+import { restoreWritingRequest, type WritingAiRequest, type SavedWritingRequest } from '../lib/writing-ai-selection';
 import './assets-workspace.css';
 
 type WorkTab = 'body' | 'plot' | 'foreshadow';
@@ -22,6 +22,8 @@ const SnapshotPanel = lazy(() => import('./snapshot-panel').then(module => ({ de
 const AiWorkspace = lazy(() => import('./ai-workspace').then(module => ({ default: module.AiWorkspace })));
 const ConsistencyPanel = lazy(() => import('./consistency-panel').then(module => ({ default: module.ConsistencyPanel })));
 export interface WritingWorkspaceProps {
+  savedSelection?: SavedWritingRequest;
+  onSelectionChange?: (value: SavedWritingRequest | undefined) => void;
   ai: Omit<AiWorkspaceProps, 'work' | 'chapterId' | 'busy'>;
   onExport: (format: 'txt' | 'docx') => void;
   onBackup: () => void;
@@ -58,13 +60,14 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
   const [aiOpened, setAiOpened] = useState(false);
   const [entryToken, setEntryToken] = useState(0);
   const [selectionRequest, setSelectionRequest] = useState<WritingAiRequest>();
+  const restoringSelection = useRef(!!props.savedSelection);
   function openSelection(request: WritingAiRequest) {
     if (props.busy) return;
-    void props.changeTab(() => { setEntryToken(value => value + 1); setSelectionRequest(request); setAiOpened(true); setTool('ai'); }).catch(() => { /* 保存失败时不打开工具。 */ });
+    void props.changeTab(() => { setEntryToken(value => value + 1); setSelectionRequest(request); if (props.draft) props.onSelectionChange?.({ chapterId: props.draft.id, document: JSON.stringify(props.draft.document), request }); setAiOpened(true); setTool('ai'); }).catch(() => { /* 保存失败时不打开工具。 */ });
   }
   function showTool(next: 'ai' | 'snapshots' | null) {
     if (props.busy) return;
-    void props.changeTab(() => { if (next === 'ai') { setAiOpened(true); setSelectionRequest(undefined); setEntryToken(value => value + 1); } setTool(next); }).catch(() => { /* 保存失败时保留当前工具和草稿。 */ });
+    void props.changeTab(() => { if (next === 'ai') { const restored = restoringSelection.current ? restoreWritingRequest(props.savedSelection, props.draft) : undefined; restoringSelection.current = false; setAiOpened(true); setSelectionRequest(restored); if (!restored) props.onSelectionChange?.(undefined); setEntryToken(value => value + 1); } setTool(next); }).catch(() => { /* 保存失败时保留当前工具和草稿。 */ });
   }
   useEffect(() => { setSelectionRequest(undefined); }, [props.draft?.id]);
   const tabsRef = useRef<HTMLDivElement>(null);
