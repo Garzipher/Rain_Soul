@@ -39,3 +39,6 @@ coverage/
 /.writing-*.log
 /test-results-*/
 /.legacy-artifacts-*/
+
+# 本机模型资格试验的权重和隔离运行库
+/.tmp-model-qualification/
