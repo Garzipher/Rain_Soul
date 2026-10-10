@@ -29,4 +29,20 @@
 
 ## 验证记录
 
-实施中。最终结果、复审和安装器哈希在完成后追加；不以单元替身冒充真实云验收。
+实现已按TDD分批提交本地main，源码版本1.2.0，未推送：可信预览、受限协议、独立云命令与缓存、正式IPC、所选原段/授权/推荐、替换确认及人工审核入库。
+
+专项验证：云命令/服务36项，兼容链路75项；正式IPC与可信预览6项；教材构建/初始化47项；UI采纳及替换39项。新增核心覆盖范围进入统一80%门禁，未降低阈值。
+
+独立review修复采纳时效、替换确认间隙、取消未决解锁、JSON转义凭据和授权键盘审阅问题，最终复审DONE；详见[p1-ai-book-extraction-review.md](p1-ai-book-extraction-review.md)。原生独立上下文审查未调用外部模型。新教材第八卷第17章及三个真实隔离桌面截图已提交，源码编译为38章20图。
+
+全部验证与新安装器处理中；最终命令退出码、实际包结果和哈希将在完成后追加。桌面测试拦截全部HTTPS请求，不以网络替身冒充真实云验收。
+
+### 首次全量失败与修复
+
+`ai-book-verify.log`完整运行107组833项单元/组件、静态检查、构建及桌面测试：桌面22项通过、1项会话设置后导航失败，退出1，Demo未执行，不能称整条命令通过。失败页面同时显示配置保存成功及资产未保存导航拦截；单独原场景重跑通过。Profiler确定性回归验证useEffect通知落后于界面提交（`settings-race-red.log`），改为useLayoutEffect后19项专项通过（`settings-race-green.log`），真实Electron原场景通过（`settings-race-desktop.log`），类型/Lint及构建通过。独立复审无阻断，修复提交521d33e；完整复验写入`ai-book-verify-final.log`，保留原失败记录。
+
+### 1.2.0候选安装器
+
+`RAINSOUL_PACK_DIRECTORY=release/p1-ai-1.2.0`执行`npm run pack:installer`退出0，生成安装器130,017,306字节，SHA-256为`a438dfe84cc5a36aa20b3cda61790291b0edbe6c935c8da3e30a081eb4b74f61`。39个dist文件逐一与ASAR哈希一致，检查6,544个包内路径未发现作者库、归档、作者资料或凭据文件，Electron/Chromium及第三方许可完整。安装器与目录EXE均为NotSigned；工具的signtool输出不表示取得数字签名。日志与核对结果为`ai-book-pack-installer.log`、`ai-book-package-integrity.json`。
+
+外部声明模板`test-results-release-p1/evidence.pending.json`已改为该版本与实际哈希；14个Windows场景、7个P0真实云操作继续pending，并单列P1会话及AI拆书的真实云质量/费用pending。`node scripts/release-gate.mjs`退出2、blocked、schemaOnly=true（`ai-book-external-gate.log`），为缺证据的预期结果；工具尚未自动覆盖两项P1云扩展，须人工核对独立证据。用户已授权缺免费凭据时保留；未借用其他工具凭据、未发送作者正文、未运行作者账户安装卸载矩阵。
