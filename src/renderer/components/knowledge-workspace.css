@@ -9,6 +9,7 @@
 .knowledge-categories > button { text-align: left; background: transparent; padding: 10px; border: 0; border-radius: 6px; color: #546776; font-size: 13px; overflow-wrap: anywhere; }
 .knowledge-categories button[aria-pressed=true], .knowledge-filter-tags button[aria-pressed=true] { background: #eaf5ff; color: #245e90; }
 .knowledge-content { min-width: 0; }
+.knowledge-pagination { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 16px; padding: 24px 0 8px; color: #657786; font-size: 12px; }
 .knowledge-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .knowledge-toolbar input { flex: 1; min-width: 180px; padding: 10px 12px; border: 1px solid #d4dfe7; border-radius: 8px; }
 .knowledge-toolbar label { display: grid; gap: 4px; color: #657786; font-size: 11px; }

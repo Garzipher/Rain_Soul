@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AssetState, SearchResult } from '../../src/shared/assets';
 import type { WorkDetail } from '../../src/shared/contracts';
+import type { RetrievalReply } from '../../src/shared/retrieval';
 import { KnowledgeWorkspace } from '../../src/renderer/components/knowledge-workspace';
 import { auditedKnowledgeSource } from './knowledge-source-helper';
 
@@ -20,6 +21,61 @@ function setup(options: Partial<React.ComponentProps<typeof KnowledgeWorkspace>>
   return { ...props, view: render(<KnowledgeWorkspace {...props} />) };
 }
 describe('知识卡片与搜索', () => {
+  it('默认使用关键词检索，显示回退原因并按页请求本机知识', async () => {
+    const replies: RetrievalReply[] = [{ queryId: 'q1', hits: [{ workId: 'work', entryId: 'a', bodyHash: 'hash', excerpt: '站台的雨水', source: '雨夜练习', matchedBy: ['keyword'], reliable: true }], total: 21, sourceRevisions: { a: 1 }, modelFingerprint: null, status: 'fallback', message: '本机模型未安装，已回退关键词' }, { queryId: 'q2', hits: [{ workId: 'work', entryId: 'b', bodyHash: 'hash', excerpt: '月光', source: '另一篇练习', matchedBy: ['keyword'], reliable: true }], total: 21, sourceRevisions: { b: 1 }, modelFingerprint: null, status: 'ready' }];
+    const onRetrieve = vi.fn(async (request) => ({ ...replies.shift()!, queryId: request.queryId }));
+    setup({ onRetrieve });
+    fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '雨' } });
+    await waitFor(() => expect(onRetrieve).toHaveBeenCalledWith(expect.objectContaining({ mode: 'keyword', page: 1, pageSize: 20, workId: 'work' })));
+    expect(await screen.findByText('本机模型未安装，已回退关键词')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /展开知识：站台/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '下一页检索结果' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '下一页检索结果' }));
+    expect(await screen.findByRole('button', { name: /展开知识：月光/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /展开知识：站台/ })).not.toBeInTheDocument();
+    expect(onRetrieve).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
+  });
+
+  it('语义检索只搜索知识，旧回执不能覆盖新页', async () => {
+    let resolveOld!: (reply: RetrievalReply) => void;
+    const onRetrieve = vi.fn((request) => request.query === '旧' ? new Promise<RetrievalReply>(resolve => { resolveOld = resolve; }) : Promise.resolve({ queryId: request.queryId, hits: [], total: 0, sourceRevisions: {}, modelFingerprint: 'm', status: 'ready' as const }));
+    setup({ onRetrieve });
+    fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '旧' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '检索方式' }), { target: { value: 'semantic' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '新' } });
+    await waitFor(() => expect(onRetrieve).toHaveBeenCalledWith(expect.objectContaining({ query: '新', mode: 'semantic' })));
+    resolveOld({ queryId: 'old', hits: [{ workId: 'work', entryId: 'a', bodyHash: 'hash', excerpt: '旧', source: '旧', matchedBy: ['semantic'], reliable: true }], total: 1, sourceRevisions: { a: 1 }, modelFingerprint: 'm', status: 'ready' });
+    await Promise.resolve();
+    expect(screen.queryByRole('button', { name: /展开知识：站台/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: '搜索范围' }), { target: { value: 'all' } });
+    expect(screen.getByRole('combobox', { name: '检索方式' })).toHaveValue('keyword');
+  });
+
+  it('正文与知识范围不发送语义检索请求', async () => {
+    const onRetrieve = vi.fn(async () => ({ queryId: 'q', hits: [], total: 0, sourceRevisions: {}, modelFingerprint: null, status: 'ready' as const }));
+    setup({ onRetrieve });
+    fireEvent.change(screen.getByRole('combobox', { name: '搜索范围' }), { target: { value: 'all' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '检索方式' }), { target: { value: 'semantic' } });
+    fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '雨' } });
+    await Promise.resolve();
+    expect(onRetrieve).not.toHaveBeenCalled();
+  });
+  it('错配回执提示失败，不展示跨作品错误匹配的内容', async () => {
+    setup({ onRetrieve: async () => ({ queryId: 'mismatch', hits: [], total: 0, sourceRevisions: {}, modelFingerprint: null, status: 'ready' }) });
+    fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '雨' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('检索回执不匹配');
+    expect(screen.queryByRole('button', { name: /展开知识：站台/ })).not.toBeInTheDocument();
+  });
+  it('全局检索用来源作品和原条目映射卡片，复制仍使用作用域条目 ID', async () => {
+    const onCopy = vi.fn(async () => true);
+    setup({ onRetrieve: async request => ({ queryId: request.queryId, hits: [{ workId: 'other', entryId: 'source-a', bodyHash: 'h', excerpt: '雨', source: '雨夜练习', matchedBy: ['keyword'], reliable: true }], total: 1, sourceRevisions: {}, modelFingerprint: null, status: 'ready' }), scopeProps: { works: [], scopeId: 'all', canEdit: false, onScopeChange: vi.fn(), onCopy, entryOwners: { a: { workId: 'other', workTitle: '来源作品', sourceEntryId: 'source-a' } } } });
+    fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '雨' } });
+    expect(await screen.findByRole('button', { name: /展开知识：站台/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '景物描写' })).toBeDisabled();
+    expect(within(screen.getByRole('group', { name: '标签筛选' })).getByRole('button', { name: '雨 夜' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '复制到当前作品' }));
+    await waitFor(() => expect(onCopy).toHaveBeenCalledWith('a'));
+  });
   it('书签指定的知识原位展开并聚焦，可继续编辑当前作品内容', async () => {
     setup({ selectedEntryId: 'a' });
     const card = await screen.findByRole('button', { name: /收起知识：站台/ });
