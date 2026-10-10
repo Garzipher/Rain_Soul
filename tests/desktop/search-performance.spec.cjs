@@ -47,11 +47,14 @@ async function measureInput(page, text, expected, mode) {
         sawSearching ||= searching() || records.some(record => [...record.addedNodes].some(node => node.textContent === '正在搜索本机内容…'));
         if (!isComplete() || finishing) return;
         finishing = true;
+        const domDurationMs = performance.now() - start;
         requestAnimationFrame(() => requestAnimationFrame(() => {
           finishing = false;
           if (!isComplete() || finished) return;
           finished = true; observer.disconnect(); clearTimeout(timer);
-          resolve({ durationMs: performance.now() - start, renderedKnowledge: expected.knowledge.length, renderedParagraphs: expected.paragraphs.length });
+          const durationMs = performance.now() - start;
+          resolve({ durationMs, domDurationMs, frameDurationMs: durationMs - domDurationMs,
+            renderedKnowledge: expected.knowledge.length, renderedParagraphs: expected.paragraphs.length });
         }));
       });
       observer.observe(workspace, { subtree: true, childList: true, characterData: true });
@@ -81,13 +84,14 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
     await closeNormally(application); application = undefined;
     const fixture = seedSearchProject(path.join(location.runtime.dataDirectory, location.work.id, 'project.sqlite'), location.work.id);
     application = await launch(directory); page = await offlineWindow(application);
-    // 测试入口默认隐藏；显示隔离测试窗但不抢焦点，测量真实可见界面的渲染帧。
+    // 测量前将隔离窗口置于前台，避免 Windows 遮挡检测对显示帧节流。
     environment.windowState = await application.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       window.webContents.setBackgroundThrottling(false);
-      window.showInactive();
-      return { visible: window.isVisible(), backgroundThrottling: window.webContents.getBackgroundThrottling() };
+      window.show(); window.focus();
+      return { visible: window.isVisible(), focused: window.isFocused(), backgroundThrottling: window.webContents.getBackgroundThrottling() };
     });
+    await page.bringToFront();
     await page.setViewportSize({ width: 1280, height: 840 });
     environment.viewport = page.viewportSize();
     environment.electron = await application.evaluate(() => process.versions);
@@ -143,9 +147,10 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
     const artifact = test.info().outputPath('search-performance.json');
     await writeFile(artifact, JSON.stringify(report, null, 2));
     await test.info().attach('真实Electron搜索性能证据', { path: artifact, contentType: 'application/json' });
-    await page.screenshot({ path: test.info().outputPath('search-performance.png') });
     expect(samples).toHaveLength(200); expect(rank).toBe(190); expect(p95Ms).toBeLessThanOrEqual(1000);
     console.log(`真实Electron搜索：200样本，nearest-rank第190个，P95=${p95Ms.toFixed(2)}ms；预热${warmups.length}次另计。`);
+    await page.bringToFront();
+    await page.screenshot({ path: test.info().outputPath('search-performance.png') });
     await closeNormally(application);
   } finally { await cleanup(application, directory); }
 });
