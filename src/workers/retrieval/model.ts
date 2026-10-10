@@ -7,7 +7,7 @@ export interface Extractor {
 export interface TransformersRuntime {
   env: { allowRemoteModels: boolean; allowLocalModels: boolean; useBrowserCache: boolean; useFSCache: boolean };
   AutoTokenizer: { from_pretrained(directory: string, options: { local_files_only: true }): Promise<Tokenizer> };
-  pipeline(task: string, directory: string, options: { local_files_only: true; device: 'cpu'; dtype: 'q8'; session_options: { intraOpNumThreads: number; interOpNumThreads: number } }): Promise<Extractor>;
+  pipeline(task: string, directory: string, options: { local_files_only: true; device: 'wasm'; dtype: 'q8'; session_options: { executionProviders: ['wasm'] } }): Promise<Extractor>;
 }
 export interface CpuEmbeddingModel {
   tokenize(text: string): number[];
@@ -16,11 +16,11 @@ export interface CpuEmbeddingModel {
 }
 /** 仅在独立检索Worker加载。调用方提供已校验激活目录，不接收模型脚本或URL。 */
 export async function createCpuEmbeddingModel(directory: string, dependencies: { loadRuntime?: () => Promise<TransformersRuntime> } = {}): Promise<CpuEmbeddingModel> {
-  const loadRuntime = dependencies.loadRuntime ?? (async () => { const name = '@huggingface/transformers'; return await import(name) as TransformersRuntime; });
+  const loadRuntime = dependencies.loadRuntime ?? (async () => { const name = './retrieval-runtime.cjs'; return await import(name) as TransformersRuntime; });
   const runtime = await loadRuntime();
   Object.assign(runtime.env, { allowRemoteModels: false, allowLocalModels: true, useBrowserCache: false, useFSCache: false });
   const tokenizer = await runtime.AutoTokenizer.from_pretrained(directory, { local_files_only: true });
-  const extractor = await runtime.pipeline('feature-extraction', directory, { local_files_only: true, device: 'cpu', dtype: fixedManifest.dtype, session_options: { intraOpNumThreads: 2, interOpNumThreads: 1 } });
+  const extractor = await runtime.pipeline('feature-extraction', directory, { local_files_only: true, device: 'wasm', dtype: fixedManifest.dtype, session_options: { executionProviders: ['wasm'] } });
   let disposed = false;
   const available = () => { if (disposed) throw new Error('本机模型已关闭。'); };
   const tokens = (text: string, special: boolean) => Array.from(tokenizer(text, { add_special_tokens: special, padding: false, truncation: false }).input_ids.data, Number);

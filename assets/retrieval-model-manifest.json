@@ -8,9 +8,12 @@
   "license": "MIT",
   "licenseUrl": "https://github.com/FlagOpen/FlagEmbedding/blob/fd1a2bdf69488ffebe0327999d4400d8c8058a0b/LICENSE",
   "runtime": {
-    "transformers": "4.3.1",
-    "onnxruntime": "1.30.0"
+    "tokenizers": "0.2.0",
+    "onnxruntime": "1.31.0-dev.20260914-8d85527a0",
+    "backend": "wasm-cpu",
+    "implementation": 1
   },
+  "similarityThreshold": 0.5125038418350374,
   "dimensions": 512,
   "windowTokens": 512,
   "textTokens": 400,

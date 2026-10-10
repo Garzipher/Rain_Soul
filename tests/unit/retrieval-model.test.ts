@@ -16,7 +16,7 @@ it('初始化只允许本机CPU，明确CLS/L2与查询前缀，文档不加前�
   const { runtime, extractor } = runtimeFixture();
   const model = await createCpuEmbeddingModel('verified-directory', { loadRuntime: async () => runtime });
   expect(runtime.env).toMatchObject({ allowRemoteModels: false, allowLocalModels: true, useBrowserCache: false, useFSCache: false });
-  expect(runtime.pipeline).toHaveBeenCalledWith('feature-extraction', 'verified-directory', expect.objectContaining({ local_files_only: true, device: 'cpu', dtype: 'q8' }));
+  expect(runtime.pipeline).toHaveBeenCalledWith('feature-extraction', 'verified-directory', expect.objectContaining({ local_files_only: true, device: 'wasm', dtype: 'q8', session_options: { executionProviders: ['wasm'] } }));
   expect(model.tokenize('雨夜')).toHaveLength(2);
   expect(await model.embed(['雨夜'], 'query')).toHaveLength(1);
   expect(extractor).toHaveBeenLastCalledWith([prefix + '雨夜'], { pooling: 'cls', normalize: true });
@@ -47,9 +47,9 @@ it.each(['dimension', 'nan', 'norm'])('拒绝运行库输出错误：%s', async 
 });
 const temporary = resolve('.tmp-model-qualification');
 it.skipIf(!existsSync(resolve(temporary, 'model/onnx/model_quantized.onnx')))('真实固定模型离线生成512维CLS/L2中文向量并保持重复一致', async () => {
-  const requireRuntime = createRequire(resolve(temporary, 'runtime/package.json'));
+  const requireRuntime = createRequire(resolve('dist/desktop/retrieval-runtime.cjs'));
   const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => { throw new Error('真实离线试验禁止外发'); });
-  const model = await createCpuEmbeddingModel(resolve(temporary, 'model'), { loadRuntime: async () => requireRuntime('@huggingface/transformers') as TransformersRuntime });
+  const model = await createCpuEmbeddingModel(resolve(temporary, 'model'), { loadRuntime: async () => requireRuntime('./retrieval-runtime.cjs') as TransformersRuntime });
   try {
     const query = (await model.embed(['怎样用天气写出人物孤独？'], 'query'))[0];
     const repeated = (await model.embed(['怎样用天气写出人物孤独？'], 'query'))[0];

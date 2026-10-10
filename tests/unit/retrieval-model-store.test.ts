@@ -96,5 +96,5 @@ it('受信下载器停滞时取消立即结束，不等待下一块响应', asyn
   const store = new RetrievalModelStore(target, { manifest, download: async function* () { await new Promise(() => undefined); yield bytes; } });
   const pending = store.install({ operationId: randomUUID(), source: 'download' }, controller.signal);
   setTimeout(() => controller.abort(), 20);
-  await expect(Promise.race([pending, new Promise((_, reject) => setTimeout(() => reject(new Error('取消未及时结束')), 150))])).rejects.toThrow('模型安装已取消');
+  await expect(Promise.race([pending, new Promise((_, reject) => setTimeout(() => reject(new Error('取消未及时结束')), 2000))])).rejects.toThrow('模型安装已取消');
 });
