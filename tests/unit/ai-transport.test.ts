@@ -34,6 +34,24 @@ describe('正文与会话共享的云传输边界', () => {
     fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'isolated-test-secret' } }] })));
     await expect(sendAiCompletion(request, dependencies, new AbortController().signal)).rejects.toThrow(/敏感凭据/);
   });
+  it.each(['value', 'field'])('结构化回复的%s中转义凭据也禁止返回到界面', async place => {
+    const { dependencies, request, fetcher } = fixture();
+    const escaped = '\\u0069solated-test-secret';
+    const content = place === 'value' ? `{"suggestions":[{"technique":"${escaped}"}]}` : `{"${escaped}":"正常文本"}`;
+    expect(content).not.toContain('isolated-test-secret');
+    fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content } }] })));
+    await expect(sendAiCompletion(request, dependencies, new AbortController().signal)).rejects.toThrow('云端服务响应包含敏感凭据，已阻止展示。');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('正常JSON与非JSON正文均可返回，深层结构不绕过凭据检查', async () => {
+    const { dependencies, request, fetcher } = fixture();
+    const content = '{"suggestions":[],"text":"完整回复"}';
+    fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content } }] })));
+    expect(await sendAiCompletion(request, dependencies, new AbortController().signal)).toBe(content);
+    const nested = '['.repeat(2000) + '"\\u0069solated-test-secret"' + ']'.repeat(2000);
+    fetcher.mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: nested } }] })));
+    await expect(sendAiCompletion(request, dependencies, new AbortController().signal)).rejects.toThrow(/敏感凭据/);
+  });
   it.each(['https://[2001:0::1]', 'https://[2001::1]', 'https://[2001:0000:0000:0000:0000:0000:0000:1]'])('IPv6规范化后仍拒绝Teredo过渡地址 %s', baseUrl => {
     expect(() => aiCompletionEndpoint(baseUrl)).toThrow(/公开地址/);
   });

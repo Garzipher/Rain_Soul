@@ -8,6 +8,19 @@ export interface AiTransportDependencies {
   fetch?: typeof fetch; resolveHost?: (hostname: string) => Promise<string[]>;
 }
 export interface AiTransportRequest { provider: AiProvider; url: string; hostname: string; body: string }
+function containsCredential(content: string, key: string): boolean {
+  if (content.includes(key)) return true;
+  let parsed: unknown;
+  try { parsed = JSON.parse(content); } catch { return false; }
+  // 结构化回答解码后才展示；迭代检查字段和值，避免深层JSON造成递归溢出。
+  const pending: unknown[] = [parsed];
+  while (pending.length) {
+    const value = pending.pop();
+    if (typeof value === 'string' && value.includes(key)) return true;
+    if (value && typeof value === 'object') for (const [field, child] of Object.entries(value)) pending.push(field, child);
+  }
+  return false;
+}
 function isPublicIp(address: string): boolean {
   if (isIP(address) === 4) {
     const [a, b, c] = address.split('.').map(Number);
@@ -94,6 +107,6 @@ export async function sendAiCompletion(request: AiTransportRequest, dependencies
   if (finishReason !== undefined && finishReason !== 'stop') throw new Error('无法确认云端响应已完整结束，未生成可用候选；请检查服务兼容性后重新预览确认。');
   const content = choice?.message?.content;
   if (typeof content !== 'string' || !content.trim()) throw new Error('云端服务未返回有效响应内容。');
-  if (content.includes(key)) throw new Error('云端服务响应包含敏感凭据，已阻止展示。');
+  if (containsCredential(content, key)) throw new Error('云端服务响应包含敏感凭据，已阻止展示。');
   return content;
 }
