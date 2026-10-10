@@ -3,9 +3,26 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { RetrievalModelPanel } from '../../src/renderer/components/retrieval-model-panel';
-import type { RetrievalModelStatus } from '../../src/shared/retrieval-model';
+import { fixedManifest, type RetrievalModelStatus } from '../../src/shared/retrieval-model';
 afterEach(cleanup);
 const status: RetrievalModelStatus = { state: 'absent', installed: false, qualified: false, modelId: 'test', fingerprint: '', bytes: 0, message: '尚未安装模型' };
+it('显示固定模型来源修订许可和真实文件总量，空间只标估算', async () => {
+  render(<RetrievalModelPanel api={{ getRetrievalModelStatus: async () => ({ ...status, bytes: 1234567 }) }} busy={false} workId="work" />);
+  await screen.findByText('尚未安装模型');
+  expect(screen.getByText(fixedManifest.modelId)).toBeInTheDocument();
+  expect(screen.getByText(fixedManifest.revision.slice(0, 12))).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'MIT 许可证' })).toHaveAttribute('href', fixedManifest.licenseUrl);
+  expect(screen.getByRole('link', { name: '固定版本来源' })).toHaveAttribute('href', `https://huggingface.co/${fixedManifest.repository}/tree/${fixedManifest.revision}`);
+  expect(screen.getByText('1.18 MiB（1,234,567 字节）')).toBeInTheDocument();
+  expect(screen.getByText(/可用磁盘空间尚未测量/)).toBeInTheDocument();
+  expect(screen.getByText(/取消导入尚未接入/)).toBeInTheDocument();
+});
+it('已安装但资格待核验不显示已启用并禁止重建', async () => {
+  render(<RetrievalModelPanel api={{ getRetrievalModelStatus: async () => ({ ...status, state: 'ready', installed: true }), rebuildKnowledgeIndex: async () => {} }} busy={false} workId="work" />);
+  expect(await screen.findByText('已安装，资格待核验')).toBeInTheDocument();
+  expect(screen.queryByText('已启用')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '重建当前作品索引' })).toBeDisabled();
+});
 it('未安装或未验收模型明确说明原因，禁止启用，关键词继续可用', async () => {
   render(<RetrievalModelPanel api={{ getRetrievalModelStatus: async () => status }} busy={false} workId="work" />);
   expect(await screen.findByText('尚未安装模型')).toBeInTheDocument();
