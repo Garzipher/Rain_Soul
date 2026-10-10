@@ -87,6 +87,16 @@ it('取消完成候选不删除ready；后续失败和取消均保留前批，�
   await expect(state.create().execute('getBookExtractionAiResult', state.lookup(cancelled))).resolves.toEqual({ status: 'missing' });
   expect(state.fetcher).toHaveBeenCalledTimes(3);
 });
+it('取消命令返回时本批已停止且可核对missing，不等待无关请求', async () => {
+  const state = await setup(), prepared = await state.prepare();
+  state.fetcher.mockImplementationOnce(async () => new Promise(() => {}));
+  const pending = state.execute(prepared).catch(() => {});
+  await vi.waitFor(() => expect(state.fetcher).toHaveBeenCalledTimes(1));
+  await state.commands.execute('cancelBookExtractionAi', { confirmationToken: prepared.confirmationToken });
+  await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(prepared))).resolves.toEqual({ status: 'missing' });
+  await pending;
+  expect((await state.drafts.readExtractionDraft(state.workId))?.batches[0].status).toBe('cancelled');
+});
 it('格式不合法仍持久完整原始回答及错误，重启保持不可应用', async () => {
   const state = await setup(), prepared = await state.prepare(); state.fetcher.mockResolvedValueOnce(state.response('不合法JSON'));
   const result = await state.execute(prepared); expect(result.validationError).toBeTruthy();

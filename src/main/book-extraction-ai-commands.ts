@@ -16,7 +16,7 @@ const schemas = {
   cancelBookExtractionAi: z.object({ confirmationToken: z.string().min(1).max(200) }).strict(),
 };
 interface Frozen { request: BookExtractionAiPrepareRequest; prepared: AiPreparedRequest; baselineRevision: number; providerHash: string; previewHash: string; dictionaryHash: string; categoryIds: string[]; tagIds: string[] }
-interface Entry { frozen: Frozen; controller?: AbortController; result?: BookExtractionAiResult }
+interface Entry { frozen: Frozen; controller?: AbortController; result?: BookExtractionAiResult; completed?: Promise<void> }
 const fingerprint = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const dictionaries = (work: WorkDetail) => ({
   categories: (work.assets?.categories ?? []).filter(item => !item.deletedAt).map(({ id, name }) => ({ id, name })),
@@ -86,7 +86,7 @@ export class BookExtractionAiCommands {
     if (command === 'cancelBookExtractionAi') {
       const { confirmationToken } = schemas.cancelBookExtractionAi.parse(payload), hash = this.tokenHashes.get(confirmationToken), entry = hash ? this.entries.get(hash) : undefined;
       this.confirmations.delete(confirmationToken); this.service.cancel(confirmationToken);
-      if (entry?.controller) entry.controller.abort();
+      if (entry?.controller) { entry.controller.abort(); await entry.completed; }
       else if (hash && !this.draftCoordinator) { this.entries.delete(hash); this.tokenHashes.delete(confirmationToken); }
       return;
     }
@@ -126,7 +126,8 @@ export class BookExtractionAiCommands {
     if (this.entries.has(request.requestHash) || this.attemptedHashes.has(request.requestHash)) throw new Error('此拆书请求已执行，禁止重复联网；请核对已有结果。');
     if (this.entries.size >= 100) throw new Error('待审核拆书回答过多，请先核对或明确放弃已有结果。');
     this.confirmations.delete(request.confirmationToken);
-    const controller = new AbortController(), entry: Entry = { frozen, controller };
+    let settle!: () => void;
+    const controller = new AbortController(), entry: Entry = { frozen, controller, completed: new Promise<void>(resolve => { settle = resolve; }) };
     const batch:ExtractionDraft['batches'][number]={id:randomUUID(),requestHash:request.requestHash,segmentIds:frozen.request.segmentIds,
       status:'running',categoryIds:frozen.categoryIds,tagIds:frozen.tagIds,dictionaryHash:frozen.dictionaryHash,suggestions:[],rawText:''};
     let recorded=false;
@@ -153,6 +154,7 @@ export class BookExtractionAiCommands {
     } finally {
       this.service.cancel(request.confirmationToken); entry.controller = undefined;
       if (!entry.result) { this.entries.delete(request.requestHash); this.tokenHashes.delete(request.confirmationToken); }
+      settle();
     }
   }
   async drain(): Promise<void> { await Promise.allSettled([...this.running]); }
