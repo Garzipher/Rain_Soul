@@ -225,6 +225,8 @@ test('无云配置仍可手工摘选，坏模型摘录整批禁止应用且请�
     expect(await count(application)).toBe(2); await expect(raw).toContainText('伪造且不存在的摘录');
     await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
     await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true }));
+    await expect(page.getByRole('button', { name: '拆书工具', exact: true })).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByRole('article', { name: /^知识：/ })).toHaveCount(0);
     await closeNormally(application);
   } finally { await cleanup(application, directory); }
