@@ -5,9 +5,9 @@
   "created_at": "2026-09-28",
   "last_updated": "2026-10-10",
   "stats": {
-    "total_entries": 65,
+    "total_entries": 66,
     "categories": {
-      "architecture-patterns": 6,
+      "architecture-patterns": 7,
       "best-practices": 11,
       "bug-patterns": 6,
       "design-patterns": 36,
@@ -16,6 +16,16 @@
     }
   },
   "entries": [
+    {
+      "id": "rainsoul-frozen-source-index-identity",
+      "title": "冻结来源与派生索引的身份边界",
+      "path": ".trae/knowledge/冻结来源与派生索引的身份边界.md",
+      "category": "architecture-patterns",
+      "summary": "新增冻结来源须回查旧复制生命周期；原文偏移及动态量化行为绑定指纹，模型资格与推理研究分别验收。",
+      "tags": ["冻结来源", "跨作品复制", "向量检索", "generation", "模型资格"],
+      "date": "2026-10-10", "source": "project-local", "severity": "high",
+      "applies_when": ["知识来源模型扩展", "本机模型推理", "派生索引缓存", "异步检索取消"]
+    },
     {
       "id": "adding-converter-target-providers",
       "title": "Converter Target Provider Pitfalls",
