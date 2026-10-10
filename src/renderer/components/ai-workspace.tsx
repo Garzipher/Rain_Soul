@@ -9,7 +9,10 @@ import { AiExtractionPanel, type ExtractionReviewItem } from './ai-extraction-pa
 import './ai-workspace.css';
 import type { WritingAiRequest } from '../lib/writing-ai-selection';
 import { readableKnowledgeSource } from '../../shared/knowledge-source';
+import { LocalReferencePanel } from './local-reference-panel';
+import type { RetrievalQuery, RetrievalReply } from '../../shared/retrieval';
 export interface AiWorkspaceProps {
+  onRetrieve?: (request: RetrievalQuery) => Promise<RetrievalReply>;
   entryToken?: number;
   selectionRequest?: WritingAiRequest;
   onLocate?: (chapterId: string, paragraphId: string) => void;
@@ -69,7 +72,8 @@ export function AiWorkspace(props: AiWorkspaceProps) {
         if (positions.some((position, index) => position !== positions[0] + index)) throw new Error('正文候选请选择连续的目标段落，未发送请求。');
       }
       const baseline = operation === 'sentencePolish' ? sentenceText : selected.map(paragraphText).join('\n');
-      const value = await props.onPrepare({ operation, scope, chapterIds: scope === 'custom' ? chapterIds : undefined, instruction: instruction || undefined, targetParagraphIds: selected.map(item => item.attrs.id), referenceKnowledgeIds: referenceIds.filter(id => related.some(item => item.entry.id === id)), ...(operation === 'sentencePolish' ? { sentenceText, ...(sentenceFrom !== undefined ? { sentenceFrom } : {}) } : {}) });
+      const validReferenceIds = referenceIds.filter(id => props.onRetrieve ? props.work.assets?.knowledge.some(entry => entry.id === id && !entry.deletedAt) : related.some(item => item.entry.id === id));
+      const value = await props.onPrepare({ operation, scope, chapterIds: scope === 'custom' ? chapterIds : undefined, instruction: instruction || undefined, targetParagraphIds: selected.map(item => item.attrs.id), referenceKnowledgeIds: validReferenceIds, ...(operation === 'sentencePolish' ? { sentenceText, ...(sentenceFrom !== undefined ? { sentenceFrom } : {}) } : {}) });
       if (!alive.current) { await props.onCancel(value.confirmationToken); return; }
       token.current = value.confirmationToken; pendingOriginal.current = baseline; setPrepared(value);
     });
@@ -109,7 +113,7 @@ export function AiWorkspace(props: AiWorkspaceProps) {
     {scope === 'previous' && chapterIndex === 0 && <p className="ai-muted">当前是首章，没有前章，仅发送当前章节。</p>}
     {scope === 'custom' && <fieldset disabled={disabled}><legend>自定义章节</legend>{props.work.chapters.map(item => <label key={item.id}><input type="checkbox" checked={chapterIds.includes(item.id)} onChange={event => setChapterIds(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} />{item.title}</label>)}</fieldset>}
     <details><summary>指定目标段落（默认当前章全部段落）</summary><fieldset disabled={disabled}>{chapter?.document.content.map((paragraph, index) => <label key={paragraph.attrs.id}><input type="checkbox" checked={targetIds.includes(paragraph.attrs.id)} onChange={event => setTargetIds(previous => event.target.checked ? [...previous, paragraph.attrs.id] : previous.filter(id => id !== paragraph.attrs.id))} />第 {index + 1} 段 · {paragraphText(paragraph).slice(0, 50) || '空段落'}</label>)}</fieldset></details>
-    <details><summary>知识参考 · 作者选用</summary><p className="ai-muted">按本作品关键词推荐最多五条，勾选后加入发送预览，借鉴写法与表达。</p><fieldset disabled={disabled}><legend>可选知识参考</legend>{related.length ? related.map(({ entry }) => <div key={entry.id}><label><input type="checkbox" checked={referenceIds.includes(entry.id)} onChange={event => setReferenceIds(previous => event.target.checked ? [...previous, entry.id] : previous.filter(id => id !== entry.id))} /><span>{entry.body}</span></label><small>{readableKnowledgeSource(entry.source) || '未注明出处'}</small></div>) : <p>当前范围没有匹配的知识参考。</p>}</fieldset></details>
+    <details><summary>知识参考 · 作者选用</summary>{props.onRetrieve ? <LocalReferencePanel workId={props.work.id} revision={props.work.revision} entries={props.work.assets?.knowledge ?? []} busy={disabled} onRetrieve={props.onRetrieve} onSelect={setReferenceIds} /> : <><p className="ai-muted">按本作品关键词推荐最多五条，勾选后加入发送预览，借鉴写法与表达。</p><fieldset disabled={disabled}><legend>可选知识参考</legend>{related.length ? related.map(({ entry }) => <div key={entry.id}><label><input type="checkbox" checked={referenceIds.includes(entry.id)} onChange={event => setReferenceIds(previous => event.target.checked ? [...previous, entry.id] : previous.filter(id => id !== entry.id))} /><span>{entry.body}</span></label><small>{readableKnowledgeSource(entry.source) || '未注明出处'}</small></div>) : <p>当前范围没有匹配的知识参考。</p>}</fieldset></>}</details>
     <label>作者补充要求<textarea aria-label="作者补充要求" value={instruction} disabled={disabled} onChange={event => setInstruction(event.target.value)} placeholder="可填写希望保留的语气与表达" /></label>
     <button className="primary" disabled={disabled || !chapter} onClick={preview}>预览 AI 请求</button>{sending && <button className="secondary" onClick={cancel}>取消 AI 请求</button>}
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}{pending && <p role="status">{sending ? '等待云端候选…' : '正在处理…'}</p>}
