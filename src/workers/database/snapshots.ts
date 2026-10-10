@@ -6,7 +6,7 @@ import { rebuildAssetSearch } from './assets-search';
 import type { SnapshotSummary, SnapshotPreview } from '../../shared/snapshots';
 import { snapshotManuscript } from './snapshot-export';
 import { sourceAssetTables } from './source-schema';
-import { readSourceAssets, validateSourcePayload } from './source-document';
+import { readSourceAssets, validateSourcePayload, normalizeSourceCoordinates } from './source-document';
 export type { SnapshotSummary } from '../../shared/snapshots';
 
 interface SnapshotRow { id: string; title: string; payload_json: string; payload_hash: string }
@@ -107,6 +107,7 @@ export function readCompatiblePayload(db: Database.Database, row: SnapshotRow & 
   if (hash(row.payload_json) !== row.payload_hash) throw new Error('快照内容校验失败。');
   let payload: Record<string, unknown>;
   try { payload = JSON.parse(row.payload_json) as Record<string, unknown>; } catch { throw new Error('快照内容校验失败。'); }
+  if (row.schema_version === 2 && Array.isArray(payload?.source_segment)) normalizeSourceCoordinates(payload as Record<string, unknown[]>);
   validatePayload(db, payload, row.schema_version);
   if (row.schema_version === 2) validateSourcePayload(payload as Record<string, unknown[]>);
   for (const table of contentTables(db)) if (!Object.hasOwn(payload, table)) payload[table] = [];

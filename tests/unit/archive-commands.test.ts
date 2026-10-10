@@ -21,5 +21,5 @@ it('当前项目归档清单标注真实V6，避免新数据库被误标旧版�
   const service = new ArchiveCommands({ execute: async command => command === 'freezeWork' ? { id: workId, title: '来源作品', revision: 2 } : bytes },
     { choose: async () => null, save: async (_name, value) => { saved = value; return true; } });
   await service.execute('exportProjectArchive', { workId });
-  expect((await parseProjectArchive(saved)).manifest.schemaVersion).toBe(6);
+  expect((await parseProjectArchive(saved)).manifest.schemaVersion).toBe(7);
 });

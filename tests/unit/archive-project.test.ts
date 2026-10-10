@@ -21,7 +21,7 @@ function setup() {
   source.prepare('UPDATE chapter SET document_json=?,word_count=6').run(JSON.stringify(document));
   return { directory, projects, source, work, document };
 }
-const archive = (workId: string, database: Buffer): ParsedProjectArchive => ({ manifest: { formatVersion: 1, projectId: workId, schemaVersion: 6, databaseSha256: sha(database) }, database });
+const archive = (workId: string, database: Buffer): ParsedProjectArchive => ({ manifest: { formatVersion: 1, projectId: workId, schemaVersion: 7, databaseSha256: sha(database) }, database });
 function changed(input: ParsedProjectArchive, callback: (db: Database.Database) => void): ParsedProjectArchive {
   const directory = mkdtempSync(join(tmpdir(), 'rainsoul-archive-change-')); directories.push(directory);
   const path = join(directory, 'source.sqlite'); writeFileSync(path, input.database);

@@ -25,6 +25,17 @@ it('审核事务写入原文关联与独立学习注释，重试不重复入库'
   expect(assets.annotations).toEqual([expect.objectContaining({ entryId: entry.id, ...request.items[0].annotation })]);
   expect(listSnapshots(fixture.db)).toHaveLength(1); expect(fixture.state().knowledge).toHaveLength(1);
 });
+it('同一带章段坐标来源分两批审核入库，真实SQLite事务保留坐标与幂等回执', () => {
+  const request = sample();
+  const sourceDocument = freezeSource({ kind: 'txt', title: '多章素材', rawBytes: Buffer.from('甲乙'), segments: [{ text: '甲章原文', chapterIndex: 1, paragraphIndex: 1 }, { text: '乙章原文', chapterIndex: 2, paragraphIndex: 1 }] });
+  const first = { ...request, sourceDocument, items: [{ ...request.items[0], body: '甲章原文', segmentId: sourceDocument.segments[0].id }] };
+  importBookExtraction(fixture.db, first);
+  const second = { ...request, sourceDocument, operationId: crypto.randomUUID(), expectedRevision: 2, items: [{ ...request.items[0], body: '乙章原文', segmentId: sourceDocument.segments[1].id }] };
+  importBookExtraction(fixture.db, second); importBookExtraction(fixture.db, second);
+  expect(fixture.state().knowledge).toHaveLength(2); expect(readSourceAssets(fixture.db).documents).toEqual([sourceDocument]);
+  expect(readSourceAssets(fixture.db).links).toHaveLength(2); expect(listSnapshots(fixture.db)).toHaveLength(2);
+  expect(fixture.db.prepare('SELECT revision FROM work_meta').get()).toEqual({ revision: 3 });
+});
 it('不属于来源的段落、坏哈希或后续条目失败时全部回滚', () => {
   const request = sample();
   for (const invalid of [

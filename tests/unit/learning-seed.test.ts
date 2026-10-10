@@ -47,7 +47,7 @@ describe('项目开发学习作品', () => {
 
   it('schema 3课程重启保留学习笔记，新增章节离线搜索立即可用', () => {
     seed(); const db = database();
-    expect(db.pragma('user_version', { simple: true })).toBe(6);
+    expect(db.pragma('user_version', { simple: true })).toBe(7);
     const edited = emptyDocument(); edited.content[0].content = [{ type: 'text', text: '我的个人笔记' }];
     db.prepare('UPDATE chapter SET document_json=?').run(JSON.stringify(edited)); db.close();
     const next = chapter('foundation/02'); next.document.content[0].content = [{ type: 'text', text: '本批新知识' }];
@@ -80,7 +80,7 @@ describe('项目开发学习作品', () => {
     volume.chapters.push(next); seed(); seed();
     const reopened = database();
     try {
-      expect(reopened.pragma('user_version', { simple: true })).toBe(6);
+      expect(reopened.pragma('user_version', { simple: true })).toBe(7);
       expect(reopened.prepare('SELECT title,revision FROM work_meta').get()).toEqual({ title: '作者修改的课程名', revision: 7 });
       expect(reopened.prepare('SELECT title FROM volume').get()).toEqual({ title: '作者的卷名' });
       expect(JSON.parse((reopened.prepare('SELECT document_json FROM chapter WHERE id=?').get(first.id) as { document_json: string }).document_json)).toEqual(edited);

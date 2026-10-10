@@ -16,12 +16,16 @@ function validateSource(value: FrozenSourceDocument): FrozenSourceDocument {
 }
 
 interface DocumentRow { id: string; kind: string; hash_version: number; original_url: string | null; final_url: string | null; title: string; fetched_at: string | null; raw_hash: string; body_hash: string }
-interface SegmentRow { id: string; ordinal: number; chapter_title: string; text: string; text_hash: string }
+interface SegmentRow { id: string; ordinal: number; chapter_title: string; text: string; text_hash: string; chapter_index?: number | null; paragraph_index?: number | null }
+function sourceSegment(segment: SegmentRow) {
+  return { id: segment.id, ordinal: segment.ordinal, chapterTitle: segment.chapter_title, text: segment.text, textHash: segment.text_hash,
+    ...(segment.chapter_index == null && segment.paragraph_index == null ? {} : { chapterIndex: segment.chapter_index ?? undefined, paragraphIndex: segment.paragraph_index ?? undefined }) };
+}
 function readDocument(db: Database.Database, row: DocumentRow): FrozenSourceDocument {
-  const segments = db.prepare('SELECT id,ordinal,chapter_title,text,text_hash FROM source_segment WHERE source_id=? ORDER BY ordinal').all(row.id) as SegmentRow[];
+  const segments = db.prepare('SELECT * FROM source_segment WHERE source_id=? ORDER BY ordinal').all(row.id) as SegmentRow[];
   return validateSource({ id: row.id, kind: row.kind as FrozenSourceDocument['kind'], hashVersion: row.hash_version as 1,
     originalUrl: row.original_url, finalUrl: row.final_url, title: row.title, fetchedAt: row.fetched_at, rawHash: row.raw_hash, bodyHash: row.body_hash,
-    segments: segments.map(segment => ({ id: segment.id, ordinal: segment.ordinal, chapterTitle: segment.chapter_title, text: segment.text, textHash: segment.text_hash })),
+    segments: segments.map(sourceSegment),
   });
 }
 
@@ -46,8 +50,8 @@ export function commitSourceAssets(db: Database.Database, value: FrozenSourceDoc
   if (!existing) {
     db.prepare('INSERT INTO source_document VALUES(?,?,?,?,?,?,?,?,?)').run(source.id, source.kind, source.hashVersion,
       source.originalUrl, source.finalUrl, source.title, source.fetchedAt, source.rawHash, source.bodyHash);
-    const insertSegment = db.prepare('INSERT INTO source_segment VALUES(?,?,?,?,?,?)');
-    for (const segment of source.segments) insertSegment.run(segment.id, source.id, segment.ordinal, segment.chapterTitle, segment.text, segment.textHash);
+    const insertSegment = db.prepare('INSERT INTO source_segment VALUES(?,?,?,?,?,?,?,?)');
+    for (const segment of source.segments) insertSegment.run(segment.id, source.id, segment.ordinal, segment.chapterTitle, segment.text, segment.textHash, segment.chapterIndex ?? null, segment.paragraphIndex ?? null);
   }
   const insertLink = db.prepare('INSERT INTO knowledge_source VALUES(?,?,?)');
   for (const link of links) insertLink.run(link.entryId, link.sourceId, link.segmentId);
@@ -82,7 +86,7 @@ export function validateSourcePayload(payload: Record<string, unknown[]>): void 
   for (const row of documents) validateSource({ id: row.id, kind: row.kind as FrozenSourceDocument['kind'], hashVersion: row.hash_version as 1,
     title: row.title, originalUrl: row.original_url, finalUrl: row.final_url, fetchedAt: row.fetched_at, rawHash: row.raw_hash, bodyHash: row.body_hash,
     segments: segments.filter(segment => segment.source_id === row.id).sort((a, b) => a.ordinal-b.ordinal)
-      .map(segment => ({ id: segment.id, ordinal: segment.ordinal, chapterTitle: segment.chapter_title, text: segment.text, textHash: segment.text_hash })),
+      .map(sourceSegment),
   });
   for (const row of payload.knowledge_source as { entry_id: string; source_id: string; segment_id: string }[]) {
     knowledgeSourceLinkSchema.parse({ entryId: row.entry_id, sourceId: row.source_id, segmentId: row.segment_id });
@@ -92,4 +96,16 @@ export function validateSourcePayload(payload: Record<string, unknown[]>): void 
     learningAnnotationSchema.parse({ ...learningAnnotationPayloadSchema.parse(JSON.parse(row.payload_json)), id: row.id, entryId: row.entry_id });
     if (!knowledgeIds.has(row.entry_id)) throw new Error('快照学习注释知识关系无效。');
   }
+}
+
+/** 只接受旧固定六列或新固定八列；在内存补NULL，不改历史hash或推测坐标。 */
+export function normalizeSourceCoordinates(payload: Record<string, unknown[]>): void {
+  const base = ['id', 'source_id', 'ordinal', 'chapter_title', 'text', 'text_hash'];
+  payload.source_segment = (payload.source_segment ?? []).map(value => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('来源坐标字段结构无效。');
+    const row = value as Record<string, unknown>, names = Object.keys(row);
+    const expected = names.length === 6 ? base : [...base, 'chapter_index', 'paragraph_index'];
+    if (names.length !== expected.length || expected.some(name => !Object.hasOwn(row, name))) throw new Error('来源坐标字段结构无效。');
+    return names.length === 6 ? { ...row, chapter_index: null, paragraph_index: null } : row;
+  });
 }

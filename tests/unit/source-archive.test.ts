@@ -21,7 +21,7 @@ function setup() {
   const projects = join(dir, 'Projects'), db = new Database(join(projects, work.id, 'project.sqlite')); dbs.push(db); db.pragma('foreign_keys=ON');
   return { dir, db, work, projects };
 }
-function archive(workId: string, bytes: Buffer, version = 6): ParsedProjectArchive { return { manifest: { formatVersion: 1, schemaVersion: version, projectId: workId, databaseSha256: hash(bytes) }, database: bytes }; }
+function archive(workId: string, bytes: Buffer, version = 7): ParsedProjectArchive { return { manifest: { formatVersion: 1, schemaVersion: version, projectId: workId, databaseSha256: hash(bytes) }, database: bytes }; }
 function mutate(bytes: Buffer, callback: (db: Database.Database) => void): Buffer {
   const dir = mkdtempSync(join(tmpdir(), 'rainsoul-source-portable-')); dirs.push(dir); const path = join(dir, 'input.sqlite'); writeFileSync(path, bytes);
   const db = new Database(path); try { callback(db); } finally { db.close(); } return readFileSync(path);
@@ -29,7 +29,7 @@ function mutate(bytes: Buffer, callback: (db: Database.Database) => void): Buffe
 it('payload2来源/学习注释归档新作品映射身份，恢复来源快照仍保留当前会话', async () => {
   const { db, work, projects } = setup(), entryId = randomUUID(), annotationId = randomUUID();
   const category = db.prepare('SELECT id FROM category LIMIT 1').get() as { id: string };
-  const source = freezeSource({ kind: 'web', title: '雨夜', rawBytes: Buffer.from('原页'), originalUrl: 'https://example.com/page', finalUrl: 'https://example.com/page', fetchedAt: '2026-10-10T01:00:00Z', segments: [{ text: '雨落灯下' }] });
+  const source = freezeSource({ kind: 'web', title: '雨夜', rawBytes: Buffer.from('原页'), originalUrl: 'https://example.com/page', finalUrl: 'https://example.com/page', fetchedAt: '2026-10-10T01:00:00Z', segments: [{ text: '雨落灯下', chapterIndex: 2, paragraphIndex: 1 }] });
   db.transaction(() => {
     db.prepare('INSERT INTO knowledge_entry VALUES(?,?,?,?,NULL,1,NULL)').run(entryId, '雨落灯下', '雨夜', category.id);
     commitSourceAssets(db, source, [{ entryId, sourceId: source.id, segmentId: source.segments[0].id }], [{ id: annotationId, entryId, technique: '视听结合', usage: '夜景', exercise: '仿写' }]);
@@ -39,6 +39,7 @@ it('payload2来源/学习注释归档新作品映射身份，恢复来源快照�
   const imported = new Database(join(projects, id, 'project.sqlite')); dbs.push(imported); imported.pragma('foreign_keys=ON');
   const assets = readSourceAssets(imported);
   expect(assets.documents[0].id).not.toBe(source.id); expect(assets.documents[0].segments[0].id).not.toBe(source.segments[0].id);
+  expect(assets.documents[0].segments[0]).toMatchObject({ chapterIndex: 2, paragraphIndex: 1 });
   expect(assets.annotations[0]).toMatchObject({ entryId, technique: '视听结合' }); expect(assets.annotations[0].id).not.toBe(annotationId);
   const conversationId = randomUUID(); imported.prepare('INSERT INTO conversation VALUES(?,?,1,?,?,?,NULL)').run(conversationId, '保留当前会话', '', '2026-10-10T01:00:00Z', '2026-10-10T01:00:00Z');
   restoreSnapshot(imported, snapshot.id, 1); expect(readSourceAssets(imported)).toEqual(assets);
@@ -57,7 +58,7 @@ it.each([4, 5] as const)('旧v%s便携归档带payload1可导入v6并恢复后�
   });
   const id = randomUUID(); importArchivedProject(projects, archive(work.id, bytes, version), id);
   const imported = new Database(join(projects, id, 'project.sqlite')); dbs.push(imported); imported.pragma('foreign_keys=ON');
-  expect(imported.pragma('user_version', { simple: true })).toBe(6);
+  expect(imported.pragma('user_version', { simple: true })).toBe(7);
   expect(restoreSnapshot(imported, snapshot.id, 1).restored.schemaVersion).toBe(2);
   expect(readSourceAssets(imported).documents).toEqual([]);
   const secondId = randomUUID(); importArchivedProject(projects, archive(id, await exportProjectDatabase(projects, id, 2)), secondId);
@@ -68,4 +69,23 @@ it('归档来源哈希损坏拒绝，既有作品数据不变', async () => {
   const bytes = mutate(await exportProjectDatabase(projects, work.id, 1), portable => portable.prepare('UPDATE source_segment SET text=?').run('被篡改'));
   expect(() => importArchivedProject(projects, archive(work.id, bytes), randomUUID())).toThrow(/哈希|hash/);
   expect(readSourceAssets(db).documents[0]).toEqual(source);
+});
+it('旧v6归档与旧六列payload2兼容导入，来源保持未知坐标且可恢复再导出', async () => {
+  const { db, work, projects } = setup();
+  const source = freezeSource({ kind: 'txt', title: '旧素材', rawBytes: Buffer.from('旧原文'), segments: [{ text: '旧原文' }] });
+  db.transaction(() => commitSourceAssets(db, source, [], []))(); const snapshot = createSnapshot(db, '旧来源');
+  const bytes = mutate(await exportProjectDatabase(projects, work.id, 1), portable => {
+    for (const row of portable.prepare('SELECT * FROM snapshot').all() as { id: string; payload_json: string }[]) {
+      const payload = JSON.parse(row.payload_json);
+      for (const segment of payload.source_segment) { delete segment.chapter_index; delete segment.paragraph_index; }
+      const text = JSON.stringify(payload); portable.prepare('UPDATE snapshot SET payload_json=?,payload_hash=? WHERE id=?').run(text, hash(text), row.id);
+    }
+    portable.exec('ALTER TABLE source_segment DROP COLUMN paragraph_index; ALTER TABLE source_segment DROP COLUMN chapter_index;'); portable.pragma('user_version=6');
+  });
+  const id = randomUUID(); importArchivedProject(projects, archive(work.id, bytes, 6), id);
+  const imported = new Database(join(projects, id, 'project.sqlite')); dbs.push(imported); imported.pragma('foreign_keys=ON');
+  const restored = readSourceAssets(imported); expect(restored.documents[0].segments[0].chapterIndex).toBeUndefined();
+  expect(imported.pragma('user_version', { simple: true })).toBe(7);
+  restoreSnapshot(imported, snapshot.id, 1); expect(readSourceAssets(imported)).toEqual(restored);
+  importArchivedProject(projects, archive(id, await exportProjectDatabase(projects, id, 2)), randomUUID());
 });

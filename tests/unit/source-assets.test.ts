@@ -12,7 +12,7 @@ afterEach(() => fixture.db.close());
 function sample() {
   fixture.change({ type: 'createKnowledge', body: '雨落灯下', source: '作品原文', categoryId: fixture.state().categories[0].id, tagIds: [] });
   const entryId = fixture.state().knowledge[0].id;
-  const source = freezeSource({ kind: 'paste', title: '雨夜', rawBytes: Buffer.from('雨落灯下'), segments: [{ text: '雨落灯下' }, { text: '船鸣渐远' }] });
+  const source = freezeSource({ kind: 'txt', title: '雨夜', rawBytes: Buffer.from('雨落灯下'), segments: [{ text: '雨落灯下', chapterIndex: 1, paragraphIndex: 1 }, { text: '船鸣渐远', chapterIndex: 2, paragraphIndex: 1 }] });
   const links = [{ entryId, sourceId: source.id, segmentId: source.segments[0].id }];
   const annotations = [{ id: randomUUID(), entryId, technique: '视听结合', usage: '夜景', exercise: '改写为晴天' }];
   return { source, links, annotations, entryId };
@@ -72,4 +72,9 @@ it('读取时严格验证学习注释JSON，不静默忽略损坏资产', () => 
   const value = sample(); commit(value);
   fixture.db.prepare('UPDATE learning_annotation SET payload_json=?').run('{"technique":1}');
   expect(() => readSourceAssets(fixture.db)).toThrow();
+});
+it('来源坐标必须成对保存，直接SQLite写入半个坐标会失败', () => {
+  const value = sample(); commit(value);
+  expect(() => fixture.db.prepare('UPDATE source_segment SET paragraph_index=NULL WHERE id=?').run(value.source.segments[0].id)).toThrow(/CHECK/);
+  expect(readSourceAssets(fixture.db).documents).toEqual([value.source]);
 });

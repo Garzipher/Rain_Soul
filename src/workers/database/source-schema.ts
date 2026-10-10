@@ -24,4 +24,9 @@ CREATE INDEX learning_annotation_entry ON learning_annotation(entry_id);
 `;
 
 /** 建库与迁移由调用方控制版本、备份及事务，本模块不改user_version。 */
-export function initializeSourceSchema(db: Database.Database): void { db.exec(sourceSchema); }
+export function initializeSourceSchema(db: Database.Database): void { db.exec(sourceSchema); initializeSourceCoordinates(db); }
+/** 追加可空坐标，不推测旧素材的章节位置。成对约束同时保护直接SQLite写入。 */
+export function initializeSourceCoordinates(db: Database.Database): void {
+  db.exec(`ALTER TABLE source_segment ADD COLUMN chapter_index INTEGER CHECK(chapter_index IS NULL OR chapter_index>0);
+    ALTER TABLE source_segment ADD COLUMN paragraph_index INTEGER CHECK((chapter_index IS NULL AND paragraph_index IS NULL) OR (chapter_index IS NOT NULL AND paragraph_index IS NOT NULL AND paragraph_index>0));`);
+}

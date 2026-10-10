@@ -18,7 +18,7 @@ describe('会话 schema 5 的备份前向迁移', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); db.close(); rmSync(directory, { recursive: true, force: true }); });
   it('迁移包含 WAL 元数据备份，增加会话表而保留正文版本，重开不再备份', () => {
-    initializeSchema(db, 'project'); expect(db.pragma('user_version', { simple: true })).toBe(6);
+    initializeSchema(db, 'project'); expect(db.pragma('user_version', { simple: true })).toBe(7);
     expect(db.prepare('SELECT revision FROM work_meta').get()).toEqual({ revision: 7 });
     expect(db.prepare('SELECT * FROM conversation').all()).toEqual([]);
     const names = readdirSync(directory).filter(name => name.includes('v4-backup')); expect(names).toHaveLength(1);
