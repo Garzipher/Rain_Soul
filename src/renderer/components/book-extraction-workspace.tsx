@@ -1,25 +1,46 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WorkDetail } from '../../shared/contracts';
 import type { BookExtractionApi, BookExtractionConfirmation, BookExtractionPreview } from '../../shared/book-extraction';
 import { extractionCategoryPath } from '../../shared/ai-extraction';
 import { StructureDialog } from './structure-dialog';
+import { BookExtractionAiPanel } from './book-extraction-ai-panel';
+import type { BookExtractionAiApi, BookExtractionAiSuggestion } from '../../shared/book-extraction-ai';
 import './book-extraction-workspace.css';
 
-interface Review { body: string; categoryId: string; tagIds: string[]; checked: boolean }
+interface Review { body: string; categoryId: string; tagIds: string[]; checked: boolean; edited?: boolean }
 export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDirtyChange }: {
-  work: WorkDetail; api: BookExtractionApi; onClose: () => void; onCommitted: (work: WorkDetail) => void; onDirtyChange?: (dirty: boolean) => void;
+  work: WorkDetail; api: BookExtractionApi & BookExtractionAiApi; onClose: () => void; onCommitted: (work: WorkDetail) => void; onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [preview, setPreview] = useState<BookExtractionPreview | null>(null), [reviews, setReviews] = useState<Record<string, Review>>({});
   const [encoding, setEncoding] = useState<'utf-8' | 'gb18030'>('utf-8'), [sourceTitle, setSourceTitle] = useState(''), [sourceAuthor, setSourceAuthor] = useState('');
-  const [permission, setPermission] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
+  const [permission, setPermission] = useState(false), [fileBusy, setBusy] = useState(false), [aiBusy, setAiBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
+  const [replacement, setReplacement] = useState<BookExtractionAiSuggestion | null>(null);
+  const busy = fileBusy || aiBusy;
   const [page, setPage] = useState(0), [leaving, setLeaving] = useState(false);
   const locked = useRef(false), attempt = useRef<{ fingerprint: string; operationId: string } | null>(null);
   const categories = work.assets?.categories.filter(item => !item.deletedAt) ?? [], tags = work.assets?.tags.filter(item => !item.deletedAt) ?? [];
   const chosen = preview?.segments.filter(segment => reviews[segment.id]?.checked) ?? [];
+  const changeAiBusy = useCallback((value: boolean) => { locked.current = value; setAiBusy(value); }, []);
   useEffect(() => { onDirtyChange?.(preview !== null || busy); }, [onDirtyChange, preview, busy]);
   useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
   function update(id: string, patch: Partial<Review>) {
-    setReviews(current => ({ ...current, [id]: { ...current[id], ...patch, checked: patch.checked ?? false } }));
+    setReviews(current => ({ ...current, [id]: { ...current[id], ...patch, edited: current[id].edited || patch.body !== undefined || patch.categoryId !== undefined || patch.tagIds !== undefined, checked: patch.checked ?? false } }));
+  }
+  function applySuggestion(suggestion: BookExtractionAiSuggestion): boolean {
+    const segment = preview?.segments.find(item => item.id === suggestion.segmentId);
+    if (busy || !segment || !segment.text.includes(suggestion.excerpt) || !categories.some(item => item.id === suggestion.categoryId) || !suggestion.tagIds.every(id => tags.some(tag => tag.id === id))) {
+      setError('AI建议来源或分类已变化，请重新分析后审核。'); return false;
+    }
+    const body = `原文摘录：\n${suggestion.excerpt}\n\n写作手法：\n${suggestion.technique}\n\n适用场景：\n${suggestion.usage}\n\n仿写练习：\n${suggestion.exercise}`;
+    if (body.length > 20000) { setError('AI学习内容超过单条知识容量，请缩小分析范围。'); return false; }
+    update(suggestion.segmentId, { body, categoryId: suggestion.categoryId, tagIds: suggestion.tagIds });
+    setPage(Math.floor(preview!.segments.findIndex(item => item.id === suggestion.segmentId) / 20));
+    setMessage('AI建议已带入审核，确认内容与分类后再勾选入库。'); return true;
+  }
+  function useSuggestion(suggestion: BookExtractionAiSuggestion) {
+    const review = reviews[suggestion.segmentId];
+    if (busy || !review) return;
+    if (review.edited || review.checked) setReplacement(suggestion); else applySuggestion(suggestion);
   }
   async function choose() {
     if (locked.current) return;
@@ -63,7 +84,7 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
       <label>来源作者<input aria-label="来源作者" value={sourceAuthor} maxLength={200} disabled={busy} onChange={event => setSourceAuthor(event.target.value)} placeholder="未知可留空" /></label>
       <label><input type="checkbox" aria-label="确认有权使用摘选内容" checked={permission} disabled={busy} onChange={event => setPermission(event.target.checked)} />我确认有权使用这些摘选内容；仅整理已审核的写作参考。</label>
       {preview.warnings.map((warning, index) => <p role="status" key={index}>{warning.message}</p>)}
-    </div><div className="book-extraction-segments">{preview.segments.slice(page * 20, (page + 1) * 20).map((segment, index) => {
+    </div><div inert={fileBusy}><BookExtractionAiPanel work={work} preview={preview} api={api} permission={permission} onUse={useSuggestion} onBusyChange={changeAiBusy} /></div><div className="book-extraction-segments">{preview.segments.slice(page * 20, (page + 1) * 20).map((segment, index) => {
       const item = reviews[segment.id], number = page * 20 + index + 1;
       return <fieldset key={segment.id} disabled={busy}><legend>{segment.chapterTitle} · 第 {segment.paragraphIndex} 段</legend>
         <details><summary>查看原文</summary><p>{segment.text}</p></details>
@@ -74,5 +95,6 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
       </fieldset>;
     })}</div><footer className="book-extraction-footer"><button disabled={busy || page === 0} onClick={() => setPage(page - 1)}>上一页</button><span>第 {page + 1} / {Math.ceil(preview.segments.length / 20)} 页</span><button disabled={busy || (page + 1) * 20 >= preview.segments.length} onClick={() => setPage(page + 1)}>下一页</button><button className="primary" disabled={busy || !permission || !sourceTitle.trim() || !chosen.length || chosen.length > 100} onClick={() => void commit()}>确认入库（{chosen.length}）</button></footer>{chosen.length > 100 && <p role="alert">每次最多审核 100 段，请减少选择。</p>}</>}
     {leaving && <StructureDialog busy={busy} onClose={() => setLeaving(false)} state={{ heading: '放弃本次摘选？', description: '尚未入库的审核内容将被放弃，原有知识库保持不变。', submitLabel: '放弃摘选并返回', onSubmit: close }} />}
+    {replacement && <StructureDialog busy={busy} onClose={() => setReplacement(null)} state={{ heading: '替换本段审核内容？', description: '本段已有手工修改或审核。替换后保留文件原文，但本次审核内容将改为AI建议，并需要重新审核。', submitLabel: '替换并重新审核', submitTone: 'primary', onSubmit: async () => applySuggestion(replacement) }} />}
   </section>;
 }
