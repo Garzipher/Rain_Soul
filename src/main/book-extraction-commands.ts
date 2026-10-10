@@ -16,6 +16,11 @@ export class BookExtractionCommands {
   private preview: BookExtractionPreview | null = null;
   private queue: Promise<unknown> = Promise.resolve();
   constructor(private readonly store: StoreAccess, private readonly files: Files) {}
+  /** AI仅能读取有效预览的副本，不能由渲染层提供原文、路径或出处。 */
+  getPreview(workId: string, token: string): BookExtractionPreview {
+    if (!this.preview || this.preview.workId !== workId || this.preview.token !== token) throw new Error('拆书预览已失效，请重新选择文件。');
+    return structuredClone(this.preview);
+  }
   accepts(command: string) { return ['chooseBookExtraction', 'confirmBookExtraction', 'cancelBookExtraction'].includes(command); }
   execute(command: string, payload: unknown): Promise<unknown> {
     const operation = this.queue.then(async () => {

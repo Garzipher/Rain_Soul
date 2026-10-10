@@ -67,3 +67,14 @@ it('冻结预览不受渲染层修改影响，新文件取代旧预览，取消�
   await commands.execute('confirmBookExtraction', request);
   expect(store.execute).toHaveBeenCalledWith('importBookExtraction', expect.objectContaining({ items: [expect.objectContaining({ source: expect.stringContaining('参考.txt') })] }));
 });
+it('AI只读取主进程冻结预览，拒绝跨作品及过期token，调用方不能改动真实来源', async () => {
+  const { commands, workId } = setup();
+  expect(() => commands.getPreview(workId, crypto.randomUUID())).toThrow(/预览/);
+  const preview = await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' }) as BookExtractionPreview;
+  const frozen = commands.getPreview(workId, preview.token);
+  frozen.filename = '伪造.txt'; frozen.segments[0].text = '伪造摘录';
+  expect(commands.getPreview(workId, preview.token)).toEqual(preview);
+  expect(() => commands.getPreview(crypto.randomUUID(), preview.token)).toThrow(/预览/);
+  await commands.execute('cancelBookExtraction', { token: preview.token });
+  expect(() => commands.getPreview(workId, preview.token)).toThrow(/预览/);
+});
