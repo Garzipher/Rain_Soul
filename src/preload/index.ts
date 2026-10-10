@@ -8,6 +8,9 @@ const invoke = async <T>(command: string, payload: unknown): Promise<T> => {
   return reply.data;
 };
 const api: DesktopApi = {
+  readExtractionDraft: workId => invoke('readExtractionDraft', { workId }),
+  discardExtractionDraft: (workId, token) => invoke('discardExtractionDraft', { workId, token }),
+  saveExtractionReview: request => invoke('saveExtractionReview', request),
   listConversations: workId => invoke('listConversations', { workId }),
   readConversation: (workId, conversationId, beforeMessageId) => invoke('readConversation', { workId, conversationId, ...(beforeMessageId ? { beforeMessageId } : {}) }),
   manageConversation: request => invoke('manageConversation', request),

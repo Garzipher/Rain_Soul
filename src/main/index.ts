@@ -21,6 +21,8 @@ import { ConversationAiCommands } from './conversation-ai-commands';
 import { ConversationAiService } from './conversation-ai-service';
 import { BookExtractionAiCommands } from './book-extraction-ai-commands';
 import { BookExtractionAiService } from './book-extraction-ai-service';
+import { ExtractionDraftStore } from './extraction-draft-store';
+import { ExtractionDraftCoordinator } from './extraction-draft-coordinator';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'rainsoul', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const testDirectory = !app.isPackaged ? process.env.RAINSOUL_TEST_DIRECTORY : undefined;
@@ -66,8 +68,9 @@ else {
     const aiService = new AiService({ credentials: aiSettings });
     const ai = new AiCommands(store, aiSettings, aiService);
     const conversationAi = new ConversationAiCommands(store, aiSettings, new ConversationAiService({ credentials: aiSettings }));
-    const books = new BookExtractionCommands(store, { choose: () => chooseLocalManuscript(() => dialog.showOpenDialog(window!, { title: '选择拆书素材', properties: ['openFile'], filters: [{ name: 'TXT / DOCX 素材', extensions: ['txt', 'docx'] }] })) });
-    const bookAi = new BookExtractionAiCommands(store, aiSettings, books, new BookExtractionAiService({ credentials: aiSettings }));
+    const extractionDrafts = new ExtractionDraftCoordinator(new ExtractionDraftStore(join(directory, 'ExtractionDrafts')), store);
+    const books = new BookExtractionCommands(store, { choose: () => chooseLocalManuscript(() => dialog.showOpenDialog(window!, { title: '选择拆书素材', properties: ['openFile'], filters: [{ name: 'TXT / DOCX 素材', extensions: ['txt', 'docx'] }] })) }, undefined, extractionDrafts);
+    const bookAi = new BookExtractionAiCommands(store, aiSettings, books, new BookExtractionAiService({ credentials: aiSettings }), extractionDrafts);
     const profiles = new ProfileCommands(authorService, () => selectAuthorAvatar(authorService,
       () => dialog.showOpenDialog(window!, { title: '选择本地头像', properties: ['openFile'], filters: [{ name: 'PNG / JPEG 图片', extensions: ['png', 'jpg', 'jpeg'] }] }),
       bytes => nativeImage.createFromBuffer(bytes)));

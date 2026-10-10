@@ -2,6 +2,11 @@ import { expect, it, vi } from 'vitest';
 import { BookExtractionCommands } from '../../src/main/book-extraction-commands';
 import type { BookExtractionPreview } from '../../src/shared/book-extraction';
 import { Document, Packer, Paragraph } from 'docx';
+import { ExtractionDraftStore } from '../../src/main/extraction-draft-store';
+import { ExtractionDraftCoordinator } from '../../src/main/extraction-draft-coordinator';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 function setup() {
   const workId = crypto.randomUUID();
@@ -26,6 +31,28 @@ it('只预览不落库，确认只提交已审核段落，出处由冻结文件�
   await expect(commands.execute('confirmBookExtraction', { ...request, workId: crypto.randomUUID() })).rejects.toThrow(/预览/);
   await expect(commands.execute('confirmBookExtraction', { ...request, permissionConfirmed: false })).rejects.toThrow();
   await expect(commands.execute('confirmBookExtraction', { ...request, items: [{ ...request.items[0], segmentId: crypto.randomUUID() }] })).rejects.toThrow(/段落/);
+});
+it('生产拆书预览重启后恢复，正文与学习注释分别入库，保留已入库段落状态', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'rainsoul-command-draft-'));
+  try {
+    const { workId, store, files } = setup(), drafts = new ExtractionDraftStore(root), coordinator = new ExtractionDraftCoordinator(drafts, store);
+    const commands = new BookExtractionCommands(store, files, undefined, coordinator);
+    const preview = await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' }) as BookExtractionPreview;
+    const restarted = new BookExtractionCommands(store, files, undefined, new ExtractionDraftCoordinator(drafts, store));
+    const restored = await restarted.execute('readExtractionDraft', { workId }) as { preview: BookExtractionPreview };
+    expect(restored.preview.source).toEqual(preview.source); expect(restored.preview.token).toBe(preview.token);
+    const reviews = [{ segmentId: preview.segments[0].id, body: '雨落在窗上。', categoryId: crypto.randomUUID(), tagIds: [], status: 'approved' }];
+    await restarted.execute('saveExtractionReview', { workId, token: preview.token, reviews });
+    expect((await drafts.readExtractionDraft(workId))?.reviews).toEqual(reviews);
+    const annotation = { technique: '以光传暖', usage: '写夜景', exercise: '仿写冬夜' };
+    await restarted.execute('confirmBookExtraction', { workId, token: preview.token, expectedRevision: 1, operationId: crypto.randomUUID(), sourceTitle: '原作', sourceAuthor: '', permissionConfirmed: true,
+      items: [{ segmentId: preview.segments[0].id, body: '雨落在窗上。', categoryId: crypto.randomUUID(), tagIds: [], annotation }] });
+    expect(store.execute).toHaveBeenLastCalledWith('importBookExtraction', expect.objectContaining({ items: [expect.objectContaining({ body: '雨落在窗上。', annotation })] }));
+    expect((await drafts.readExtractionDraft(workId))?.reviews[0].status).toBe('committed');
+    await restarted.execute('discardExtractionDraft', { workId, token: preview.token });
+    expect(await drafts.readExtractionDraft(workId)).toBeNull();
+    expect(() => restarted.getPreview(workId, preview.token)).toThrow();
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 it('取消使预览失效；文件替换使旧token失效；失败同请求可以重试', async () => {
   const { workId, store, commands, files } = setup();

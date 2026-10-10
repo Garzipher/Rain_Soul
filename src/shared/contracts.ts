@@ -40,6 +40,9 @@ export interface StructureRequest { workId: string; expectedRevision: number; op
 export interface SaveResult { revision: number; wordCount: number; assets?: AssetState }
 export interface RuntimeInfo { version: string; dataDirectory: string }
 export interface DesktopApi extends BookExtractionAiApi {
+  readExtractionDraft?(workId: string): Promise<ExtractionDraftRecovery | null>;
+  discardExtractionDraft?(workId: string, token: string): Promise<void>;
+  saveExtractionReview?(request: ExtractionReviewRequest): Promise<ExtractionDraft>;
   listConversations(workId: string): Promise<ConversationSummary[]>;
   readConversation(workId: string, conversationId: string, beforeMessageId?: string): Promise<ConversationDetail>;
   manageConversation(request: ConversationRequest): Promise<ConversationDetail | null>;
@@ -102,3 +105,4 @@ import type { ConversationSummary, ConversationDetail, ConversationRequest } fro
 import type { ConversationAiPrepareRequest, PendingConversationReply } from './conversation-ai';
 import type { BookExtractionPreview, BookExtractionConfirmation, WebImportRequest, PastedImportRequest } from './book-extraction';
 import type { BookExtractionAiApi } from './book-extraction-ai';
+import type { ExtractionDraft, ExtractionDraftRecovery, ExtractionReviewRequest } from './extraction-draft';
