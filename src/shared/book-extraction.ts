@@ -1,12 +1,16 @@
 import { z } from 'zod';
 import type { WorkDetail } from './contracts';
 import type { ManuscriptWarning } from './manuscript';
+import type { FrozenSourceDocument } from './source-document';
 
 export interface BookExtractionSegment { id: string; chapterTitle: string; chapterIndex: number; paragraphIndex: number; text: string }
 export interface BookExtractionPreview {
-  token: string; workId: string; filename: string; fileHash: string; format: 'txt' | 'docx';
+  token: string; workId: string; filename: string; fileHash: string; format: 'txt' | 'docx' | 'web' | 'paste';
   warnings: ManuscriptWarning[]; segments: BookExtractionSegment[];
+  source?: FrozenSourceDocument;
 }
+export interface WebImportRequest { workId: string; operationId: string; url: string }
+export interface PastedImportRequest { workId: string; text: string; title: string }
 const text = z.string().trim().min(1).max(20000);
 const tags = z.array(z.uuid()).max(100).refine(ids => new Set(ids).size === ids.length);
 export const bookExtractionConfirmationSchema = z.object({
