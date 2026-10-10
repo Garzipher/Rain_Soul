@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { BookExtractionAiPanel } from '../../src/renderer/components/book-extraction-ai-panel';
 import type { WorkDetail } from '../../src/shared/contracts';
@@ -29,7 +29,8 @@ function setup(permission = true, count = 2) {
   return { ...props, prepared, result, view };
 }
 async function prepare() {
-  fireEvent.click(screen.getByRole('checkbox', { name: 'AI 分析段落 1' }));
+  const checkbox = screen.getByRole('checkbox', { name: 'AI 分析段落 1' });
+  if (!(checkbox as HTMLInputElement).checked) fireEvent.click(checkbox);
   screen.getByRole('button', { name: '准备 AI 推荐' }).focus();
   fireEvent.click(screen.getByRole('button', { name: '准备 AI 推荐' }));
   return screen.findByRole('dialog', { name: '确认 AI 辅助拆书' });
@@ -80,4 +81,84 @@ it('推荐展示写法、场景、练习和分类标签，点击带入审核才�
   expect(onUse).toHaveBeenCalledWith(result.suggestions[0]);
   expect(api.executeBookExtractionAi).toHaveBeenCalledTimes(1);
   expect(api.executeBookExtractionAi).toHaveBeenCalledWith(expect.objectContaining({ confirmed: true }));
+});
+it('结构校验失败只展示可复制纯文本，含脚本字符串也不能带入审核', async () => {
+  const { api, result, onUse } = setup();
+  const rawText = '<script>window.bad = true</script>模型原始响应';
+  vi.mocked(api.executeBookExtractionAi).mockResolvedValueOnce({ ...result, rawText, validationError: '摘录未匹配原文' });
+  const copy = vi.fn(async () => {}); Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: copy } });
+  await execute();
+  expect(await screen.findByText(rawText)).toBeVisible(); expect(screen.getByRole('alert')).toHaveTextContent('摘录未匹配原文');
+  expect(document.querySelector('script')).toBeNull();
+  expect(screen.queryByRole('button', { name: '带入审核' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '复制原始响应' }));
+  await waitFor(() => expect(copy).toHaveBeenCalledWith(rawText)); expect(onUse).not.toHaveBeenCalled();
+});
+it('执行回执不明保持退出保护，仅按冻结哈希核对本机；进行中不解锁也不重发', async () => {
+  const { api, work, preview, prepared, onBusyChange } = setup();
+  vi.mocked(api.executeBookExtractionAi).mockRejectedValueOnce(new Error('IPC 回执丢失'));
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'running' });
+  await execute();
+  expect(await screen.findByRole('button', { name: '核对本机结果' })).toBeEnabled();
+  expect(onBusyChange).toHaveBeenLastCalledWith(true); expect(screen.getByRole('button', { name: '准备 AI 推荐' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '核对本机结果' }));
+  expect(await screen.findByText('请求仍在进行中，可稍后再次核对本机结果。')).toBeVisible();
+  expect(onBusyChange).toHaveBeenLastCalledWith(true);
+  expect(api.getBookExtractionAiResult).toHaveBeenCalledWith({ workId: work.id, previewToken: preview.token, requestHash: prepared.requestHash });
+  fireEvent.click(screen.getByRole('button', { name: '核对本机结果' }));
+  expect(await screen.findByText('用声音刻画雨景')).toBeVisible();
+  expect(onBusyChange).toHaveBeenLastCalledWith(false); expect(api.executeBookExtractionAi).toHaveBeenCalledTimes(1);
+});
+it('失败与本机无回执保留上次成功推荐，核对缺失后解除保护且不自动重试', async () => {
+  const { api, onBusyChange } = setup();
+  await execute(); await screen.findByText('用声音刻画雨景');
+  vi.mocked(api.executeBookExtractionAi).mockRejectedValueOnce(new Error('联网失败'));
+  vi.mocked(api.getBookExtractionAiResult).mockResolvedValueOnce({ status: 'missing' });
+  await execute(); await screen.findByRole('button', { name: '核对本机结果' });
+  expect(screen.getByText('用声音刻画雨景')).toBeVisible(); expect(screen.getByRole('button', { name: '带入审核' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '核对本机结果' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '带入审核' })).toBeEnabled());
+  expect(onBusyChange).toHaveBeenLastCalledWith(false); expect(api.executeBookExtractionAi).toHaveBeenCalledTimes(2);
+});
+it('联网期间可以明确取消，取消后的晚响应不能覆盖旧成功推荐', async () => {
+  const { api, result, prepared, onBusyChange } = setup();
+  await execute(); await screen.findByText('用声音刻画雨景');
+  let resolve!: (value: BookExtractionAiResult) => void;
+  vi.mocked(api.executeBookExtractionAi).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  await execute();
+  fireEvent.click(screen.getByRole('button', { name: '取消本次 AI 请求' }));
+  await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
+  expect(api.cancelBookExtractionAi).toHaveBeenCalledWith(prepared.confirmationToken);
+  await act(async () => resolve({ ...result, suggestions: [{ ...result.suggestions[0], technique: '不应出现的晚回复' }] }));
+  expect(screen.queryByText('不应出现的晚回复')).toBeNull(); expect(screen.getByText('用声音刻画雨景')).toBeVisible();
+});
+it('取消失败保留退出保护，可重试取消并解除', async () => {
+  const { api, onBusyChange } = setup();
+  vi.mocked(api.cancelBookExtractionAi).mockRejectedValueOnce(new Error('取消回执不明'));
+  vi.mocked(api.executeBookExtractionAi).mockRejectedValueOnce(new Error('发送回执不明'));
+  await execute(); await screen.findByRole('button', { name: '核对本机结果' });
+  fireEvent.click(screen.getByRole('button', { name: '取消本次 AI 请求' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('取消回执不明'); expect(onBusyChange).toHaveBeenLastCalledWith(true);
+  fireEvent.click(screen.getByRole('button', { name: '取消本次 AI 请求' }));
+  await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
+});
+it('许可撤销立即作废发送授权；卸载时取消所有完成缓存及未完成授权', async () => {
+  const context = setup(), { view, api, prepared } = context;
+  await execute(); await screen.findByText('用声音刻画雨景');
+  const another = { ...prepared, confirmationToken: crypto.randomUUID() }; vi.mocked(api.prepareBookExtractionAi).mockResolvedValueOnce(another);
+  await prepare();
+  view.rerender(<BookExtractionAiPanel {...context} permission={false} />);
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(api.cancelBookExtractionAi).toHaveBeenCalledWith(another.confirmationToken); expect(api.executeBookExtractionAi).toHaveBeenCalledTimes(1);
+  view.unmount(); expect(api.cancelBookExtractionAi).toHaveBeenCalledWith(prepared.confirmationToken);
+});
+it('准备期间同步上报退出保护；卸载后的准备晚回执立即取消', async () => {
+  const { api, prepared, view, onBusyChange } = setup();
+  let resolve!: (value: AiPreparedRequest) => void;
+  vi.mocked(api.prepareBookExtractionAi).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'AI 分析段落 1' }));
+  fireEvent.click(screen.getByRole('button', { name: '准备 AI 推荐' }));
+  expect(onBusyChange).toHaveBeenLastCalledWith(true);
+  view.unmount(); await act(async () => resolve(prepared));
+  expect(api.cancelBookExtractionAi).toHaveBeenCalledWith(prepared.confirmationToken); expect(api.executeBookExtractionAi).not.toHaveBeenCalled();
 });
