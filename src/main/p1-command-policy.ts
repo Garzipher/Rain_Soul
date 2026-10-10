@@ -1,6 +1,6 @@
 /** 私有命令只由主进程审核后构造；受信窗口同样不能绕过授权。 */
 export function assertPublicP1Command(command: string, payload: unknown): void {
-  if (command === 'appendConversationTurn' || command === 'importBookExtraction') throw new Error('此命令仅允许主进程审核后执行。');
+  if (command === 'appendConversationTurn' || command === 'importBookExtraction' || command === 'getBookExtractionReceipt') throw new Error('此命令仅允许主进程审核后执行。');
   if (command !== 'manageConversation' || !payload || typeof payload !== 'object' || !('action' in payload)) return;
   const action = payload.action;
   if (!action || typeof action !== 'object' || !('type' in action) || action.type !== 'appendMessage') return;

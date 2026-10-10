@@ -25,7 +25,7 @@ import { snapshotCreateRequestSchema, snapshotRestoreRequestSchema, type Snapsho
 import { listSnapshots as readSnapshots, createSnapshot as captureSnapshot, restoreSnapshot as applySnapshot, previewSnapshot as readSnapshotPreview, freezeSnapshotExport } from './snapshots';
 import { listConversations, readConversation, manageConversation, appendConversationTurn } from './conversations';
 import type { ConversationRequest, ConversationTurnRequest } from '../../shared/conversations';
-import { importBookExtraction } from './book-extraction';
+import { importBookExtraction, getBookExtractionReceipt, type BookExtractionReceiptRequest } from './book-extraction';
 import type { BookExtractionCommit } from '../../shared/book-extraction';
 export { RepositoryError } from './schema';
 
@@ -152,6 +152,10 @@ export class WorkRepository {
   appendConversationTurn(request: ConversationTurnRequest) { return appendConversationTurn(this.projectDb(request.workId), request); }
   importBookExtraction(request: BookExtractionCommit) {
     importBookExtraction(this.projectDb(request.workId), request); this.pending.add(request.workId); return this.openWork(request.workId);
+  }
+  getBookExtractionReceipt(request: BookExtractionReceiptRequest) {
+    const receipt = getBookExtractionReceipt(this.projectDb(request.workId), request);
+    return receipt.status === 'missing' ? receipt : { ...receipt, result: this.openWork(request.workId) };
   }
 
   listDeletedWorks(): DeletedWork[] {

@@ -14,6 +14,7 @@ import type { AiCandidate } from '../../shared/ai';
 import type { SnapshotCreateRequest, SnapshotRestoreRequest } from '../../shared/snapshots';
 import type { ConversationRequest, ConversationTurnRequest } from '../../shared/conversations';
 import type { BookExtractionCommit } from '../../shared/book-extraction';
+import type { BookExtractionReceiptRequest } from './book-extraction';
 
 const directory = (workerData as { directory: string }).directory;
 ensureLearningWork(join(directory, 'Projects'), JSON.parse(readFileSync(join(__dirname, 'learning-course.json'), 'utf8')));
@@ -27,6 +28,7 @@ parentPort?.on('message', async ({ requestId, command, payload }: { requestId: s
       case 'manageConversation': data = repository.manageConversation(payload as unknown as ConversationRequest); break;
       case 'appendConversationTurn': data = repository.appendConversationTurn(payload as unknown as ConversationTurnRequest); break;
       case 'importBookExtraction': data = repository.importBookExtraction(payload as unknown as BookExtractionCommit); break;
+      case 'getBookExtractionReceipt': data = repository.getBookExtractionReceipt(payload as unknown as BookExtractionReceiptRequest); break;
       case 'listWorks': data = repository.listWorks(); break;
       case 'listDeletedWorks': data = repository.listDeletedWorks(); break;
       case 'manageStructure': data = repository.manageStructure(payload as unknown as StructureRequest); break;

@@ -13,10 +13,13 @@ it('只预览不落库，确认只提交已审核段落，出处由冻结文件�
   const { workId, store, commands } = setup();
   const preview = await commands.execute('chooseBookExtraction', { workId, encoding: 'utf-8' }) as BookExtractionPreview;
   expect(store.execute).not.toHaveBeenCalled(); expect(preview.segments).toHaveLength(2);
+  expect(preview.source?.kind).toBe('txt');
+  expect(preview.source?.segments.map(segment => segment.id)).toEqual(preview.segments.map(segment => segment.id));
   const request = { workId, token: preview.token, expectedRevision: 1, operationId: crypto.randomUUID(), sourceTitle: '优秀作品', sourceAuthor: '原作者', permissionConfirmed: true,
     items: [{ segmentId: preview.segments[1].id, body: '审核后的灯火描写', categoryId: crypto.randomUUID(), tagIds: [] }] };
   await commands.execute('confirmBookExtraction', request);
-  expect(store.execute).toHaveBeenCalledWith('importBookExtraction', expect.objectContaining({ workId, items: [expect.objectContaining({ body: '审核后的灯火描写', source: expect.stringContaining('第2段') })] }));
+  expect(store.execute).toHaveBeenCalledWith('importBookExtraction', expect.objectContaining({ workId, sourceDocument: preview.source,
+    items: [expect.objectContaining({ body: '审核后的灯火描写', segmentId: preview.segments[1].id, source: expect.stringContaining('第2段') })] }));
   const commit = store.execute.mock.calls[0][1] as { items: { source: string }[] };
   expect(commit.items[0].source).toContain(preview.fileHash); expect(commit.items[0].source).toContain('原作者'); expect(commit.items[0].source).not.toContain('雨落在窗上');
   await expect(commands.execute('confirmBookExtraction', { ...request, source: '伪造来源' })).rejects.toThrow();

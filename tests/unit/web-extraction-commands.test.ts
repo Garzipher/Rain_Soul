@@ -75,3 +75,15 @@ it('旧文件选择晚返回不能覆盖新作品的粘贴预览', async () => {
   release({name:'旧文件.txt',bytes:Buffer.from('旧正文')}); await rejected;
   expect(commands.getPreview(current.workId,current.token)).toEqual(current);
 });
+it('网页确认仅绑定冻结来源，出处保留原始与最终网址，调用方不能伪造', async () => {
+  const { commands, store, workId, operationId } = setup();
+  const preview = await commands.execute('fetchWebExtraction', { workId, operationId, url: 'https://article.example.com/start' }) as BookExtractionPreview;
+  const request = { workId, token: preview.token, expectedRevision: 1, operationId: randomUUID(), sourceTitle: '原文', sourceAuthor: '', permissionConfirmed: true,
+    items: [{ segmentId: preview.segments[0].id, body: '雨落在岸边。', categoryId: randomUUID(), tagIds: [] }] };
+  await commands.execute('confirmBookExtraction', request);
+  expect(store.execute).toHaveBeenCalledWith('importBookExtraction', expect.objectContaining({ sourceDocument: preview.source,
+    items: [expect.objectContaining({ segmentId: preview.segments[0].id, source: expect.stringContaining('https://article.example.com/start') })] }));
+  const commit = store.execute.mock.calls.at(-1) as unknown as [string, { items: { source: string }[] }];
+  expect(commit[1].items[0].source).toContain('https://article.example.com/read');
+  await expect(commands.execute('confirmBookExtraction', { ...request, sourceDocument: preview.source })).rejects.toThrow();
+});

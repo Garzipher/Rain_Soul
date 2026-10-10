@@ -20,6 +20,7 @@ const schemas = {
   manageConversation: conversationRequestSchema,
   appendConversationTurn: conversationTurnSchema,
   importBookExtraction: bookExtractionCommitSchema,
+  getBookExtractionReceipt: z.object({ workId: id, operationId: id, requestHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
   listWorks: z.object({}).strict(),
   listDeletedWorks: z.object({}).strict(),
   createWork: z.object({ title }).strict(),
