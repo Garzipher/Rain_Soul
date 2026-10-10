@@ -103,6 +103,15 @@ test('AI拆书真实IPC逐次授权、独立原文范围、审核后原子入库
     await expect(dialog).toContainText('所选1段'); await expect(dialog).toContainText('可能产生费用');
     await expect(dialog).not.toContainText(unselected); await expect(dialog).not.toContainText(privateBody);
     await expect(dialog).not.toContainText(fakeKey);
+    const sendButton = dialog.getByRole('button', { name: '确认发送', exact: true });
+    await sendButton.focus(); await page.keyboard.press('Tab');
+    await expect(dialog.locator('summary')).toBeFocused();
+    await page.keyboard.press('Tab');
+    const material = dialog.locator('pre[aria-label="完整发送内容"]');
+    await expect(material).toBeFocused();
+    await material.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await page.keyboard.press('Home');
+    await expect(material).toBeFocused();
     await capture(page, 'book-ai-authorization');
     expect(await count(application)).toBe(0);
     await activate(dialog.getByRole('button', { name: '取消', exact: true }));
