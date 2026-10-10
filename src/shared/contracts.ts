@@ -52,6 +52,9 @@ export interface DesktopApi extends BookExtractionAiApi {
   chooseBookExtraction(workId: string, encoding: 'utf-8' | 'gb18030'): Promise<BookExtractionPreview | null>;
   confirmBookExtraction(request: BookExtractionConfirmation): Promise<WorkDetail>;
   cancelBookExtraction(token: string): Promise<void>;
+  fetchWebExtraction?(request: WebImportRequest): Promise<BookExtractionPreview>;
+  cancelWebExtraction?(operationId: string): Promise<void>;
+  previewPastedExtraction?(request: PastedImportRequest): Promise<BookExtractionPreview>;
   getAiSettings(): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
   saveAiSettings(provider: AiProvider, key?: string): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
   clearAiSettings(): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
@@ -97,5 +100,5 @@ import type { KnowledgeScope, KnowledgeScopeResult, KnowledgeCopyRequest } from 
 import type { SnapshotSummary, SnapshotPreview, SnapshotCreateRequest, SnapshotRestoreRequest } from './snapshots';
 import type { ConversationSummary, ConversationDetail, ConversationRequest } from './conversations';
 import type { ConversationAiPrepareRequest, PendingConversationReply } from './conversation-ai';
-import type { BookExtractionPreview, BookExtractionConfirmation } from './book-extraction';
+import type { BookExtractionPreview, BookExtractionConfirmation, WebImportRequest, PastedImportRequest } from './book-extraction';
 import type { BookExtractionAiApi } from './book-extraction-ai';
