@@ -284,8 +284,17 @@ test('云端设置与发送范围预览可离线取消且不修改原稿', async
     await activate(page.getByRole('menuitem', { name: 'AI 单句润色', exact: true }));
     await expect(page.getByRole('textbox', { name: '目标单句', exact: true })).toHaveValue(prose.slice(0, 3));
     await expect(page.getByRole('combobox', { name: 'AI 操作', exact: true })).toHaveValue('sentencePolish');
+    // 从写作进入知识页选参考，再返回时保留同正文版本的单句目标。
+    await activate(page.getByRole('button', { name: '关闭AI工具', exact: true }));
+    await sidebar(page, '知识库');
+    await activate(page.getByRole('button', { name: '用于写作参考', exact: true }));
+    await activate(page.getByRole('button', { name: '返回写作', exact: true }));
+    await activate(page.getByRole('button', { name: 'AI 工具', exact: true }));
+    await expect(page.getByRole('textbox', { name: '目标单句', exact: true })).toHaveValue(prose.slice(0, 3));
+    await expect(page.getByRole('combobox', { name: 'AI 操作', exact: true })).toHaveValue('sentencePolish');
     await activate(page.getByRole('button', { name: '预览 AI 请求', exact: true }));
     await expect(confirmation).toContainText(prose.slice(0, 3));
+    await expect(confirmation).toContainText('自写参考句');
     await activate(confirmation.getByRole('button', { name: '取消', exact: true }));
     expect((await currentWork(page, 'AI授权演练')).chapters).toEqual(before.chapters);
   } finally { await cleanup(application, directory); }
