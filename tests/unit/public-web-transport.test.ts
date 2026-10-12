@@ -86,7 +86,7 @@ describe('安全公开网页GET', () => {
     const controller = new AbortController(), pending = fetchPublicArticle('https://article.example.com', controller.signal, f.dependencies);
     const rejected = expect(pending).rejects.toThrow(/取消/); controller.abort(); await rejected; finish(['8.8.8.8']); await Promise.resolve(); expect(f.openRequest).not.toHaveBeenCalled();
     vi.useFakeTimers(); f.dependencies.resolveHost = () => new Promise(() => {});
-    const timeout = expect(fetchPublicArticle('https://article.example.com', new AbortController().signal, f.dependencies)).rejects.toThrow(/超时/);
+    const timeout = expect(fetchPublicArticle('https://article.example.com', new AbortController().signal, f.dependencies)).rejects.toThrow(/超过30秒/);
     await vi.advanceTimersByTimeAsync(30000); await timeout;
   });
   it('取消响应读取关闭请求与流，预先取消完全不联网', async () => {
@@ -101,6 +101,35 @@ describe('安全公开网页GET', () => {
     const f = fixture(); f.resolveHost.mockRejectedValue(new Error('网页地址必须 secret-token'));
     await expect(fetchPublicArticle('https://article.example.com', new AbortController().signal, f.dependencies)).rejects.toThrow('网页获取失败，请检查网络后手动重试。');
   });
+  it.each([
+    ['ECONNRESET', '网页连接被目标网站提前关闭，可能是网站访问策略或当前网络线路限制；可重试，或改用粘贴/本地文件。', false],
+    ['ETIMEDOUT', '连接目标网站超时；请重试，或改用粘贴/本地文件。', false],
+    ['ESOCKETTIMEDOUT', '连接目标网站超时；请重试，或改用粘贴/本地文件。', false],
+    ['ENOTFOUND', '无法解析目标网站地址；请检查网址和网络，或改用粘贴/本地文件。', true],
+    ['EAI_AGAIN', '无法解析目标网站地址；请检查网址和网络，或改用粘贴/本地文件。', true],
+    ['UNKNOWN', '网页获取失败，请检查网络后手动重试。', false],
+  ])('网络错误%s提示可操作原因且不泄漏原始消息', async (code, expected, dns) => {
+    const f = fixture();
+    if (dns) f.resolveHost.mockRejectedValue(Object.assign(new Error('secret-token'), { code }));
+    if (!dns) f.dependencies.openRequest = (() => {
+      const outgoing = new EventEmitter() as ClientRequest;
+      outgoing.destroy = vi.fn(() => outgoing);
+      outgoing.end = vi.fn(() => { queueMicrotask(() => outgoing.emit('error', Object.assign(new Error('secret-token'), { code }))); return outgoing; }) as ClientRequest['end'];
+      return outgoing;
+    }) as PublicWebDependencies['openRequest'];
+    await expect(fetchPublicArticle('https://article.example.com', new AbortController().signal, f.dependencies)).rejects.toThrow(expected);
+    if (dns) expect(f.openRequest).not.toHaveBeenCalled();
+  });
+  it('网络错误发生时已取消或达到总期限，优先显示取消或总超时', async () => {
+    const f = fixture(), controller = new AbortController();
+    f.dependencies.resolveHost = async () => { controller.abort(); throw Object.assign(new Error('secret-token'), { code: 'ECONNRESET' }); };
+    await expect(fetchPublicArticle('https://article.example.com', controller.signal, f.dependencies)).rejects.toThrow('网页获取已取消。');
+    vi.useFakeTimers();
+    const g = fixture();
+    g.dependencies.resolveHost = () => new Promise((_resolve, reject) => setTimeout(() => reject(Object.assign(new Error('secret-token'), { code: 'ENOTFOUND' })), 30000));
+    const timeout = expect(fetchPublicArticle('https://article.example.com', new AbortController().signal, g.dependencies)).rejects.toThrow('网页获取超过30秒，已停止；请手动重试，或改用粘贴/本地文件。');
+    await vi.advanceTimersByTimeAsync(30000); await timeout;
+  });
   it('连接等待可取消，不接受取消后的响应；跨跳共用原始截止时间', async () => {
     const f = fixture(); let receive!: (response: IncomingMessage) => void;
     const outgoing = new EventEmitter() as ClientRequest; outgoing.destroy = vi.fn(() => outgoing); outgoing.end = vi.fn(() => outgoing) as ClientRequest['end'];
@@ -111,7 +140,7 @@ describe('安全公开网页GET', () => {
     const late = new PassThrough() as unknown as IncomingMessage; receive(late); expect(late.destroyed).toBe(true); expect(outgoing.destroy).toHaveBeenCalled();
     const g = fixture([{ status: 302, headers: { location: '/next' } }]); let clock = 0; g.dependencies.now = () => clock;
     g.resolveHost.mockImplementation(async () => { clock = 30000; return ['8.8.8.8']; });
-    await expect(fetchPublicArticle('https://article.example.com', new AbortController().signal, g.dependencies)).rejects.toThrow(/超时/);
+    await expect(fetchPublicArticle('https://article.example.com', new AbortController().signal, g.dependencies)).rejects.toThrow(/超过30秒/);
     expect(g.openRequest).not.toHaveBeenCalled();
   });
 });

@@ -14,10 +14,20 @@ export interface PublicWebDependencies {
 }
 export interface PublicArticle { bytes: Buffer; finalUrl: string; contentType: string; deadline: number }
 class WebError extends Error {}
+const timeoutMessage = '网页获取超过30秒，已停止；请手动重试，或改用粘贴/本地文件。';
+function networkErrorMessage(reason: unknown): string | undefined {
+  if (!reason || typeof reason !== 'object' || !('code' in reason)) return undefined;
+  const code = (reason as { code?: unknown }).code;
+  if (typeof code !== 'string') return undefined;
+  if (code === 'ECONNRESET') return '网页连接被目标网站提前关闭，可能是网站访问策略或当前网络线路限制；可重试，或改用粘贴/本地文件。';
+  if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT') return '连接目标网站超时；请重试，或改用粘贴/本地文件。';
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return '无法解析目标网站地址；请检查网址和网络，或改用粘贴/本地文件。';
+  return undefined;
+}
 const abortError = (signal: AbortSignal) => signal.reason instanceof WebError ? signal.reason : new WebError('网页获取已取消。');
 function check(signal: AbortSignal, deadline: number, now: () => number): void {
   if (signal.aborted) throw abortError(signal);
-  if (now() >= deadline) throw new WebError('网页获取超时，请手动重试。');
+  if (now() >= deadline) throw new WebError(timeoutMessage);
 }
 /** 即使DNS或注入依赖不支持中止，调用仍立即结束；晚结果不能启动请求。 */
 async function interruptible<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -80,7 +90,7 @@ export async function fetchPublicArticle(url: string, signal: AbortSignal, depen
   const now = dependencies.now ?? Date.now, deadline = now() + 30000, controller = new AbortController();
   const cancel = () => controller.abort(new WebError('网页获取已取消。'));
   signal.addEventListener('abort', cancel, { once: true }); if (signal.aborted) cancel();
-  const timer = setTimeout(() => controller.abort(new WebError('网页获取超时，请手动重试。')), 30000);
+  const timer = setTimeout(() => controller.abort(new WebError(timeoutMessage)), 30000);
   const active = controller.signal, visited = new Set<string>();
   const resolveHost = dependencies.resolveHost ?? (async (hostname: string) => (await lookup(hostname, { all: true })).map(item => item.address));
   try {
@@ -116,6 +126,6 @@ export async function fetchPublicArticle(url: string, signal: AbortSignal, depen
     if (reason instanceof WebError) throw reason;
     // 地址校验文案由本地生成；其他DNS/TLS/压缩错误不得回显远端数据。
     if (reason instanceof PublicWebAddressError) throw reason;
-    throw new WebError('网页获取失败，请检查网络后手动重试。');
+    throw new WebError(networkErrorMessage(reason) ?? '网页获取失败，请检查网络后手动重试。');
   } finally { clearTimeout(timer); signal.removeEventListener('abort', cancel); }
 }
