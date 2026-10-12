@@ -107,14 +107,19 @@ test('新的失败状态会取消旧的重试回调', async ({ page }) => {
 });
 
 test('重试保存期间的新输入会重新排队保存', async ({ page }) => {
+  // 暂停浏览器时钟，避免机器负载把中间状态的观察推迟到保存完成之后。
+  await page.clock.install({ time: new Date('2026-10-12T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-10-12T00:00:01Z'));
   await page.locator('.book[data-work="雾港来信"]').click();
   await page.locator('[data-demo="error"]').click();
   await page.locator('#retry-save').click();
   await page.locator('#editor').fill('重试期间的新正文');
-  await page.waitForTimeout(800);
+  await page.clock.runFor(650);
   await expect(page.locator('#save-status')).toHaveText('未保存');
   await expect(page.locator('#editor')).toContainText('重试期间的新正文');
-  await page.waitForTimeout(600);
+  await page.clock.runFor(499);
+  await expect(page.locator('#save-status')).toHaveText('未保存');
+  await page.clock.runFor(1);
   await expect(page.locator('#save-status')).toHaveText('已保存');
 });
 
