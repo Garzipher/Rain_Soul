@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
@@ -77,7 +77,7 @@ it('外部篡改激活身份或权重时状态失败并保留原文件，不向�
   await store.install({ operationId: randomUUID(), source: 'local', directory: source }); const active = await store.getActiveDirectory();
   writeFileSync(join(active!, manifest.files[0].path), '损坏');
   expect((await store.getStatus()).state).toBe('error'); expect(await store.getActiveDirectory()).toBeNull();
-  writeFileSync(join(target, 'active.json'), JSON.stringify({ generation: '../outside', fingerprint: modelFingerprint(manifest), enabled: true }));
+  writeFileSync(join(target, 'selection.json'), JSON.stringify({ schemaVersion: 1, source: 'user', userGeneration: '../outside', fingerprint: modelFingerprint(manifest), enabled: true }));
   expect((await store.getStatus()).state).toBe('error'); expect(await store.getActiveDirectory()).toBeNull();
 });
 it('完整固定下载可激活，断流和短流保留旧模型，不自动重试', async () => {
@@ -115,8 +115,8 @@ it('安装进度绑定操作身份与准确字节，可取消本地导入，未�
 it('旧激活记录声称启用但资格未通过时，状态与模型目录仍保持停用', async () => {
   const { manifest, source, target } = fixture(false), store = new RetrievalModelStore(target, { manifest });
   await store.install({ operationId: randomUUID(), source: 'local', directory: source });
-  const pointer = JSON.parse(readFileSync(join(target, 'active.json'), 'utf8')); pointer.enabled = true;
-  writeFileSync(join(target, 'active.json'), JSON.stringify(pointer));
+  const selection = JSON.parse(readFileSync(join(target, 'selection.json'), 'utf8')); selection.enabled = true;
+  writeFileSync(join(target, 'selection.json'), JSON.stringify(selection));
   expect(await store.getStatus()).toMatchObject({ installed: true, state: 'disabled', qualified: false });
   expect(await store.getActiveDirectory()).toBeNull();
 });
@@ -130,4 +130,86 @@ it('分块下载报告已写入字节且状态副本不能篡改安装进度', a
   const status = await store.getStatus(); expect(status).toMatchObject({ state: 'installing', progress: { operationId, phase: 'downloading', receivedBytes: 3, totalBytes: bytes.length } });
   status.progress!.receivedBytes = 999; expect(store.getProgress()?.receivedBytes).toBe(3);
   resume(); await pending; expect(store.getProgress()).toBeNull();
+});
+it('新用户默认只读使用可信内置目录，不复制权重或创建激活记录', async () => {
+  const { manifest, source, target } = fixture();
+  const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+  expect(await store.getStatus()).toMatchObject({ state: 'ready', source: 'bundled', bundledPresent: true, enabled: true, installed: true });
+  expect(await store.getActiveDirectory()).toBe(source);
+  expect(readdirSync(target)).toEqual([]);
+  expect(readFileSync(join(source, manifest.files[0].path))).toEqual(bytes);
+});
+it.each(Object.keys(fixedManifest.qualification) as (keyof typeof fixedManifest.qualification)[])('内置来源的 %s 未通过不能向推理暴露目录', async key => {
+  const { manifest, source, target } = fixture(); manifest.qualification[key] = false;
+  const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+  expect(await store.getStatus()).toMatchObject({ state: 'disabled', source: 'bundled', installed: true, qualified: false, enabled: true });
+  expect(await store.getActiveDirectory()).toBeNull();
+});
+it('内置停用跨启动保留，显式启用清除旧禁用说明', async () => {
+  const { manifest, source, target } = fixture();
+  const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+  await store.setEnabled(false);
+  const restarted = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+  expect(await restarted.getStatus()).toMatchObject({ state: 'disabled', enabled: false, source: 'bundled' });
+  expect(await restarted.getActiveDirectory()).toBeNull();
+  await restarted.setEnabled(true); expect(await restarted.getActiveDirectory()).toBe(source);
+});
+it('旧 false 手动来源优先迁移，保留原记录并注明禁用来源不明确', async () => {
+  const { manifest, source, target } = fixture(), generation = randomUUID();
+  mkdirSync(join(target, generation, 'onnx'), { recursive: true }); writeFileSync(join(target, generation, manifest.files[0].path), bytes);
+  const original = JSON.stringify({ generation, fingerprint: modelFingerprint(manifest), enabled: false });
+  writeFileSync(join(target, 'active.json'), original);
+  const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+  expect(await store.getStatus()).toMatchObject({ state: 'disabled', source: 'user', enabled: false, legacyDisabled: true });
+  expect(readFileSync(join(target, 'active.json'), 'utf8')).toBe(original);
+  await store.setEnabled(true);
+  expect(await store.getStatus()).toMatchObject({ legacyDisabled: false, enabled: true });
+  expect(await store.getActiveDirectory()).toBe(join(target, generation));
+});
+it('手动来源损坏不暗换，作者显式换回内置后可恢复并保留手动身份', async () => {
+  const { manifest, source, target } = fixture();
+  const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+  await store.install({ operationId: randomUUID(), source: 'local', directory: source });
+  const userDirectory = (await store.getActiveDirectory())!;
+  writeFileSync(join(userDirectory, manifest.files[0].path), '损坏');
+  expect(await store.getStatus()).toMatchObject({ state: 'error', source: 'user', bundledPresent: true });
+  expect(await store.getActiveDirectory()).toBeNull();
+  await store.selectSource('bundled'); expect(await store.getActiveDirectory()).toBe(source);
+  await expect(store.selectSource('user')).rejects.toThrow(/校验/);
+  expect(await store.getActiveDirectory()).toBe(source);
+  writeFileSync(join(userDirectory, manifest.files[0].path), bytes);
+  await store.selectSource('user'); expect(await store.getActiveDirectory()).toBe(userDirectory);
+});
+it('内置缺失、错误 hash 或未知文件不可用且不会联网修复', async () => {
+  const { manifest, source, target } = fixture();
+  const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+  writeFileSync(join(source, manifest.files[0].path), Buffer.alloc(bytes.length));
+  expect(await store.getStatus()).toMatchObject({ state: 'error', source: 'bundled', bundledPresent: true });
+  expect(await store.getActiveDirectory()).toBeNull();
+  writeFileSync(join(source, manifest.files[0].path), bytes); writeFileSync(join(source, 'extra'), '额外文件');
+  expect((await store.getStatus()).state).toBe('error');
+  rmSync(source, { recursive: true });
+  expect(await store.getStatus()).toMatchObject({ state: 'absent', bundledPresent: false });
+  await expect(store.selectSource('bundled')).rejects.toThrow();
+});
+it('坏选择和旧版本原样保留，不能偷偷使用有效内置模型', async () => {
+  const { manifest, source, target } = fixture();
+  for (const original of ['损坏', JSON.stringify({ schemaVersion: 1, source: 'bundled', fingerprint: '旧版本', enabled: false })]) {
+    writeFileSync(join(target, 'selection.json'), original);
+    const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+    expect((await store.getStatus()).state).toBe('error'); expect(await store.getActiveDirectory()).toBeNull();
+    await expect(store.setEnabled(true)).rejects.toThrow();
+    await expect(store.selectSource('bundled')).rejects.toThrow();
+    expect(readFileSync(join(target, 'selection.json'), 'utf8')).toBe(original);
+  }
+});
+it('停用偏好在换源和重新导入后保持，不因安装成功偷偷开启', async () => {
+  const { manifest, source, target } = fixture();
+  const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+  await store.setEnabled(false);
+  await store.install({ operationId: randomUUID(), source: 'local', directory: source });
+  expect(await store.getStatus()).toMatchObject({ state: 'disabled', source: 'user', enabled: false });
+  await store.selectSource('bundled');
+  expect(await store.getStatus()).toMatchObject({ state: 'disabled', source: 'bundled', enabled: false });
+  expect(await store.getActiveDirectory()).toBeNull();
 });

@@ -36,5 +36,6 @@ export interface RetrievalModelStatus {
   installed: boolean; qualified: boolean; fingerprint: string; bytes: number; message?: string;
   requiredSpaceBytes?: number; availableSpaceBytes?: number;
   progress?: RetrievalModelInstallProgress | null;
+  source?: 'bundled' | 'user'; bundledPresent?: boolean; enabled?: boolean; legacyDisabled?: boolean;
 }
 export interface RetrievalModelInstallProgress { operationId: string; source: 'local' | 'download'; phase: 'checking-space' | 'downloading' | 'copying' | 'verifying' | 'activating'; receivedBytes: number; totalBytes: number; file?: string }

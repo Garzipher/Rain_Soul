@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, lstatSync, mkdirSync, readdirSync } from 'node:fs';
-import { lstat, mkdir, open, readFile, rename, rm, statfs } from 'node:fs/promises';
+import { lstat, mkdir, open, rename, rm, statfs } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { fixedManifest, modelFingerprint, retrievalModelManifestSchema, type RetrievalModelManifest, type RetrievalModelStatus, type RetrievalModelInstallProgress } from '../shared/retrieval-model';
 import { createTrustedModelDownloader } from './retrieval-model-download';
+import { readModelSelection, writeModelSelection, type ModelSelection } from './retrieval-model-selection';
 
 function safePath(path: string): void {
   let current = resolve(path);
@@ -51,18 +52,20 @@ export async function validateModelDirectory(directory: string, manifest: Retrie
     if (data.length !== file.bytes || createHash('sha256').update(data).digest('hex') !== file.sha256) throw new Error('模型文件SHA校验失败。');
   }
 }
-const pointerSchema = z.object({ generation: z.uuid(), fingerprint: z.string().max(20000), enabled: z.boolean() }).strict();
 const localRequest = z.object({ operationId: z.uuid(), source: z.literal('local'), directory: z.string().min(1) }).strict();
 const downloadRequest = z.object({ operationId: z.uuid(), source: z.literal('download') }).strict();
-interface Dependencies { manifest?: RetrievalModelManifest; download?: (url: string, signal?: AbortSignal) => AsyncIterable<Uint8Array>; freeSpace?: (directory: string) => Promise<number> }
+interface Dependencies { manifest?: RetrievalModelManifest; bundledDirectory?: string; download?: (url: string, signal?: AbortSignal) => AsyncIterable<Uint8Array>; freeSpace?: (directory: string) => Promise<number> }
 export class RetrievalModelStore {
   private readonly root: string;
   private readonly manifest: RetrievalModelManifest;
+  private readonly bundledDirectory?: string;
+  private changing = false;
   private installing = false;
   private progress: RetrievalModelInstallProgress | null = null;
   constructor(directory: string, private readonly dependencies: Dependencies = {}) {
     this.root = resolve(directory); safePath(this.root);
     this.manifest = retrievalModelManifestSchema.parse(dependencies.manifest ?? fixedManifest);
+    this.bundledDirectory = dependencies.bundledDirectory ? resolve(dependencies.bundledDirectory) : undefined;
   }
   getProgress() { return this.progress ? { ...this.progress } : null; }
   private requiredSpace() { return this.manifest.files.reduce((sum, file) => sum + file.bytes, 0) + 8 * 1024 ** 2; }
@@ -73,51 +76,69 @@ export class RetrievalModelStore {
     const bytes = this.dependencies.freeSpace ? await this.dependencies.freeSpace(existing) : await statfs(existing, { bigint: true }).then(stat => Number(stat.bavail * stat.bsize));
     if (!Number.isFinite(bytes) || bytes < 0) throw new Error('无法确认模型安装磁盘空间。'); return bytes;
   }
-  private async pointer() {
-    const path = join(this.root, 'active.json'); safePath(path);
-    const stat = await lstat(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
-    if (!stat) return null;
-    if (!stat.isFile() || stat.size > 20000) throw new Error('模型激活记录无效。');
-    const value = pointerSchema.parse(JSON.parse(await readFile(path, 'utf8')));
-    if (value.fingerprint !== modelFingerprint(this.manifest)) throw new Error('模型版本已变化，请重新安装。');
-    return value;
+  private selection() { return readModelSelection(this.root, modelFingerprint(this.manifest)); }
+  private defaultSelection(): ModelSelection { return { schemaVersion: 1, source: 'bundled', fingerprint: modelFingerprint(this.manifest), enabled: true }; }
+  private selectedDirectory(selection: ModelSelection): string | undefined {
+    return selection.source === 'bundled' ? this.bundledDirectory : join(this.root, selection.userGeneration);
   }
-  private async writePointer(value: z.infer<typeof pointerSchema>, signal?: AbortSignal) {
-    safePath(this.root); await mkdir(this.root, { recursive: true }); safePath(this.root);
-    const temporary = join(this.root, `.pointer-${randomUUID()}.tmp`), target = join(this.root, 'active.json');
-    try {
-      const handle = await open(temporary, 'wx', 0o600);
-      try { await handle.writeFile(JSON.stringify(value)); await handle.sync(); } finally { await handle.close(); }
-      safePath(target); cancelled(signal); await rename(temporary, target);
-    } finally { await rm(temporary, { force: true }); }
+  private async bundledPresent() {
+    if (!this.bundledDirectory) return false;
+    return !!await lstat(this.bundledDirectory).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
   }
   async getStatus(): Promise<RetrievalModelStatus> {
     const base = { modelId: this.manifest.modelId, fingerprint: modelFingerprint(this.manifest), bytes: this.manifest.files.reduce((sum, file) => sum + file.bytes, 0), qualified: Object.values(this.manifest.qualification).every(Boolean), requiredSpaceBytes: this.requiredSpace(), availableSpaceBytes: await this.availableSpace().catch(() => undefined), progress: this.getProgress() };
+    let selection: ModelSelection | null = null;
+    const bundledPresent = await this.bundledPresent().catch(() => false);
     try {
-      const pointer = await this.pointer();
-      if (pointer) await validateModelDirectory(join(this.root, pointer.generation), this.manifest);
-      return { ...base, installed: !!pointer, state: this.installing ? 'installing' : !pointer ? 'absent' : pointer.enabled && base.qualified ? 'ready' : 'disabled' };
-    } catch { return { ...base, installed: false, state: 'error', message: '本机模型校验失败，原文件保留；关键词仍可使用。' }; }
+      selection = await this.selection() ?? this.defaultSelection();
+      const directory = this.selectedDirectory(selection);
+      const present = selection.source === 'bundled' ? bundledPresent : !!directory;
+      if (present && directory) await validateModelDirectory(directory, this.manifest);
+      return { ...base, source: selection.source, bundledPresent, enabled: selection.enabled, legacyDisabled: selection.legacyDisabled, installed: present, state: this.installing ? 'installing' : !present ? 'absent' : selection.enabled && base.qualified ? 'ready' : 'disabled' };
+    } catch { return { ...base, ...(selection ? { source: selection.source, enabled: selection.enabled, legacyDisabled: selection.legacyDisabled } : {}), bundledPresent, installed: false, state: 'error', message: '本机模型或选择记录校验失败，原文件保留；关键词仍可使用。' }; }
   }
   async getActiveDirectory(): Promise<string | null> {
     try {
-      const pointer = await this.pointer(); if (!pointer?.enabled || !Object.values(this.manifest.qualification).every(Boolean)) return null;
-      const directory = join(this.root, pointer.generation); await validateModelDirectory(directory, this.manifest); return directory;
+      const selection = await this.selection() ?? this.defaultSelection();
+      if (!selection.enabled || !Object.values(this.manifest.qualification).every(Boolean) || this.changing || this.installing) return null;
+      const directory = this.selectedDirectory(selection); if (!directory) return null;
+      await validateModelDirectory(directory, this.manifest);
+      const current = await this.selection() ?? this.defaultSelection();
+      return !this.changing && !this.installing && JSON.stringify(selection) === JSON.stringify(current) ? directory : null;
     } catch { return null; }
   }
   async setEnabled(enabled: boolean): Promise<void> {
-    z.boolean().parse(enabled); if (this.installing) throw new Error('模型安装正在进行，请稍后重试。');
+    z.boolean().parse(enabled); if (this.installing || this.changing) throw new Error('模型变更正在进行，请稍后重试。');
     if (enabled && !Object.values(this.manifest.qualification).every(Boolean)) throw new Error('模型资格核验尚未完成，关键词检索仍可使用。');
-    const pointer = await this.pointer(); if (pointer) await this.writePointer({ ...pointer, enabled });
+    this.changing = true;
+    try {
+      const selection = await this.selection() ?? this.defaultSelection();
+      if (enabled) { const directory = this.selectedDirectory(selection); if (!directory) throw new Error('当前模型来源不存在。'); await validateModelDirectory(directory, this.manifest); }
+      await writeModelSelection(this.root, { ...selection, enabled, legacyDisabled: false });
+    } finally { this.changing = false; }
+  }
+  async selectSource(source: 'bundled' | 'user'): Promise<void> {
+    z.enum(['bundled', 'user']).parse(source);
+    if (this.installing || this.changing) throw new Error('模型变更正在进行，请稍后重试。');
+    this.changing = true;
+    try {
+      const selection = await this.selection() ?? this.defaultSelection();
+      if (source === 'user' && !selection.userGeneration) throw new Error('没有可选择的手动模型。');
+      const next = { ...selection, source } as ModelSelection, directory = this.selectedDirectory(next);
+      if (!directory) throw new Error('当前模型来源不存在。');
+      await validateModelDirectory(directory, this.manifest);
+      await writeModelSelection(this.root, next);
+    } finally { this.changing = false; }
   }
   async install(value: { operationId: string; source: 'local' | 'download'; directory?: string }, signal?: AbortSignal): Promise<void> {
     const request = z.discriminatedUnion('source', [localRequest, downloadRequest]).parse(value);
-    if (this.installing) throw new Error('模型安装正在进行，请勿重复安装。');
+    if (this.installing || this.changing) throw new Error('模型变更正在进行，请勿重复安装。');
     this.installing = true;
     this.progress = { operationId: request.operationId, source: request.source, phase: 'checking-space', receivedBytes: 0, totalBytes: this.manifest.files.reduce((sum, file) => sum + file.bytes, 0) };
     const generation = randomUUID(), stage = join(this.root, `.stage-${generation}`), destination = join(this.root, generation);
     let activated = false;
     try {
+      const selection = await this.selection();
       cancelled(signal); if (await this.availableSpace() < this.requiredSpace()) throw new Error('模型安装磁盘空间不足，原模型保持。'); cancelled(signal);
       safePath(this.root); mkdirSync(this.root, { recursive: true }); safePath(this.root);
       await mkdir(stage); safePath(stage);
@@ -150,7 +171,7 @@ export class RetrievalModelStore {
       cancelled(signal); this.progress.phase = 'verifying'; await validateModelDirectory(stage, this.manifest); cancelled(signal);
       safePath(destination); await rename(stage, destination); cancelled(signal);
       this.progress.phase = 'activating';
-      await this.writePointer({ generation, fingerprint: modelFingerprint(this.manifest), enabled: Object.values(this.manifest.qualification).every(Boolean) }, signal); activated = true;
+      await writeModelSelection(this.root, { schemaVersion: 1, source: 'user', userGeneration: generation, fingerprint: modelFingerprint(this.manifest), enabled: selection?.enabled ?? Object.values(this.manifest.qualification).every(Boolean), legacyDisabled: selection?.legacyDisabled }, signal); activated = true;
     } finally {
       this.installing = false;
       this.progress = null;
