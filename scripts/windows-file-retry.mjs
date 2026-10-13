@@ -6,7 +6,7 @@ export async function retryWindowsFileOperation(operation, { platform = process.
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     try { return await operation(); }
     catch (error) {
-      if (platform !== 'win32' || error?.code !== 'UNKNOWN' || error?.syscall !== 'open' || attempt === 5) throw error;
+      if (platform !== 'win32' || !['UNKNOWN', 'EBUSY'].includes(error?.code) || error?.syscall !== 'open' || attempt === 5) throw error;
       await delay(1500);
     }
   }
