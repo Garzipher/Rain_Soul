@@ -120,3 +120,8 @@ it('四连接挂起时请求预算在入队前生效，取消全部等待', asyn
   await f.broker.close(); expect((await Promise.all(requests)).every(e=>e instanceof Error)).toBe(true);
   expect(f.openRequest.mock.calls.length).toBeLessThanOrEqual(5);
 });
+it('宿主能复核代理健康，取消或安全拒绝后不能报告成功', async () => {
+  const f=fixture(); await f.broker.initialize(); expect(()=>f.broker.assertHealthy()).not.toThrow();
+  await expect(f.broker.fetch('https://other.example.com/a','stylesheet')).rejects.toThrow();
+  expect(()=>f.broker.assertHealthy()).toThrow(); await f.broker.close();
+});

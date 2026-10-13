@@ -34,6 +34,8 @@ export class RenderResourceBroker {
     this.controller.signal.throwIfAborted();
     if (this.now() >= this.options.deadline) { this.stop(new Error('网页渲染超过总期限，已停止。')); this.controller.signal.throwIfAborted(); }
   }
+  /** 宿主在提取前复核安全拒绝与预算状态，不依赖错误消息猜测。 */
+  assertHealthy(): void { this.check(); }
   private async interrupt<T>(operation: Promise<T>, signal = this.controller.signal): Promise<T> {
     let abort!: () => void;
     const cancelled = new Promise<never>((_, reject) => { abort = () => reject(signal.reason ?? new Error('网页获取已取消。')); if (signal.aborted) abort(); else signal.addEventListener('abort', abort, { once: true }); });
