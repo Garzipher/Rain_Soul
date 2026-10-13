@@ -56,6 +56,7 @@ export interface DesktopApi extends BookExtractionAiApi, RetrievalApi {
   confirmBookExtraction(request: BookExtractionConfirmation): Promise<WorkDetail>;
   cancelBookExtraction(token: string): Promise<void>;
   fetchWebExtraction?(request: WebImportRequest): Promise<BookExtractionPreview>;
+  getWebRenderCapability?(): Promise<import('./source-capture').RenderCapability>;
   cancelWebExtraction?(operationId: string): Promise<void>;
   previewPastedExtraction?(request: PastedImportRequest): Promise<BookExtractionPreview>;
   getAiSettings(): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;

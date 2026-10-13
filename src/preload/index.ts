@@ -33,6 +33,7 @@ const api: DesktopApi = {
   confirmBookExtraction: request => invoke('confirmBookExtraction', request),
   cancelBookExtraction: token => invoke('cancelBookExtraction', { token }),
   fetchWebExtraction: request => invoke('fetchWebExtraction', request),
+  getWebRenderCapability: () => invoke('getWebRenderCapability', undefined),
   cancelWebExtraction: operationId => invoke('cancelWebExtraction', { operationId }),
   previewPastedExtraction: request => invoke('previewPastedExtraction', request),
   prepareBookExtractionAi: request => invoke('prepareBookExtractionAi', request),

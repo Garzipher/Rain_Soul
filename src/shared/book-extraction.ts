@@ -46,6 +46,7 @@ export interface BookExtractionApi {
   discardExtractionDraft?(workId: string, token: string): Promise<void>;
   saveExtractionReview?(request: ExtractionReviewRequest): Promise<ExtractionDraft>;
   fetchWebExtraction?(request: WebImportRequest): Promise<BookExtractionPreview>;
+  getWebRenderCapability?(): Promise<import('./source-capture').RenderCapability>;
   cancelWebExtraction?(operationId: string): Promise<void>;
   previewPastedExtraction?(request: PastedImportRequest): Promise<BookExtractionPreview>;
   chooseBookExtraction(workId: string, encoding: 'utf-8' | 'gb18030'): Promise<BookExtractionPreview | null>;

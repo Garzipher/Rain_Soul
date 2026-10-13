@@ -8,3 +8,4 @@ export const sourceCaptureSchema = z.discriminatedUnion('captureMethod', [
   z.object({ ...captureFields, captureMethod: z.literal('restricted-browser'), renderedDomHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
 ]);
 export type SourceCapture = z.infer<typeof sourceCaptureSchema>;
+export interface RenderCapability { enabled: boolean; policyVersion: 1; message: string }

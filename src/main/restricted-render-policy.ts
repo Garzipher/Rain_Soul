@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import type { RenderCapability } from '../shared/source-capture';
+export type { RenderCapability } from '../shared/source-capture';
 
 /** 政策 v1 的共享限额不能由页面、IPC 或环境变量调整。 */
 export const renderLimits = Object.freeze({
@@ -9,7 +11,6 @@ export const renderLimits = Object.freeze({
   maxDomNodes: 20000, maxDomBytes: 5 * 1024 * 1024,
   maxBodyCharacters: 200000, maxParagraphs: 2000, quietPeriodMs: 500, maxQuietWaitMs: 5000,
 });
-export interface RenderCapability { enabled: boolean; policyVersion: 1; message: string }
 const buildFields = { packageSha256: z.string().regex(/^[a-f0-9]{64}$/), electronVersion: z.string().min(1).max(100),
   platform: z.enum(['win32', 'darwin', 'linux']) };
 const buildIdentitySchema = z.object(buildFields).strict();

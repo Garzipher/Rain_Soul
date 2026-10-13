@@ -32,7 +32,7 @@ export class BookExtractionCommands {
   accepts(command: string) { return this.web.accepts(command) || ['chooseBookExtraction', 'confirmBookExtraction', 'cancelBookExtraction', 'readExtractionDraft', 'saveExtractionReview', 'discardExtractionDraft'].includes(command); }
   execute(command: string, payload: unknown): Promise<unknown> {
     if (this.web.accepts(command)) return this.web.execute(command, payload).then(async result => {
-      if (result && this.drafts) {
+      if (result && this.drafts && command !== 'getWebRenderCapability') {
         const preview = result as BookExtractionPreview;
         await this.drafts.begin(preview, () => this.preview?.token === preview.token);
         if (this.preview?.token !== preview.token) throw new Error('素材预览已被替换。');
