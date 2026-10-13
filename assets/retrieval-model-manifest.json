@@ -27,9 +27,9 @@
     "publicSourceRecorded": true,
     "officialSourceVerified": false,
     "conversionRevisionVerified": false,
-    "networkAuditPassed": false,
-    "packagedRuntimePassed": false,
-    "qualityCalibrated": false
+    "networkAuditPassed": true,
+    "packagedRuntimePassed": true,
+    "qualityCalibrated": true
   },
   "files": [
     {
