@@ -5,6 +5,7 @@ import { frozenSourceDocumentSchema, type FrozenSourceDocument } from '../../sha
 import { knowledgeSourceLinkSchema, learningAnnotationPayloadSchema, learningAnnotationSchema,
   sourceAssetsSchema, type KnowledgeSourceLink, type LearningAnnotation, type SourceAssets } from '../../shared/source-assets';
 import { RepositoryError } from './errors';
+import { sourceCaptureSchema } from '../../shared/source-capture';
 
 const sha = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
 function validateSource(value: FrozenSourceDocument): FrozenSourceDocument {
@@ -17,15 +18,27 @@ function validateSource(value: FrozenSourceDocument): FrozenSourceDocument {
 
 interface DocumentRow { id: string; kind: string; hash_version: number; original_url: string | null; final_url: string | null; title: string; fetched_at: string | null; raw_hash: string; body_hash: string }
 interface SegmentRow { id: string; ordinal: number; chapter_title: string; text: string; text_hash: string; chapter_index?: number | null; paragraph_index?: number | null }
+const captureRowSchema = z.object({ source_id: z.uuid(), method: z.enum(['static', 'restricted-browser']),
+  captured_at: z.iso.datetime({ offset: true }), rendered_dom_hash: z.string().regex(/^[a-f0-9]{64}$/).nullable(), policy_version: z.literal(1),
+}).strict();
+const hasCaptureTable = (db: Database.Database) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_capture'").get();
+function sourceCapture(value: unknown) {
+  const row = captureRowSchema.parse(value);
+  if (row.method === 'static' && row.rendered_dom_hash !== null) throw new Error('静态捕获不能携带渲染 DOM 哈希。');
+  return sourceCaptureSchema.parse({ sourceId: row.source_id, captureMethod: row.method, capturedAt: row.captured_at, policyVersion: row.policy_version,
+    ...(row.method === 'restricted-browser' ? { renderedDomHash: row.rendered_dom_hash } : {}) });
+}
 function sourceSegment(segment: SegmentRow) {
   return { id: segment.id, ordinal: segment.ordinal, chapterTitle: segment.chapter_title, text: segment.text, textHash: segment.text_hash,
     ...(segment.chapter_index == null && segment.paragraph_index == null ? {} : { chapterIndex: segment.chapter_index ?? undefined, paragraphIndex: segment.paragraph_index ?? undefined }) };
 }
 function readDocument(db: Database.Database, row: DocumentRow): FrozenSourceDocument {
   const segments = db.prepare('SELECT * FROM source_segment WHERE source_id=? ORDER BY ordinal').all(row.id) as SegmentRow[];
+  const capture = hasCaptureTable(db) ? db.prepare('SELECT * FROM source_capture WHERE source_id=?').get(row.id) : undefined;
   return validateSource({ id: row.id, kind: row.kind as FrozenSourceDocument['kind'], hashVersion: row.hash_version as 1,
     originalUrl: row.original_url, finalUrl: row.final_url, title: row.title, fetchedAt: row.fetched_at, rawHash: row.raw_hash, bodyHash: row.body_hash,
     segments: segments.map(sourceSegment),
+    ...(capture ? { capture: sourceCapture(capture) } : {}),
   });
 }
 
@@ -52,6 +65,8 @@ export function commitSourceAssets(db: Database.Database, value: FrozenSourceDoc
       source.originalUrl, source.finalUrl, source.title, source.fetchedAt, source.rawHash, source.bodyHash);
     const insertSegment = db.prepare('INSERT INTO source_segment VALUES(?,?,?,?,?,?,?,?)');
     for (const segment of source.segments) insertSegment.run(segment.id, source.id, segment.ordinal, segment.chapterTitle, segment.text, segment.textHash, segment.chapterIndex ?? null, segment.paragraphIndex ?? null);
+    if (source.capture) db.prepare('INSERT INTO source_capture VALUES(?,?,?,?,?)').run(source.id, source.capture.captureMethod,
+      source.capture.capturedAt, source.capture.captureMethod === 'restricted-browser' ? source.capture.renderedDomHash : null, source.capture.policyVersion);
   }
   const insertLink = db.prepare('INSERT INTO knowledge_source VALUES(?,?,?)');
   for (const link of links) insertLink.run(link.entryId, link.sourceId, link.segmentId);
@@ -63,6 +78,8 @@ export function commitSourceAssets(db: Database.Database, value: FrozenSourceDoc
 /** 归档/快照消费者读取规范资产，损坏JSON或原文哈希不能静默放过。 */
 export function readSourceAssets(db: Database.Database, entryId?: string): SourceAssets {
   if(entryId!==undefined) z.uuid().parse(entryId);
+  if (hasCaptureTable(db) && db.prepare("SELECT 1 FROM source_capture LEFT JOIN source_document ON source_capture.source_id=source_document.id WHERE source_document.id IS NULL OR source_document.kind<>'web' LIMIT 1").get())
+    throw new RepositoryError('INVALID_INPUT', '捕获证据必须属于现有网页来源。');
   const documentRows=entryId===undefined ? db.prepare('SELECT * FROM source_document ORDER BY id').all()
     : db.prepare('SELECT DISTINCT source_document.* FROM source_document JOIN knowledge_source ON knowledge_source.source_id=source_document.id WHERE knowledge_source.entry_id=? ORDER BY source_document.id').all(entryId);
   const documents = (documentRows as DocumentRow[]).map(row => readDocument(db, row));
@@ -83,10 +100,14 @@ export function validateSourcePayload(payload: Record<string, unknown[]>): void 
   const sourceIds = new Set(documents.map(row => row.id)), segmentIds = new Set(segments.map(row => row.id));
   const knowledgeIds = new Set((payload.knowledge_entry as { id: string }[]).map(row => row.id));
   if (sourceIds.size !== documents.length || segmentIds.size !== segments.length || segments.some(row => !sourceIds.has(row.source_id))) throw new Error('快照来源身份或关系无效。');
+  const captures = (payload.source_capture ?? []).map(sourceCapture);
+  if (new Set(captures.map(capture => capture.sourceId)).size !== captures.length || captures.some(capture => !sourceIds.has(capture.sourceId)))
+    throw new Error('快照捕获身份或关系无效。');
   for (const row of documents) validateSource({ id: row.id, kind: row.kind as FrozenSourceDocument['kind'], hashVersion: row.hash_version as 1,
     title: row.title, originalUrl: row.original_url, finalUrl: row.final_url, fetchedAt: row.fetched_at, rawHash: row.raw_hash, bodyHash: row.body_hash,
     segments: segments.filter(segment => segment.source_id === row.id).sort((a, b) => a.ordinal-b.ordinal)
       .map(sourceSegment),
+    ...(captures.some(capture => capture.sourceId === row.id) ? { capture: captures.find(capture => capture.sourceId === row.id)! } : {}),
   });
   for (const row of payload.knowledge_source as { entry_id: string; source_id: string; segment_id: string }[]) {
     knowledgeSourceLinkSchema.parse({ entryId: row.entry_id, sourceId: row.source_id, segmentId: row.segment_id });

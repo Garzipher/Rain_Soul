@@ -6,10 +6,13 @@ const sha256 = (value: string | Uint8Array) => createHash('sha256').update(value
 
 /** hashVersion=1：只处理换行和空段，保留原文空白及 Unicode 表示。 */
 export function freezeSource(input: SourceInput): FrozenSourceDocument {
+  if (input.capture && Object.hasOwn(input.capture, 'sourceId')) throw new Error('捕获来源身份只能由冻结过程生成。');
+  const id = randomUUID();
   const paragraphs = input.segments.map(segment => ({ ...segment, text: segment.text.replace(/\r\n?/g, '\n') }))
     .filter(segment => segment.text.trim().length > 0);
   return frozenSourceDocumentSchema.parse({
-    id: randomUUID(), kind: input.kind, hashVersion: 1,
+    id, kind: input.kind, hashVersion: 1,
+    ...(input.capture ? { capture: { ...input.capture, sourceId: id } } : {}),
     originalUrl: input.originalUrl ?? null, finalUrl: input.finalUrl ?? null,
     title: input.title, fetchedAt: input.fetchedAt ?? null,
     rawHash: sha256(input.rawBytes), bodyHash: sha256(JSON.stringify(paragraphs.map(segment => segment.text))),

@@ -14,7 +14,8 @@ export function copyKnowledgeSources(db:Database.Database,value:SourceAssets,sou
   for(const sourceId of new Set(links.map(link=>link.sourceId))) {
     const original=documents.get(sourceId)!, id=randomUUID();
     const segmentIds=new Map(original.segments.map(segment=>[segment.id,randomUUID()]));
-    const source={...original,id,segments:original.segments.map(segment=>({...segment,id:segmentIds.get(segment.id)!}))};
+    const source={...original,id,...(original.capture ? {capture:{...original.capture,sourceId:id}} : {}),
+      segments:original.segments.map(segment=>({...segment,id:segmentIds.get(segment.id)!}))};
     const copied=links.filter(link=>link.sourceId===sourceId).map(link=>({entryId:targetEntryId,sourceId:id,segmentId:segmentIds.get(link.segmentId)!}));
     // 单次来源写入沿用审核协议的100项上限，不截断多段证据。
     for(let offset=0;offset<copied.length;offset+=100) commitSourceAssets(db,source,copied.slice(offset,offset+100),[]);

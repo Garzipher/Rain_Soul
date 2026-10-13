@@ -17,7 +17,8 @@ beforeEach(()=> {
   directory=mkdtempSync(join(tmpdir(),'rainsoul-source-copy-')); repository=new WorkRepository(directory);
   source=repository.createWork('原作品');
   const sourceDocument=freezeSource({kind:'web',title:'雨夜灯火',originalUrl:'https://article.example.com/original',finalUrl:'https://article.example.com/final',fetchedAt:'2026-10-10T00:00:00.000Z',
-    rawBytes:Buffer.from('灯火很暖。雨落窗边。'),segments:[{text:'灯火很暖。',chapterIndex:2,paragraphIndex:1},{text:'雨落窗边。',chapterIndex:2,paragraphIndex:2}]});
+    rawBytes:Buffer.from('灯火很暖。雨落窗边。'),capture:{captureMethod:'restricted-browser',capturedAt:'2026-10-13T00:00:00Z',policyVersion:1,renderedDomHash:'d'.repeat(64)},
+    segments:[{text:'灯火很暖。',chapterIndex:2,paragraphIndex:1},{text:'雨落窗边。',chapterIndex:2,paragraphIndex:2}]});
   source=repository.importBookExtraction({workId:source.id,expectedRevision:source.revision,operationId:randomUUID(),sourceDocument,
     items:sourceDocument.segments.map(segment=>({body:segment.text,source:'原作品第二章',categoryId:source.assets!.categories[0].id,tagIds:[],segmentId:segment.id,annotation}))});
   target=repository.createWork('目标作品');
@@ -32,6 +33,7 @@ it('跨作品复制同时映射来源、完整段落和学习注释ID，保留�
   const before=assets(source.id), command=request(); target=repository.copyKnowledge(command);
   const copied=assets(target.id), entry=target.assets!.knowledge[0];
   expect(copied.documents).toHaveLength(1); expect(copied.documents[0]).toEqual({...before.documents[0],id:expect.any(String),
+    capture:{...before.documents[0].capture,sourceId:copied.documents[0].id},
     segments:before.documents[0].segments.map(segment=>({...segment,id:expect.any(String)}))});
   expect(copied.documents[0].id).not.toBe(before.documents[0].id);
   expect(copied.documents[0].segments[0]).toMatchObject({chapterIndex:2,paragraphIndex:1});

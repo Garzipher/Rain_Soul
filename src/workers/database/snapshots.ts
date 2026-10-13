@@ -5,7 +5,7 @@ import { validateDocument } from '../../shared/document';
 import { rebuildAssetSearch } from './assets-search';
 import type { SnapshotSummary, SnapshotPreview } from '../../shared/snapshots';
 import { snapshotManuscript } from './snapshot-export';
-import { sourceAssetTables } from './source-schema';
+import { sourceAssetTables, legacySourceAssetTables } from './source-schema';
 import { readSourceAssets, validateSourcePayload, normalizeSourceCoordinates } from './source-document';
 export type { SnapshotSummary } from '../../shared/snapshots';
 
@@ -43,7 +43,7 @@ function createSnapshotRow(db: Database.Database, title: string, kind: 'manual' 
   if (!metadata || metadata.deleted_at) throw new Error('当前作品不可创建快照。');
   const sourceRevision = metadata.revision;
   const payload = JSON.stringify(capture(db));
-  const payloadVersion = sourceAssetTables.every(table => present(db, table)) ? 2 : 1;
+  const payloadVersion = sourceAssetTables.every(table => present(db, table)) ? 3 : legacySourceAssetTables.every(table => present(db, table)) ? 2 : 1;
   db.prepare('INSERT INTO snapshot(id,title,kind,created_at,source_snapshot_id,payload_json,payload_hash,source_revision,schema_version) VALUES (?,?,?,?,?,?,?,?,?)')
     .run(id, title, kind, createdAt, sourceSnapshotId, payload, hash(payload), sourceRevision, payloadVersion);
   return { id, title, kind, createdAt, sourceSnapshotId, sourceRevision, schemaVersion: payloadVersion };
@@ -72,7 +72,7 @@ export function listSnapshots(db: Database.Database): SnapshotSummary[] {
 }
 
 function validatePayload(db: Database.Database, payload: Record<string, unknown>, version: number) {
-  const names = [...tables, ...learningTables.filter(table => Object.hasOwn(payload ?? {}, table)), ...(version === 2 ? sourceAssetTables : [])];
+  const names = [...tables, ...learningTables.filter(table => Object.hasOwn(payload ?? {}, table)), ...(version === 3 ? sourceAssetTables : version === 2 ? legacySourceAssetTables : [])];
   if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length !== names.length) throw new Error('快照内容校验失败。');
   for (const table of names) {
     if (!Array.isArray(payload[table])) throw new Error('快照内容校验失败。');
@@ -103,13 +103,13 @@ export function validateLearningPayload(payload: Record<string, unknown>) {
 
 /** 原hash先校验，旧固定表集合校验后仅在内存补空新关系，不改历史hash。 */
 export function readCompatiblePayload(db: Database.Database, row: SnapshotRow & { schema_version: number }): Record<string, unknown[]> {
-  if (row.schema_version !== 1 && row.schema_version !== 2) throw new Error('快照格式版本不支持，未修改当前作品。');
+  if (row.schema_version !== 1 && row.schema_version !== 2 && row.schema_version !== 3) throw new Error('快照格式版本不支持，未修改当前作品。');
   if (hash(row.payload_json) !== row.payload_hash) throw new Error('快照内容校验失败。');
   let payload: Record<string, unknown>;
   try { payload = JSON.parse(row.payload_json) as Record<string, unknown>; } catch { throw new Error('快照内容校验失败。'); }
   if (row.schema_version === 2 && Array.isArray(payload?.source_segment)) normalizeSourceCoordinates(payload as Record<string, unknown[]>);
   validatePayload(db, payload, row.schema_version);
-  if (row.schema_version === 2) validateSourcePayload(payload as Record<string, unknown[]>);
+  if (row.schema_version >= 2) validateSourcePayload(payload as Record<string, unknown[]>);
   for (const table of contentTables(db)) if (!Object.hasOwn(payload, table)) payload[table] = [];
   return payload as Record<string, unknown[]>;
 }

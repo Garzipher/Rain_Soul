@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { sourceCaptureSchema } from './source-capture';
+import { sourceCaptureSchema, type SourceCapture } from './source-capture';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const boundedText = (max: number) => z.string().refine(value => [...value].length <= max, `文本最多 ${max} 个字符`);
@@ -47,8 +47,10 @@ export const frozenSourceDocumentSchema = z.object({
 export type FrozenSourceDocument = z.infer<typeof frozenSourceDocumentSchema>;
 
 /** 仅由主进程从可信提取结果构造，渲染层不能替换原始字节或正文。 */
+type CaptureInput<T = SourceCapture> = T extends SourceCapture ? Omit<T, 'sourceId'> : never;
 export interface SourceInput {
   kind: FrozenSourceDocument['kind']; rawBytes: Uint8Array; title: string;
   segments: { text: string; chapterTitle?: string; chapterIndex?: number; paragraphIndex?: number }[];
   originalUrl?: string | null; finalUrl?: string | null; fetchedAt?: string | null;
+  capture?: CaptureInput;
 }

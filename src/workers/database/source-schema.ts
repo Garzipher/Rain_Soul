@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
-export const sourceAssetTables = ['source_document', 'source_segment', 'knowledge_source', 'learning_annotation'] as const;
+export const legacySourceAssetTables = ['source_document', 'source_segment', 'knowledge_source', 'learning_annotation'] as const;
+export const sourceAssetTables = [...legacySourceAssetTables, 'source_capture'] as const;
 
 export const sourceSchema = `
 CREATE TABLE source_document (

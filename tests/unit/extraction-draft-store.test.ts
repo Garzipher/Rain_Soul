@@ -27,6 +27,19 @@ it('重启保留原文、完成候选和审核草稿，返回副本且不自动�
   expect(await restarted.readExtractionDraft(draft.workId)).toEqual(draft);
   expect(await restarted.readExtractionDraft(randomUUID())).toBeNull();
 });
+it('受限网页草稿重启完整保留捕获证据，来源身份损坏拒绝恢复', async () => {
+  const draft = sample(), store = new ExtractionDraftStore(root);
+  draft.source = freezeSource({ kind: 'web', title: '受限来源', rawBytes: Buffer.from('原HTML'), originalUrl: 'https://example.com/article',
+    finalUrl: 'https://example.com/article', fetchedAt: '2026-10-13T00:00:00Z', segments: [{ text: '雨落在岸边。' }],
+    capture: { captureMethod: 'restricted-browser', capturedAt: '2026-10-13T00:00:00Z', policyVersion: 1, renderedDomHash: 'd'.repeat(64) } });
+  const segmentId = draft.source.segments[0].id;
+  draft.batches[0].segmentIds = [segmentId]; draft.batches[0].suggestions[0].segmentId = segmentId; draft.reviews[0].segmentId = segmentId;
+  await store.saveExtractionDraft({ draft, expectedTaskId: null });
+  expect((await new ExtractionDraftStore(root).readExtractionDraft(draft.workId))?.source.capture).toEqual(draft.source.capture);
+  const broken = structuredClone(draft); broken.source.capture!.sourceId = randomUUID();
+  await writeFile(join(root, `${draft.workId}.json`), JSON.stringify(broken));
+  await expect(store.readExtractionDraft(draft.workId)).rejects.toThrow(/损坏/);
+});
 it('临时写入失败保留旧草稿，清理临时文件；冻结committing请求身份不变', async () => {
   const draft = sample(), store = new ExtractionDraftStore(root);
   await store.saveExtractionDraft({ draft, expectedTaskId: null });

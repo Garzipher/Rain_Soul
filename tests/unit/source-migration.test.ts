@@ -21,13 +21,13 @@ export function legacySourceFixture(version: 4 | 5) {
   fixture.db.pragma(`user_version=${version}`); const file = join(directory, 'project.sqlite'); fixture.db.prepare('VACUUM INTO ?').run(file); fixture.db.close();
   const db = new Database(file); databases.push(db); db.pragma('foreign_keys=ON'); return { db, directory, snapshot };
 }
-it.each([4, 5] as const)('v%s升级保留原payload1哈希，恢复生成payload2并只备份一次', version => {
+it.each([4, 5] as const)('v%s升级保留原payload1哈希，恢复生成payload3并只备份一次', version => {
   const { db, directory, snapshot } = legacySourceFixture(version);
   const original = db.prepare('SELECT payload_hash FROM snapshot WHERE id=?').get(snapshot.id);
   initializeSchema(db, 'project'); expect(db.pragma('user_version', { simple: true })).toBe(8);
   expect(readSourceAssets(db)).toEqual({ documents: [], links: [], annotations: [] });
   const backups = readdirSync(directory).filter(name => name.includes(`v${version}-backup`)); expect(backups).toHaveLength(1);
-  const restored = restoreSnapshot(db, snapshot.id, 1); expect(restored.restored.schemaVersion).toBe(2);
+  const restored = restoreSnapshot(db, snapshot.id, 1); expect(restored.restored.schemaVersion).toBe(3);
   expect(db.prepare('SELECT payload_hash FROM snapshot WHERE id=?').get(snapshot.id)).toEqual(original);
   initializeSchema(db, 'project'); expect(readdirSync(directory).filter(name => name.includes('backup'))).toEqual(backups);
 });
