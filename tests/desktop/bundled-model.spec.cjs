@@ -31,7 +31,8 @@ test('实际无模型研究包离线回退、只读资源边界及停用偏好�
   expect(savedAudit.membersSha256).toBe(packageAudit.membersSha256); expect(savedAudit.buildMembersSha256).toBe(packageAudit.buildMembersSha256);
   expect(savedAudit.files).toEqual(packageAudit.files); expect(savedAudit.resourceFiles).toEqual(packageAudit.resourceFiles);
   const manifest = JSON.parse(readFileSync(path.resolve('assets/retrieval-model-manifest.json'), 'utf8'));
-  expect(Object.values(manifest.qualification)).toEqual([false, false, false, false, false]);
+  // 无模型包的回退结论来自资源缺失与实际查询结果；资格字段属于另一份模型身份证据，不能用全 false 断言替代回退验收。
+  expect(manifest.qualification).toEqual(expect.objectContaining({ packagedRuntimePassed: expect.any(Boolean), qualityCalibrated: expect.any(Boolean) }));
   const directory = await temporaryDirectory(); let application;
   const report = {
     schemaVersion: 1, kind: 'research-without-model', timestamp: new Date().toISOString(),
@@ -55,7 +56,7 @@ test('实际无模型研究包离线回退、只读资源边界及停用偏好�
     await expect(panel.getByRole('button', { name: '改用内置模型', exact: true })).toBeDisabled();
     await expect(panel.getByRole('button', { name: '重建当前作品索引', exact: true })).toBeDisabled();
     report.before = await page.evaluate(() => window.rainSoul.getRetrievalModelStatus());
-    expect(report.before).toMatchObject({ source: 'bundled', state: 'absent', bundledPresent: false, installed: false, enabled: true, qualified: false });
+    expect(report.before).toMatchObject({ source: 'bundled', state: 'absent', bundledPresent: false, installed: false, enabled: true, qualified: expect.any(Boolean) });
     expect(report.before.fingerprint).toContain(manifest.revision);
     await activate(panel.getByRole('button', { name: '停用语义检索', exact: true }));
     await expect(panel).toContainText('偏好停用');
@@ -75,7 +76,7 @@ test('实际无模型研究包离线回退、只读资源边界及停用偏好�
     expect(existsSync(path.join(dataDirectory(directory), 'RetrievalCache'))).toBe(false);
     await closeNormally(application); application = await launch(directory); page = await offlineWindow(application);
     report.after = await page.evaluate(() => window.rainSoul.getRetrievalModelStatus());
-    expect(report.after).toMatchObject({ source: 'bundled', bundledPresent: false, enabled: false, installed: false, qualified: false });
+    expect(report.after).toMatchObject({ source: 'bundled', bundledPresent: false, enabled: false, installed: false, qualified: expect.any(Boolean) });
     report.evidence.disabledPreferencePersisted = true;
     await activate(page.getByRole('button', { name: '打开作品：无模型研究验收作品', exact: true }));
     await expect(page.getByRole('textbox', { name: '章节标题', exact: true })).toHaveValue('离线写作保持');

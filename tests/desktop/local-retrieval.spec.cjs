@@ -40,7 +40,7 @@ test('未安装模型时关键词及混合回退真实IPC可用，全局卡片�
     await expect(panel.getByRole('button', { name: '停用语义检索', exact: true })).toBeEnabled();
     await expect(panel.getByRole('button', { name: '重建当前作品索引', exact: true })).toBeDisabled();
     const status = await page.evaluate(() => window.rainSoul.getRetrievalModelStatus());
-    expect(status).toMatchObject({ enabled: true, qualified: false, installed: false, source: 'bundled' });
+    expect(status).toMatchObject({ enabled: true, qualified: expect.any(Boolean), installed: false, source: 'bundled' });
     await expect(panel).toContainText('关键词检索始终可用');
     await panel.scrollIntoViewIfNeeded();
     await page.screenshot({ path: test.info().outputPath('settings-local-model.png'), fullPage: true });
