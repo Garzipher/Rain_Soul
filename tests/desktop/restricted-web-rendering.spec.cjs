@@ -81,7 +81,11 @@ for (const method of ['static', 'restricted-browser', 'legacy']) {
       await activate(page.getByRole('button', { name: '更换素材', exact: true }));
       await activate(page.getByRole('button', { name: '取消', exact: true })); await expect(body).toHaveValue('重启后仍需保留的手工修改');
       await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
-      await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true })); await closeNormally(application);
+      await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true }));
+      // Enter仅表示事件已发送；等异步保存完成并卸载工作区，再触发真正的关闭门禁。
+      await expect(page.getByRole('region', { name: '拆书工作区', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '拆书工具', exact: true })).toBeEnabled();
+      await closeNormally(application);
       application = await launch(directory); page = await offlineWindow(application);
       await activate(page.getByRole('button', { name: '打开作品：网页来源证据练习', exact: true })); await openBook(page);
       await expect(page.getByRole('textbox', { name: '摘选内容 1', exact: true })).toHaveValue('重启后仍需保留的手工修改');
@@ -90,6 +94,8 @@ for (const method of ['static', 'restricted-browser', 'legacy']) {
       await expect(page.getByRole('checkbox', { name: '确认有权使用摘选内容', exact: true })).not.toBeChecked();
       await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
       await activate(page.getByRole('button', { name: '保存草稿并返回', exact: true }));
+      await expect(page.getByRole('region', { name: '拆书工作区', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '拆书工具', exact: true })).toBeEnabled();
       await closeNormally(application);
     } finally { await cleanup(application, directory); }
   });
