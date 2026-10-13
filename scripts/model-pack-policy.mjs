@@ -46,6 +46,7 @@ export async function createModelPackConfiguration({ projectDirectory, args = []
     config: {
       // 本项目尚未提供自动更新；禁止根据仓库地址推断更新服务。
       publish: null,
+      nsis: { perMachine: false, packElevateHelper: false, allowElevation: false },
       directories: { output },
       beforePack: async () => {
         if (!research) await checkBundledModelPackage(input);

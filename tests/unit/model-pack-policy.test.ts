@@ -26,6 +26,14 @@ it('安装器显式关闭更新配置推断，实际builder不生成更新服务
   const packager = { config: packing.config, platformSpecificBuildOptions: {}, info: { config: packing.config } };
   expect(await getAppUpdatePublishConfiguration(packager, null, 'x64', false)).toBeNull();
 });
+it('普通用户安装不打包提权助手，实际builder不取得或复制助手资源', async () => {
+  const root = fixture(), packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model', '--installer'] });
+  expect(packing.config).toHaveProperty('nsis', { perMachine: false, packElevateHelper: false, allowElevation: false });
+  const { CopyElevateHelper } = require('app-builder-lib/out/targets/nsis/nsisUtil');
+  const target = { options: packing.config.nsis, packager: { info: { framework: { isCopyElevateHelper: true } }, config: { get toolsets() { throw new Error('不应取得提权工具'); } } } };
+  await expect(new CopyElevateHelper().copy(root, target)).resolves.toBeUndefined();
+  expect(readdirSync(root)).toEqual(['dist']);
+});
 it('默认builder配置实际挂接拒绝旁路门禁，显式研究配置替换该门禁', async () => {
   const packageConfig = JSON.parse(readFileSync('package.json', 'utf8')).build;
   expect(typeof packageConfig.beforePack).toBe('string');
