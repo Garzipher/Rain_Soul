@@ -1,6 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
-import { fixedManifest, modelFingerprint } from '../../shared/retrieval-model';
+import { fixedManifest, isRetrievalModelQualified, modelFingerprint } from '../../shared/retrieval-model';
 import { validateModelDirectory } from '../../main/retrieval-model-store';
 import { createCpuEmbeddingModel } from './model';
 import { RetrievalScheduler } from './scheduler';
@@ -12,11 +12,12 @@ let loading: Promise<void> | undefined;
 let indexes: Promise<void> = Promise.resolve();
 let scheduler: RetrievalScheduler | undefined;
 async function load() {
-  if (!Object.values(fixedManifest.qualification).every(Boolean) || fixedManifest.similarityThreshold === null) throw new Error('本机模型资格核验尚未完成。');
+  const threshold = fixedManifest.similarityThreshold;
+  if (!isRetrievalModelQualified() || threshold === null) throw new Error('本机模型资格核验尚未完成。');
   await validateModelDirectory(workerData.directory);
   scheduler = new RetrievalScheduler(await createCpuEmbeddingModel(workerData.directory));
   const fingerprint = createHash('sha256').update(modelFingerprint()).digest('hex');
-  engine = new RetrievalEngine(new RetrievalCache(workerData.cacheDirectory), scheduler.background, fingerprint, fixedManifest.similarityThreshold);
+  engine = new RetrievalEngine(new RetrievalCache(workerData.cacheDirectory), scheduler.background, fingerprint, threshold);
 }
 parentPort?.on('message', async (input: unknown) => {
   const message = input && typeof input === 'object' ? input as { id?: unknown; command?: unknown; payload?: unknown } : {};

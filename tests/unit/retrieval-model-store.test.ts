@@ -11,12 +11,16 @@ const directory = () => { const value = mkdtempSync(join(tmpdir(), 'rainsoul-mod
 const bytes = Buffer.from('公开测试权重');
 function fixture(qualified = true) {
   const manifest = structuredClone(fixedManifest);
-  if (qualified) for (const key of Object.keys(manifest.qualification) as (keyof typeof manifest.qualification)[]) manifest.qualification[key] = true;
+  for (const key of Object.keys(manifest.qualification) as (keyof typeof manifest.qualification)[]) manifest.qualification[key] = qualified;
   manifest.files = [{ path: 'onnx/model_quantized.onnx', bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }];
   const source = directory(); mkdirSync(join(source, 'onnx')); writeFileSync(join(source, manifest.files[0].path), bytes);
   return { manifest, source, target: directory() };
 }
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+it('未资格夹具显式关闭所有必需记录，不依赖产品发布清单', () => {
+  const { manifest } = fixture(false);
+  expect(manifest.qualification).toMatchObject({ publicSourceRecorded: false, networkAuditPassed: false, packagedRuntimePassed: false, qualityCalibrated: false });
+});
 it('固定清单拒绝未知字段、穿越/重复/容量；指纹包含tokenizer与池化配置', () => {
   expect(() => retrievalModelManifestSchema.parse({ ...fixedManifest, script: '执行' })).toThrow();
   for (const path of ['../outside', 'C:/outside', 'onnx/../model', 'onnx\\model', 'name:ads', '.', '..']) expect(() => retrievalModelManifestSchema.parse({ ...fixedManifest, files: [{ ...fixedManifest.files[0], path }] })).toThrow();
@@ -36,6 +40,32 @@ it('离线校验安装原子激活、重启读取、禁用仍保留文件，资�
   await store.setEnabled(false); expect((await store.getStatus()).state).toBe('disabled');
   expect(await store.getActiveDirectory()).toBeNull();
   await store.setEnabled(true); expect(await store.getActiveDirectory()).toBe(active);
+});
+it('精确转换链作为记录项，不阻断已通过来源与运行门禁的固定模型', async () => {
+  const { manifest, source, target } = fixture();
+  Object.assign(manifest.qualification, { publicSourceRecorded: true, officialSourceVerified: false });
+  manifest.qualification.conversionRevisionVerified = false;
+  const store = new RetrievalModelStore(target, { manifest });
+  await store.install({ operationId: randomUUID(), source: 'local', directory: source });
+  expect(await store.getStatus()).toMatchObject({ state: 'ready', installed: true, qualified: true });
+  expect(await store.getActiveDirectory()).toBeTruthy();
+  await store.setEnabled(false); await store.setEnabled(true);
+  expect((await store.getStatus()).state).toBe('ready');
+});
+it.each(['publicSourceRecorded', 'networkAuditPassed', 'packagedRuntimePassed', 'qualityCalibrated'] as const)('%s未验收仍阻断实际推理', async missing => {
+  const { manifest, source, target } = fixture(); manifest.qualification[missing] = false;
+  const store = new RetrievalModelStore(target, { manifest });
+  await store.install({ operationId: randomUUID(), source: 'local', directory: source });
+  expect(await store.getStatus()).toMatchObject({ installed: true, qualified: false, state: 'disabled' });
+  expect(await store.getActiveDirectory()).toBeNull();
+  await expect(store.setEnabled(true)).rejects.toThrow(/资格/);
+});
+it('质量阈值未确定时即使各验收记录通过也不启用模型', async () => {
+  const { manifest, source, target } = fixture(); manifest.similarityThreshold = null;
+  const store = new RetrievalModelStore(target, { manifest });
+  await store.install({ operationId: randomUUID(), source: 'local', directory: source });
+  expect(await store.getStatus()).toMatchObject({ installed: true, state: 'disabled', qualified: false });
+  expect(await store.getActiveDirectory()).toBeNull();
 });
 it('错误SHA、长度、未知文件与符号链接不替换旧模型', async () => {
   const { manifest, source, target } = fixture(); const store = new RetrievalModelStore(target, { manifest });
@@ -149,7 +179,7 @@ it('新用户默认只读使用可信内置目录，不复制权重或创建激�
   expect(readdirSync(target)).toEqual([]);
   expect(readFileSync(join(source, manifest.files[0].path))).toEqual(bytes);
 });
-it.each(Object.keys(fixedManifest.qualification) as (keyof typeof fixedManifest.qualification)[])('内置来源的 %s 未通过不能向推理暴露目录', async key => {
+it.each(['publicSourceRecorded', 'networkAuditPassed', 'packagedRuntimePassed', 'qualityCalibrated'] as const)('内置来源的 %s 未通过不能向推理暴露目录', async key => {
   const { manifest, source, target } = fixture(); manifest.qualification[key] = false;
   const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
   expect(await store.getStatus()).toMatchObject({ state: 'disabled', source: 'bundled', installed: true, qualified: false, enabled: true });

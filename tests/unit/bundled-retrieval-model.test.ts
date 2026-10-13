@@ -5,7 +5,7 @@ import * as filesystem from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import { prepareBundledRetrievalModel, validateModelProvenance, type ModelProvenance } from '../../scripts/prepare-bundled-retrieval-model.mjs';
+import { modelArtifactDigest, prepareBundledRetrievalModel, validateModelProvenance, type ModelProvenance } from '../../scripts/prepare-bundled-retrieval-model.mjs';
 import { fixedManifest } from '../../src/shared/retrieval-model';
 vi.mock('node:fs/promises', async importOriginal => {
   const actual=await importOriginal<typeof import('node:fs/promises')>();
@@ -31,7 +31,7 @@ function fixture() {
   ] as const;
   const trustedAnchor: ModelProvenance = { schemaVersion: 1, repository: manifest.repository, revision: manifest.revision,
     upstreamRepository: manifest.upstreamRepository, upstreamRevision: manifest.upstreamReferenceRevision,
-    manifestSha256: hash(JSON.stringify(manifest)), artifacts: materials.map(({ kind, path, data, url }) => {
+    manifestSha256: modelArtifactDigest(manifest), artifacts: materials.map(({ kind, path, data, url }) => {
       writeFileSync(join(evidenceDirectory, path), data); return { kind, path, url, bytes: Buffer.byteLength(data), sha256: hash(data) };
     }) };
   writeFileSync(join(evidenceDirectory, 'provenance.json'), JSON.stringify(trustedAnchor));
@@ -47,9 +47,9 @@ it('经可信锚核验后复制五权重及独立声明，输入保持不变', a
   expect(readdirSync(options.inputDirectory).sort()).toEqual(['config.json', 'onnx', 'special_tokens_map.json', 'tokenizer.json', 'tokenizer_config.json']);
   expect(existsSync(options.outputDirectory + '.pending')).toBe(false);
 });
-it('当前真实候选没有仓库可信转换锚时拒绝外部自报来源通过', async () => {
+it('仓库固定来源锚拒绝外部自报通过与不同模型身份', async () => {
   const options = fixture();
-  expect(() => validateModelProvenance({ ...options.trustedAnchor, officialSourceVerified: true }, options.manifest)).toThrow(/可信|来源/);
+  expect(() => validateModelProvenance({ ...options.trustedAnchor, officialSourceVerified: true }, options.manifest)).toThrow();
   await expect(prepareBundledRetrievalModel({ ...options, trustedAnchor: undefined })).rejects.toThrow(/可信|来源/);
   expect(existsSync(options.outputDirectory)).toBe(false);
 });
@@ -94,13 +94,32 @@ it('重叠输入输出与根目录输出在任何删除操作前拒绝', async (
   await expect(prepareBundledRetrievalModel({ ...options, outputDirectory: options.inputDirectory })).rejects.toThrow(/输出|重叠/);
   expect(existsSync(join(options.inputDirectory, 'config.json'))).toBe(true);
 });
-it('可信锚缺转换材料、重复材料或模型字节身份不一致均拒绝', () => {
+it('可信锚缺必需模型卡、重复材料或模型字节身份不一致均拒绝', () => {
   const options = fixture();
   for (const anchor of [
-    { ...options.trustedAnchor, artifacts: options.trustedAnchor.artifacts.filter(item => item.kind !== 'conversion') },
+    { ...options.trustedAnchor, artifacts: options.trustedAnchor.artifacts.filter(item => item.kind !== 'candidate-card') },
     { ...options.trustedAnchor, artifacts: [...options.trustedAnchor.artifacts, options.trustedAnchor.artifacts[0]] },
     { ...options.trustedAnchor, manifestSha256: 'a'.repeat(64) },
   ]) expect(() => validateModelProvenance(anchor, options.manifest, anchor)).toThrow();
+});
+it('固定公开模型卡与许可完整时允许缺精确转换证明，但仍核对五权重', async () => {
+  const options = fixture();
+  options.trustedAnchor.artifacts = options.trustedAnchor.artifacts.filter(item => item.kind !== 'conversion');
+  rmSync(join(options.evidenceDirectory, 'conversion.json'));
+  writeFileSync(join(options.evidenceDirectory, 'provenance.json'), JSON.stringify(options.trustedAnchor));
+  await prepareBundledRetrievalModel(options);
+  expect(readdirSync(join(options.outputDirectory, 'notices')).sort()).toEqual(['LICENSE.txt', 'candidate.md', 'provenance.json', 'upstream.md']);
+  for (const file of options.manifest.files) expect(hash(readFileSync(join(options.outputDirectory, 'weights', file.path)))).toBe(file.sha256);
+});
+it('资格与阈值更新不改变来源字节身份，权重及许可篡改仍阻断', () => {
+  const options = fixture();
+  for (const key of Object.keys(options.manifest.qualification) as (keyof typeof options.manifest.qualification)[]) options.manifest.qualification[key] = true;
+  options.manifest.similarityThreshold = 0.6;
+  expect(validateModelProvenance(options.trustedAnchor, options.manifest, options.trustedAnchor)).toEqual(options.trustedAnchor);
+  options.manifest.files[0].sha256 = 'b'.repeat(64);
+  expect(() => validateModelProvenance(options.trustedAnchor, options.manifest, options.trustedAnchor)).toThrow(/字节身份/);
+  const altered = fixture(); altered.manifest.licenseText += '变更';
+  expect(() => validateModelProvenance(altered.trustedAnchor, altered.manifest, altered.trustedAnchor)).toThrow(/字节身份/);
 });
 it('正式CLI拒绝夹具自报可信锚和额外参数，环境变量不能放行', () => {
   const options = fixture();

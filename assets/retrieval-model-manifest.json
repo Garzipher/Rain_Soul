@@ -24,6 +24,7 @@
   "normalize": true,
   "queryPrefix": "为这个句子生成表示以用于检索相关文章：",
   "qualification": {
+    "publicSourceRecorded": true,
     "officialSourceVerified": false,
     "conversionRevisionVerified": false,
     "networkAuditPassed": false,

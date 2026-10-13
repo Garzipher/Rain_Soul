@@ -1,20 +1,28 @@
-import { mkdtemp, copyFile, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { createRequire } from 'node:module';
 import { afterEach, expect, it } from 'vitest';
+import { build } from 'esbuild';
 import { fixedManifest } from '../../src/shared/retrieval-model';
 
 const directories: string[] = [];
 afterEach(async () => { for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }); });
 
 it('实际编译Worker在资格关闭时拒绝加载与后续命令，未读取模型、创建缓存或加载推理库', async () => {
-  expect(Object.values(fixedManifest.qualification).some(value => !value)).toBe(true);
   const directory = await mkdtemp(join(tmpdir(), 'rainsoul-worker-gate-')); directories.push(directory);
   const compiled = join(directory, 'retrieval-worker.cjs');
-  await copyFile(resolve('dist/desktop/retrieval-worker.cjs'), compiled);
-  // 只复制实际Worker，没有推理库；先拦截本线程I/O与网络，证实资格检查发生在这些动作之前。
+  const gatedManifest = structuredClone(fixedManifest);
+  Object.assign(gatedManifest.qualification, { publicSourceRecorded: false, networkAuditPassed: false, packagedRuntimePassed: false, qualityCalibrated: false });
+  // 编译原生产入口，仅替换测试清单；产品资格放行后仍验证关闭门禁，且不改共享dist。
+  await build({ entryPoints: [resolve('src/workers/retrieval/worker.ts')], outfile: compiled,
+    bundle: true, platform: 'node', target: 'node24', format: 'cjs', external: ['better-sqlite3'],
+    plugins: [{ name: '隔离的未资格测试清单', setup(builder) {
+      builder.onLoad({ filter: /retrieval-model-manifest\.json$/ }, () => ({ contents: JSON.stringify(gatedManifest), loader: 'json' }));
+    } }],
+  });
+  // 没有推理库；先拦截本线程I/O与网络，证实资格检查发生在这些动作之前。
   const worker = new Worker(`
     const { parentPort, workerData } = require('node:worker_threads');
     const fs = require('node:fs');

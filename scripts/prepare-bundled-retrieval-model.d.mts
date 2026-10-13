@@ -5,6 +5,7 @@ export interface ModelProvenance {
   artifacts: (ModelFile & { kind: 'upstream-card' | 'candidate-card' | 'license' | 'conversion'; url: string })[];
 }
 export const bundledManifest: RetrievalModelManifest;
+export function modelArtifactDigest(manifest?: RetrievalModelManifest): string;
 export function assertSafeLocalPath(path: string): void;
 export function validateModelProvenance(evidence: unknown, manifest?: RetrievalModelManifest, trustedAnchor?: ModelProvenance | null): ModelProvenance;
 export function validateExactDirectory(directory: string, files: ModelFile[]): Promise<void>;

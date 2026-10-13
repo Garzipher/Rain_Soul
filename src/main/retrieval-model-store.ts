@@ -3,7 +3,7 @@ import { createReadStream, lstatSync, mkdirSync, readdirSync } from 'node:fs';
 import { lstat, mkdir, open, rename, rm, statfs } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
-import { fixedManifest, modelFingerprint, retrievalModelManifestSchema, type RetrievalModelManifest, type RetrievalModelStatus, type RetrievalModelInstallProgress } from '../shared/retrieval-model';
+import { fixedManifest, isRetrievalModelQualified, modelFingerprint, retrievalModelManifestSchema, type RetrievalModelManifest, type RetrievalModelStatus, type RetrievalModelInstallProgress } from '../shared/retrieval-model';
 import { createTrustedModelDownloader } from './retrieval-model-download';
 import { ModelSelectionVersionError, readModelSelection, readModelSelectionForMaintenance, writeModelSelection, type ModelSelection } from './retrieval-model-selection';
 
@@ -86,7 +86,7 @@ export class RetrievalModelStore {
     return !!await lstat(this.bundledDirectory).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
   }
   async getStatus(): Promise<RetrievalModelStatus> {
-    const base = { modelId: this.manifest.modelId, fingerprint: modelFingerprint(this.manifest), bytes: this.manifest.files.reduce((sum, file) => sum + file.bytes, 0), qualified: Object.values(this.manifest.qualification).every(Boolean), requiredSpaceBytes: this.requiredSpace(), availableSpaceBytes: await this.availableSpace().catch(() => undefined), progress: this.getProgress() };
+    const base = { modelId: this.manifest.modelId, fingerprint: modelFingerprint(this.manifest), bytes: this.manifest.files.reduce((sum, file) => sum + file.bytes, 0), qualified: isRetrievalModelQualified(this.manifest), requiredSpaceBytes: this.requiredSpace(), availableSpaceBytes: await this.availableSpace().catch(() => undefined), progress: this.getProgress() };
     let selection: ModelSelection | null = null;
     const bundledPresent = await this.bundledPresent().catch(() => false);
     try {
@@ -104,7 +104,7 @@ export class RetrievalModelStore {
   async getActiveDirectory(): Promise<string | null> {
     try {
       const selection = await this.selection() ?? this.defaultSelection();
-      if (!selection.enabled || !Object.values(this.manifest.qualification).every(Boolean) || this.changing || this.installing) return null;
+      if (!selection.enabled || !isRetrievalModelQualified(this.manifest) || this.changing || this.installing) return null;
       const directory = this.selectedDirectory(selection); if (!directory) return null;
       await validateModelDirectory(directory, this.manifest);
       const current = await this.selection() ?? this.defaultSelection();
@@ -113,7 +113,7 @@ export class RetrievalModelStore {
   }
   async setEnabled(enabled: boolean): Promise<void> {
     z.boolean().parse(enabled); if (this.installing || this.changing) throw new Error('模型变更正在进行，请稍后重试。');
-    if (enabled && !Object.values(this.manifest.qualification).every(Boolean)) throw new Error('模型资格核验尚未完成，关键词检索仍可使用。');
+    if (enabled && !isRetrievalModelQualified(this.manifest)) throw new Error('模型资格核验尚未完成，关键词检索仍可使用。');
     this.changing = true;
     try {
       const selection = await this.selection() ?? this.defaultSelection();

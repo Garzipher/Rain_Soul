@@ -14,7 +14,7 @@ export const retrievalModelManifestSchema = z.object({
   similarityThreshold: z.number().min(-1).max(1).nullable(),
   dimensions: z.literal(512), windowTokens: z.literal(512), textTokens: z.literal(400),
   chunkOverlap: z.literal(50), chunkerVersion: z.literal(1), dtype: z.literal('q8'), pooling: z.literal('cls'), normalize: z.literal(true), queryPrefix: z.string().min(1),
-  qualification: z.object({ officialSourceVerified: z.boolean(), conversionRevisionVerified: z.boolean(), networkAuditPassed: z.boolean(), packagedRuntimePassed: z.boolean(), qualityCalibrated: z.boolean() }).strict(),
+  qualification: z.object({ publicSourceRecorded: z.boolean(), officialSourceVerified: z.boolean(), conversionRevisionVerified: z.boolean(), networkAuditPassed: z.boolean(), packagedRuntimePassed: z.boolean(), qualityCalibrated: z.boolean() }).strict(),
   files: z.array(file).min(1).max(20),
 }).strict().refine(value => new Set(value.files.map(item => item.path.toLowerCase())).size === value.files.length && value.files.reduce((sum, item) => sum + item.bytes, 0) <= 512 * 1024 ** 2, '模型文件重复或超过容量');
 export type RetrievalModelManifest = z.infer<typeof retrievalModelManifestSchema>;
@@ -23,6 +23,11 @@ function freeze<T>(value: T): T {
   return value;
 }
 export const fixedManifest = freeze(retrievalModelManifestSchema.parse(manifest));
+/** 公开来源必须记录；官方交叉与精确转换链保留历史备注，网络、实际包及质量分别验收。 */
+export function isRetrievalModelQualified(value: RetrievalModelManifest = fixedManifest): boolean {
+  const checks = value.qualification;
+  return checks.publicSourceRecorded && checks.networkAuditPassed && checks.packagedRuntimePassed && checks.qualityCalibrated && value.similarityThreshold !== null;
+}
 /** 不依赖Node，渲染层可比较完整配置；持久缓存可对该规范字符串计算SHA256。 */
 export function modelFingerprint(value: RetrievalModelManifest = fixedManifest): string {
   return JSON.stringify({ repository: value.repository, revision: value.revision, runtime: value.runtime,

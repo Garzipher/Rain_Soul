@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { checkBundledModelPackage } from '../../scripts/check-bundled-model-package.mjs';
-import { prepareBundledRetrievalModel, type ModelProvenance } from '../../scripts/prepare-bundled-retrieval-model.mjs';
+import { modelArtifactDigest, prepareBundledRetrievalModel, type ModelProvenance } from '../../scripts/prepare-bundled-retrieval-model.mjs';
 import { fixedManifest } from '../../src/shared/retrieval-model';
 
 const roots: string[] = [], hash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -14,7 +14,7 @@ async function fixture() {
   const manifest = structuredClone(fixedManifest), inputDirectory = join(root, 'input'), evidenceDirectory = join(root, 'evidence'), resources = join(root, 'resources');
   mkdirSync(inputDirectory); mkdirSync(evidenceDirectory);
   for (const file of manifest.files) { const data = `公开${file.path}`; file.bytes = Buffer.byteLength(data); file.sha256 = hash(data); const path = join(inputDirectory, file.path); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, data); }
-  const trustedAnchor: ModelProvenance = { schemaVersion: 1, repository: manifest.repository, revision: manifest.revision, upstreamRepository: manifest.upstreamRepository, upstreamRevision: manifest.upstreamReferenceRevision, manifestSha256: hash(JSON.stringify(manifest)), artifacts: ['upstream-card', 'candidate-card', 'license', 'conversion'].map((kind, index) => {
+  const trustedAnchor: ModelProvenance = { schemaVersion: 1, repository: manifest.repository, revision: manifest.revision, upstreamRepository: manifest.upstreamRepository, upstreamRevision: manifest.upstreamReferenceRevision, manifestSha256: modelArtifactDigest(manifest), artifacts: ['upstream-card', 'candidate-card', 'license', 'conversion'].map((kind, index) => {
     const path = `notice-${index}.txt`, data = kind === 'license' ? manifest.licenseText : `经审查材料${kind}`; writeFileSync(join(evidenceDirectory, path), data);
     return { kind: kind as ModelProvenance['artifacts'][number]['kind'], path, bytes: Buffer.byteLength(data), sha256: hash(data), url: kind === 'license' ? manifest.licenseUrl : `https://huggingface.co/${kind === 'upstream-card' ? manifest.upstreamRepository : manifest.repository}/raw/${kind === 'upstream-card' ? manifest.upstreamReferenceRevision : manifest.revision}/${path}` };
   }) };
@@ -70,7 +70,7 @@ it.each([{ args: [] }, { args: ['relative/resources'] }, { args: [resolve('dist'
 });
 it('CLI真实核验资源，夹具来源不能替代仓库锚放行', async () => {
   const value = await fixture(), stderr = await runCli([value.resources]);
-  expect(process.exitCode).toBe(1); expect(stderr).toHaveBeenCalledWith(expect.stringMatching(/可信锚.*禁止正式捆绑/));
+  expect(process.exitCode).toBe(1); expect(stderr).toHaveBeenCalledWith(expect.stringMatching(/来源证据与仓库可信锚不一致/));
 });
 it('作为库加载且没有argv入口时不运行CLI或改退出码', async () => {
   const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "repository": "Xenova/bge-small-zh-v1.5",
+  "revision": "75c43b069aac4d136ba6bc1122f995fedcfd2781",
+  "upstreamRepository": "BAAI/bge-small-zh-v1.5",
+  "upstreamRevision": "7999e1d3359715c523056ef9478215996d62a620",
+  "manifestSha256": "d0360589f19aa1e3218939275eb72ed10cb9a1b83435bd7bf6283b54a594b165",
+  "artifacts": [
+    {
+      "kind": "upstream-card",
+      "path": "upstream.md",
+      "url": "https://huggingface.co/BAAI/bge-small-zh-v1.5/raw/7999e1d3359715c523056ef9478215996d62a620/README.md",
+      "bytes": 27670,
+      "sha256": "c48a4eeea77f6b1d38b48ec1c5b8d4f86d5550cc43fa345a0db1b2ca1d082369"
+    },
+    {
+      "kind": "candidate-card",
+      "path": "candidate.md",
+      "url": "https://huggingface.co/Xenova/bge-small-zh-v1.5/raw/75c43b069aac4d136ba6bc1122f995fedcfd2781/README.md",
+      "bytes": 1057,
+      "sha256": "cb22054df1a98f7ee9d5b281d023e67c27cc316e1733baf03fc994d95c3048ab"
+    },
+    {
+      "kind": "license",
+      "path": "LICENSE.txt",
+      "url": "https://github.com/FlagOpen/FlagEmbedding/blob/fd1a2bdf69488ffebe0327999d4400d8c8058a0b/LICENSE",
+      "bytes": 1065,
+      "sha256": "587a673933425dbc36ec61268d3b954051b2d3ef3c9b322ede357976055ffdd5"
+    }
+  ]
+}

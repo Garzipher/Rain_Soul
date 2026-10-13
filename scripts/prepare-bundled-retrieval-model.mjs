@@ -8,15 +8,22 @@ import { fileURLToPath, URL } from 'node:url';
 import { z } from 'zod';
 
 export const bundledManifest = JSON.parse(readFileSync(new URL('../assets/retrieval-model-manifest.json', import.meta.url), 'utf8'));
-// 当前转换源没有精确证明；只能经代码审查补入仓库锚，禁止外部布尔或环境变量放行。
-const repositoryAnchor = null;
+// 固定公开仓库、修订、模型卡及许可；精确转换链只作补充，不允许外部变量跳过文件校验。
+const repositoryAnchor = JSON.parse(readFileSync(new URL('../assets/retrieval-model-provenance.json', import.meta.url), 'utf8'));
 const revision = z.string().regex(/^[a-f0-9]{40}$/), sha256 = z.string().regex(/^[a-f0-9]{64}$/);
 const localName = z.string().regex(/^(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_.-]+$/).refine(value => !value.split('/').some(part => part === '.' || part === '..'));
 const fileSchema = z.object({ path: localName, bytes: z.number().int().positive().max(512 * 1024 ** 2), sha256 }).strict();
 const artifactSchema = fileSchema.extend({ kind: z.enum(['upstream-card', 'candidate-card', 'license', 'conversion']), url: z.url() });
-const provenanceSchema = z.object({ schemaVersion: z.literal(1), repository: z.string(), revision, upstreamRepository: z.string(), upstreamRevision: revision, manifestSha256: sha256, artifacts: z.array(artifactSchema).length(4) }).strict();
+const provenanceSchema = z.object({ schemaVersion: z.literal(1), repository: z.string(), revision, upstreamRepository: z.string(), upstreamRevision: revision, manifestSha256: sha256, artifacts: z.array(artifactSchema).min(3).max(4) }).strict();
 const digest = data => createHash('sha256').update(data).digest('hex');
 const modelFiles = ['config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'onnx/model_quantized.onnx'];
+
+/** 来源锚绑定模型、运行配置与许可字节；后续验收和校准不改变固定来源身份。 */
+export function modelArtifactDigest(manifest = bundledManifest) {
+  const identity = { ...manifest };
+  delete identity.qualification; delete identity.similarityThreshold;
+  return digest(JSON.stringify(identity));
+}
 
 export function assertSafeLocalPath(path) {
   let current = resolve(path);
@@ -37,12 +44,13 @@ function validateBundledManifest(manifest) {
   if (manifest.license !== 'MIT' || typeof manifest.licenseText !== 'string' || manifest.licenseText.length < 500) throw new Error('模型许可正文缺失。');
 }
 export function validateModelProvenance(evidence, manifest = bundledManifest, trustedAnchor = repositoryAnchor) {
-  if (!trustedAnchor) throw new Error('来源缺少仓库可信锚与精确转换证明，禁止正式捆绑。');
+  if (!trustedAnchor) throw new Error('来源缺少仓库可信锚，禁止捆绑。');
   validateBundledManifest(manifest);
   const trusted = provenanceSchema.parse(trustedAnchor), actual = provenanceSchema.parse(evidence);
   if (JSON.stringify(actual) !== JSON.stringify(trusted)) throw new Error('来源证据与仓库可信锚不一致。');
-  if (trusted.repository !== manifest.repository || trusted.revision !== manifest.revision || trusted.upstreamRepository !== manifest.upstreamRepository || trusted.upstreamRevision !== manifest.upstreamReferenceRevision || trusted.manifestSha256 !== digest(JSON.stringify(manifest))) throw new Error('来源版本或模型字节身份不一致。');
-  if (new Set(trusted.artifacts.map(item => item.kind)).size !== 4 || new Set(trusted.artifacts.map(item => item.path.toLowerCase())).size !== 4 || trusted.artifacts.some(item => item.path === 'provenance.json')) throw new Error('来源材料重复或缺少精确转换证明。');
+  if (trusted.repository !== manifest.repository || trusted.revision !== manifest.revision || trusted.upstreamRepository !== manifest.upstreamRepository || trusted.upstreamRevision !== manifest.upstreamReferenceRevision || trusted.manifestSha256 !== modelArtifactDigest(manifest)) throw new Error('来源版本或模型字节身份不一致。');
+  const kinds = new Set(trusted.artifacts.map(item => item.kind));
+  if (kinds.size !== trusted.artifacts.length || !['upstream-card', 'candidate-card', 'license'].every(kind => kinds.has(kind)) || new Set(trusted.artifacts.map(item => item.path.toLowerCase())).size !== trusted.artifacts.length || trusted.artifacts.some(item => item.path === 'provenance.json')) throw new Error('来源材料重复或缺少模型卡与许可。');
   for (const item of trusted.artifacts) {
     const upstream = item.kind === 'upstream-card', url = new URL(item.url);
     const prefix = `https://huggingface.co/${upstream ? trusted.upstreamRepository : trusted.repository}/raw/${upstream ? trusted.upstreamRevision : trusted.revision}/`;
