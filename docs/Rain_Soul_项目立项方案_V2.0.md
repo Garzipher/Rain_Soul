@@ -1,9 +1,9 @@
 # Rain_Soul 项目立项方案
 
-> 2026-10-13 修订：内置中文BGE-small正式含模型安装器已生成，真实EXE质量及离线UI索引/语义检索、停用回退和重启通过；四项必需资格true，官方交叉/精确转换false。最终NSIS为release/semantic-20261013/RainSoul Setup 1.3.0.exe，NotSigned。部分OpenRouter云联调已完成；1497全套coverage通过、后续新增研究工具2测试通过、typecheck/Lint通过，Demo74通过；桌面首轮30通过/2跳过/1关闭竞态失败，修正4场景复验通过、全集重跑中，系统抓包、真人独立标注、干净Windows及全项云待验，正式受限网页渲染仍禁用。13/15为语义结果，10/15为研究二元词关键词对照，不能推导生产FTS提升。见[模型证据](../tasks/semantic-bundled-validation-2026-10-13.md)和[云报告](../tasks/real-cloud-validation-2026-10-13.md)。
+> 2026-10-13 修订：内置中文BGE-small正式含模型安装器已生成，真实EXE质量及离线UI索引/语义检索、停用回退和重启通过；四项必需资格true，官方交叉/精确转换false。最终NSIS为release/semantic-final-20261013/RainSoul Setup 1.3.0.exe，NotSigned。部分OpenRouter云联调已完成；最新完整coverage为161文件/1500项全部通过（420.68秒），语句/分支/函数/行93.29/88.65/95.49/98.27%；此前1499单测通过及1497通过/2竞态失败轮保留为历史。前轮生产源码desktop31通过/2专项跳过、Demo74及typecheck/Lint/build通过；最终包UI/教材2项另轮通过，不合成为同轮全套。系统抓包、真人独立标注、干净Windows及全项云待验，正式受限网页渲染仍禁用。13/15为语义结果，10/15为研究二元词关键词对照，不能推导生产FTS提升。见[模型证据](../tasks/semantic-bundled-validation-2026-10-13.md)和[云报告](../tasks/real-cloud-validation-2026-10-13.md)。
 
 
-当前源码教材44章27图；新教材包待生成，当前安装器hash保留原记录，不把源码内容变更算作旧包已交付。
+当前正式含模型教材包为 `release/semantic-final-20261013/RainSoul Setup 1.3.0.exe`，149,327,167字节，SHA-256 `ba3cf5c6a63fa9cc5111498fd4c6dddec637b44fb3ee6eb9a60a384ed648267f`，NotSigned。最终资源审计、真实EXE底层验收及实际包UI/教材2项（27.7秒）通过，44章27图正常；安装器生成不代表干净Windows安装、升级和卸载矩阵通过。
 
 > 历史记录（2026-10-10）：公开 URL/粘贴来源、可恢复逐批 AI 拆书、派生本机检索与模型管理已接入源码；1.3.0的1119项单元/组件、26项开发入口桌面及74项Demo测试通过。模型五项资格门禁仍未全部通过，正式语义请求回退关键词；真实网页一次获取超时，不计成功。九卷41章24图教材已更新。实际包及外部门禁以[执行与门禁记录](../tasks/url-local-retrieval-ledger.md)为准；下文旧版本测试数字仅是历史证据。
 

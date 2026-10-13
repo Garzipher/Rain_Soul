@@ -38,3 +38,25 @@ C盘独立目录 `C:/Users/NO.6/AppData/Local/Temp/RainSoul-semantic-20261013` �
 桌面首轮30通过、2实际包专项跳过、1关闭超时。轨迹表明保存草稿按键结束1.25ms后测试即请求关窗，未等待异步保存和工作区卸载；修正测试等待知识库入口恢复，保留生产保存门禁。4项相关场景复验通过，完整桌面重跑结果后续记录，失败轮不计全绿。
 
 独立review对比9865a40以来来源/资格、实际包、Windows资源编辑和凭据边界，未发现High；唯一Medium为上述研究回执，已修复并通过2项专项。研究关键词对照与生产FTS的区别已补文档。教材编译44章27图，截图进入源码晚于上述安装器，须重新打包，不沿用旧包hash。
+
+最终单元回归161文件1499项通过，420.72秒，日志`.p0-semantic-final-unit.log`。第二次coverage曾1497通过、2项effect时序断言失败：标签选中先于焦点恢复、表单关闭先于dirty通知；仅改测试等待对应状态，33项专项通过后全套1499通过。首次coverage数值保持其执行范围，不将失败coverage轮次记成通过。
+
+最终桌面全集`.p0-semantic-final3-desktop.log`为31通过、2实际包专项跳过，10.1分钟；含模型专项将显式指定新包另跑。此前全集第二轮static来源测试过早导航，被操作门禁拒绝，补等待章节标题可编辑后修正，失败日志保留。最终关键词搜索200样本P95=282.20ms。Demo74项、typecheck、Lint、生产build通过；终端NO_COLOR/FORCE_COLOR提示不影响运行，未作完整WCAG声明。
+
+二次独立审查aada34e、d2e7c37、a41ec70确认原焦点、dirty、保存失败与关窗要求保留，未扩大超时、删场景或绕过生产门禁，无未修复High/Medium。开发经验已记入教材和本报告，Compound Engineering按耐久性规则不再重复创建相同条目；本机Claude Mem数据库缺失，本轮按技能降级为会话记录，未写入休眠gbrain。
+
+## 新教材安装器复验
+
+新教材的前两次重打包（临时目录`RainSoul-semantic-20261013-final`和`final2`）在复制`THIRD_PARTY_NOTICES.txt`时EBUSY失败。单独复制成功；实际builder的`getConfig`显示默认相对源与授权绝对源被拼接到同一个目标，`copyFiles`并行执行导致竞争。`70eb047`移除默认重复资源声明，统一由受审计配置提供，直接打包拒绝hook和许可/模型字节审计保留。真实配置回归先得到双份资源的红测，再24项专项全绿；typecheck、Lint、build通过，独立review无High/Medium。没有跳过声明、修改vendor或新增复制旁路。
+
+第三次`C:/Users/NO.6/AppData/Local/Temp/RainSoul-semantic-20261013-final3`完整NSIS构建及最终资源审计通过。当前交付安装器为`release/semantic-final-20261013/RainSoul Setup 1.3.0.exe`，149,327,167字节，SHA-256为`ba3cf5c6a63fa9cc5111498fd4c6dddec637b44fb3ee6eb9a60a384ed648267f`，Authenticode为NotSigned。复制到release后再次校验相同。此前安装器及其hash只作为历史记录。
+
+新包实际EXE底层报告`acceptance/retrieval-runtime-final.json`通过：加载866.9905ms、总推理7340.0289ms，512维归一化，改写Recall@5=13/15、研究二元词关键词对照10/15、5负例1误报；受观察网络入口0，EXE/ASAR/权重身份前后一致。夹具、阈值与审计范围沿用前述定义，非生产FTS对比、系统抓包或独立真人评估。
+
+显式指定新包运行`bundled-semantic-model.spec.cjs`与`learning.spec.cjs`，2项27.7秒通过，日志`.p0-semantic-final-package-ui.log`。确认离线启用、知识改写查询与卡片、停用混合回退、重启稿件/偏好，以及44章27图教材、Markdown源文和历史作者练习保留。报告、日志、截图保存于新包`acceptance`。干净Windows安装/升级/卸载、全部P0真实云操作及正式受限网页渲染的未完成边界不变。
+
+## 当前完整覆盖率结果
+
+修正测试effect等待及重复资源配置后，重新执行完整`npm run test:coverage`，日志`.p0-semantic-final-green-coverage.log`退出0：161文件、1500项全部通过，420.68秒（含新增builder配置回归）。语句93.29%（7777/8336）、分支88.65%（5291/5968）、函数95.49%（1463/1532）、行98.27%（5003/5091）。本段是当前覆盖率结论；此前失败轮和1499项普通单测记录保留为历史，不冒充同一轮执行。
+
+桌面全集31通过/2显式实际包专项跳过与Demo74项为本轮应用源码验证；后续改动仅为打包配置去重及其回归，新实际包另有底层验收、UI与教材2项通过。各轮独立报告，不合并宣称一次全套执行了所有场景。
