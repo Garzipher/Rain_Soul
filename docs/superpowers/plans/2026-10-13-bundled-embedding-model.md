@@ -8,7 +8,7 @@
 
 **Tech Stack:** Electron 44.7.0、React/TypeScript、固定 Tokenizer/ORT CPU WASM、Node 文件校验、Vitest、Playwright、electron-builder。
 
-**Spec:** [已确认规格](../specs/2026-10-12-bundled-embedding-model-design.md)。状态：实施计划待用户审阅，未开始产品实现。
+**Spec:** [已确认规格](../specs/2026-10-12-bundled-embedding-model-design.md)。状态：用户已批准并授权实施；基础设施已实现，无模型研究目录包专项通过，来源与正式资格待证据；见 tasks/bundled-model-ledger.md。
 
 ## Global Constraints
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Electron 44.7.0、Node HTTPS、React/TypeScript、SQLite、Readability worker、Vitest、Playwright。
 
-**Spec:** [已确认规格](../specs/2026-10-12-restricted-web-rendering-design.md)。状态：计划待用户审阅，未开始产品实现。
+**Spec:** [已确认规格](../specs/2026-10-12-restricted-web-rendering-design.md)。状态：用户已批准并授权实施；实现与专项验证进行中，逐项证据见 tasks/restricted-render-ledger.md。
 
 ## Global Constraints
 
