@@ -12,6 +12,9 @@ const selectionSchema = z.discriminatedUnion('source', [
 ]);
 const pointerSchema = z.object({ generation: z.uuid(), fingerprint, enabled: z.boolean() }).strict();
 export type ModelSelection = z.infer<typeof selectionSchema>;
+export class ModelSelectionVersionError extends Error {
+  constructor(readonly selection: ModelSelection) { super('模型版本已变化，原选择记录保留，请显式选择当前内置模型或重新导入。'); }
+}
 const pending = new Map<string, Promise<unknown>>();
 function serialize<T>(directory: string, action: () => Promise<T>): Promise<T> {
   const key = resolve(directory).toLowerCase(), previous = pending.get(key) ?? Promise.resolve();
@@ -28,7 +31,7 @@ function safePath(path: string): void {
     const parent = dirname(current); if (parent === current) return; current = parent;
   }
 }
-async function readRecord(path: string): Promise<unknown | undefined> {
+async function readRecordContents(path: string): Promise<Buffer | undefined> {
   safePath(path);
   let handle;
   try { handle = await open(path, 'r'); }
@@ -41,11 +44,15 @@ async function readRecord(path: string): Promise<unknown | undefined> {
     let offset = 0;
     while (offset < buffer.length) { const result = await handle.read(buffer, offset, buffer.length - offset, offset); if (!result.bytesRead) break; offset += result.bytesRead; }
     if (offset > 20000) throw new Error('模型选择记录超过容量上限。');
-    return JSON.parse(buffer.subarray(0, offset).toString('utf8'));
+    return buffer.subarray(0, offset);
   } finally { await handle.close(); }
 }
+async function readRecord(path: string): Promise<unknown | undefined> {
+  const contents = await readRecordContents(path);
+  return contents === undefined ? undefined : JSON.parse(contents.toString('utf8'));
+}
 function currentVersion(value: ModelSelection, expected: string): ModelSelection {
-  if (value.fingerprint !== expected) throw new Error('模型版本已变化，原选择记录保留，请修复当前来源。');
+  if (value.fingerprint !== expected) throw new ModelSelectionVersionError(value);
   return value;
 }
 /** 优先读取明确选择；仅没有选择文件时幂等迁移旧手动来源，坏记录不猜测。 */
@@ -59,6 +66,15 @@ async function readSelection(directory: string, expectedFingerprint: string): Pr
   await writeSelection(directory, migrated);
   return migrated;
 }
+/** 仅供明确维护：核验完整结构但允许旧指纹，不迁移或覆盖原记录。 */
+async function readMaintenanceSelection(directory: string): Promise<ModelSelection | null> {
+  const selection = await readRecord(join(directory, 'selection.json'));
+  if (selection !== undefined) return selectionSchema.parse(selection);
+  const pointer = await readRecord(join(directory, 'active.json'));
+  if (pointer === undefined) return null;
+  const legacy = pointerSchema.parse(pointer);
+  return { schemaVersion: 1, source: 'user', userGeneration: legacy.generation, fingerprint: legacy.fingerprint, enabled: legacy.enabled, legacyDisabled: !legacy.enabled };
+}
 /** 同目录临时文件写入并 fsync 后原子替换；从不删除旧 active.json。 */
 async function writeSelection(directory: string, value: ModelSelection, signal?: AbortSignal): Promise<void> {
   const validated = selectionSchema.parse(value), contents = JSON.stringify(validated);
@@ -70,11 +86,21 @@ async function writeSelection(directory: string, value: ModelSelection, signal?:
     try { await handle.writeFile(contents); await handle.sync(); } finally { await handle.close(); }
     safePath(target);
     if (signal?.aborted) throw new Error('模型安装已取消，原模型保持。');
+    const previous = await readRecordContents(target);
+    if (previous && selectionSchema.parse(JSON.parse(previous.toString('utf8'))).fingerprint !== validated.fingerprint) {
+      // 显式升级指纹之前保存原始字节，不能用重序列化代替旧记录。
+      const backup = await open(join(directory, `.selection-backup-${randomUUID()}.json`), 'wx', 0o600);
+      try { await backup.writeFile(previous); await backup.sync(); } finally { await backup.close(); }
+    }
+    if (signal?.aborted) throw new Error('模型安装已取消，原模型保持。');
     await rename(temporary, target);
   } finally { await rm(temporary, { force: true }); }
 }
 export function readModelSelection(directory: string, expectedFingerprint: string): Promise<ModelSelection | null> {
   return serialize(directory, () => readSelection(directory, expectedFingerprint));
+}
+export function readModelSelectionForMaintenance(directory: string): Promise<ModelSelection | null> {
+  return serialize(directory, () => readMaintenanceSelection(directory));
 }
 export function writeModelSelection(directory: string, value: ModelSelection, signal?: AbortSignal): Promise<void> {
   return serialize(directory, () => writeSelection(directory, value, signal));

@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { z } from 'zod';
 import { fixedManifest, modelFingerprint, retrievalModelManifestSchema, type RetrievalModelManifest, type RetrievalModelStatus, type RetrievalModelInstallProgress } from '../shared/retrieval-model';
 import { createTrustedModelDownloader } from './retrieval-model-download';
-import { readModelSelection, writeModelSelection, type ModelSelection } from './retrieval-model-selection';
+import { ModelSelectionVersionError, readModelSelection, readModelSelectionForMaintenance, writeModelSelection, type ModelSelection } from './retrieval-model-selection';
 
 function safePath(path: string): void {
   let current = resolve(path);
@@ -95,7 +95,11 @@ export class RetrievalModelStore {
       const present = selection.source === 'bundled' ? bundledPresent : !!directory;
       if (present && directory) await validateModelDirectory(directory, this.manifest);
       return { ...base, source: selection.source, bundledPresent, enabled: selection.enabled, legacyDisabled: selection.legacyDisabled, installed: present, state: this.installing ? 'installing' : !present ? 'absent' : selection.enabled && base.qualified ? 'ready' : 'disabled' };
-    } catch { return { ...base, ...(selection ? { source: selection.source, enabled: selection.enabled, legacyDisabled: selection.legacyDisabled } : {}), bundledPresent, installed: false, state: 'error', message: '本机模型或选择记录校验失败，原文件保留；关键词仍可使用。' }; }
+    } catch (error) {
+      if (error instanceof ModelSelectionVersionError) selection = error.selection;
+      return { ...base, ...(selection ? { source: selection.source, enabled: selection.enabled, legacyDisabled: selection.legacyDisabled } : {}), bundledPresent, installed: false, state: 'error',
+        message: error instanceof ModelSelectionVersionError ? `${error.message}关键词仍可使用。` : '本机模型或选择记录校验失败，原文件保留；关键词仍可使用。' };
+    }
   }
   async getActiveDirectory(): Promise<string | null> {
     try {
@@ -122,9 +126,9 @@ export class RetrievalModelStore {
     if (this.installing || this.changing) throw new Error('模型变更正在进行，请稍后重试。');
     this.changing = true;
     try {
-      const selection = await this.selection() ?? this.defaultSelection();
+      const selection = await readModelSelectionForMaintenance(this.root) ?? this.defaultSelection();
       if (source === 'user' && !selection.userGeneration) throw new Error('没有可选择的手动模型。');
-      const next = { ...selection, source } as ModelSelection, directory = this.selectedDirectory(next);
+      const next = { ...selection, source, fingerprint: modelFingerprint(this.manifest) } as ModelSelection, directory = this.selectedDirectory(next);
       if (!directory) throw new Error('当前模型来源不存在。');
       await validateModelDirectory(directory, this.manifest);
       await writeModelSelection(this.root, next);
@@ -138,7 +142,7 @@ export class RetrievalModelStore {
     const generation = randomUUID(), stage = join(this.root, `.stage-${generation}`), destination = join(this.root, generation);
     let activated = false;
     try {
-      const selection = await this.selection() ?? this.defaultSelection();
+      const selection = await readModelSelectionForMaintenance(this.root) ?? this.defaultSelection();
       cancelled(signal); if (await this.availableSpace() < this.requiredSpace()) throw new Error('模型安装磁盘空间不足，原模型保持。'); cancelled(signal);
       safePath(this.root); mkdirSync(this.root, { recursive: true }); safePath(this.root);
       await mkdir(stage); safePath(stage);

@@ -202,9 +202,9 @@ it('内置缺失、错误 hash 或未知文件不可用且不会联网修复', a
   expect(await store.getStatus()).toMatchObject({ state: 'absent', bundledPresent: false });
   await expect(store.selectSource('bundled')).rejects.toThrow();
 });
-it('坏选择和旧版本原样保留，不能偷偷使用有效内置模型', async () => {
+it('坏选择原样保留，不能偷偷使用有效内置模型', async () => {
   const { manifest, source, target } = fixture();
-  for (const original of ['损坏', JSON.stringify({ schemaVersion: 1, source: 'bundled', fingerprint: '旧版本', enabled: false })]) {
+  for (const original of ['损坏']) {
     writeFileSync(join(target, 'selection.json'), original);
     const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
     expect((await store.getStatus()).state).toBe('error'); expect(await store.getActiveDirectory()).toBeNull();
@@ -222,4 +222,39 @@ it('停用偏好在换源和重新导入后保持，不因安装成功偷偷开�
   await store.selectSource('bundled');
   expect(await store.getStatus()).toMatchObject({ state: 'disabled', source: 'bundled', enabled: false });
   expect(await store.getActiveDirectory()).toBeNull();
+});
+it.each([
+  { record: 'selection', enabled: true, action: 'install' }, { record: 'selection', enabled: false, action: 'install' },
+  { record: 'selection', enabled: true, action: 'bundled' }, { record: 'selection', enabled: false, action: 'bundled' },
+  { record: 'active', enabled: true, action: 'install' }, { record: 'active', enabled: false, action: 'install' },
+  { record: 'active', enabled: true, action: 'bundled' }, { record: 'active', enabled: false, action: 'bundled' },
+])('旧 $record 指纹仅显式 $action 修复，enabled=$enabled 保持且旧记录不丢', async ({ record, enabled, action }) => {
+  const { manifest, source, target } = fixture(), generation = randomUUID();
+  const original = JSON.stringify(record === 'selection'
+    ? { schemaVersion: 1, source: 'user', userGeneration: generation, fingerprint: '旧版本', enabled }
+    : { generation, fingerprint: '旧版本', enabled }, null, 2);
+  writeFileSync(join(target, `${record}.json`), original);
+  const store = new RetrievalModelStore(target, { manifest, bundledDirectory: source });
+  expect(await store.getStatus()).toMatchObject({ state: 'error', source: 'user', enabled, message: expect.stringMatching(/版本/) });
+  expect(await store.getActiveDirectory()).toBeNull();
+  expect(readFileSync(join(target, `${record}.json`), 'utf8')).toBe(original);
+  if (action === 'install') await store.install({ operationId: randomUUID(), source: 'local', directory: source });
+  else await store.selectSource('bundled');
+  expect(await store.getStatus()).toMatchObject({ source: action === 'install' ? 'user' : 'bundled', enabled, installed: true });
+  expect(JSON.parse(readFileSync(join(target, 'selection.json'), 'utf8')).fingerprint).toBe(modelFingerprint(manifest));
+  if (record === 'active') expect(readFileSync(join(target, 'active.json'), 'utf8')).toBe(original);
+  else {
+    const backups = readdirSync(target).filter(name => name.startsWith('.selection-backup-'));
+    expect(backups).toHaveLength(1); expect(readFileSync(join(target, backups[0]), 'utf8')).toBe(original);
+  }
+  expect(await new RetrievalModelStore(target, { manifest, bundledDirectory: source }).getStatus()).toMatchObject({ enabled });
+  if (!enabled) expect(await store.getActiveDirectory()).toBeNull();
+});
+it('坏选择记录不能借显式安装猜测偏好，原文件和下载器保持不变', async () => {
+  const { manifest, target } = fixture(); let downloads = 0;
+  writeFileSync(join(target, 'selection.json'), '损坏原记录');
+  const store = new RetrievalModelStore(target, { manifest, download: async function* () { downloads++; yield bytes; } });
+  await expect(store.install({ operationId: randomUUID(), source: 'download' })).rejects.toThrow();
+  expect(downloads).toBe(0); expect(readFileSync(join(target, 'selection.json'), 'utf8')).toBe('损坏原记录');
+  expect(readdirSync(target)).toEqual(['selection.json']);
 });
