@@ -19,6 +19,13 @@ const require = createRequire(import.meta.url);
 const minimatch = require('minimatch').minimatch as (path: string, pattern: string) => boolean;
 const fixture = () => { const root = mkdtempSync(join(tmpdir(), 'rainsoul-pack-policy-')); roots.push(root); mkdirSync(join(root, 'dist')); return root; };
 afterEach(() => { failures.rename = false; for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+it('安装器显式关闭更新配置推断，实际builder不生成更新服务配置', async () => {
+  const packing = await createModelPackConfiguration({ projectDirectory: fixture(), args: ['--without-bundled-model', '--installer'] });
+  expect(packing.config).toHaveProperty('publish', null);
+  const { getAppUpdatePublishConfiguration } = require('app-builder-lib/out/publish/PublishManager');
+  const packager = { config: packing.config, platformSpecificBuildOptions: {}, info: { config: packing.config } };
+  expect(await getAppUpdatePublishConfiguration(packager, null, 'x64', false)).toBeNull();
+});
 it('默认builder配置实际挂接拒绝旁路门禁，显式研究配置替换该门禁', async () => {
   const packageConfig = JSON.parse(readFileSync('package.json', 'utf8')).build;
   expect(typeof packageConfig.beforePack).toBe('string');

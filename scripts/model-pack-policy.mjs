@@ -44,6 +44,8 @@ export async function createModelPackConfiguration({ projectDirectory, args = []
     mode: research ? 'research-without-model' : 'formal-bundled',
     message: research ? `研究包：本构建未捆绑模型，语义检索保持资格门禁；输出 ${output}` : `正式包：复制经仓库可信锚核验的模型；输出 ${output}`,
     config: {
+      // 本项目尚未提供自动更新；禁止根据仓库地址推断更新服务。
+      publish: null,
       directories: { output },
       beforePack: async () => {
         if (!research) await checkBundledModelPackage(input);
