@@ -1,8 +1,8 @@
 # 内置模型实际包验收记录
 
-日期：2026-10-13。最新无模型研究安装器生成、最终资源审计及指定实际EXE的32场景桌面全集通过（5.4分钟）。来源锚缺失、五资格保持false，正式权重捆绑及语义能力未放行。
+日期：2026-10-13。下方为本轮来源政策调整前的无模型研究包证据，32场景桌面全集通过（5.4分钟）。用户现已批准固定公开来源/许可/hash依据，精确转换链为补充；新含模型实际包尚待记录，旧证据不自动放行语义能力。
 
-## 当前产物与身份
+## 历史无模型产物与身份
 
 目录：E:/soulrain/release/research-without-model/35492ba6-3fc7-4034-a7e3-c2230f157386/。源码构建基线 b19fa47，后续本轮记录仅改文档。RainSoul 1.3.0、Electron 44.7.0、Windows x64；真实IPC确认app.isPackaged=true，执行路径与资源路径匹配指定包。
 
@@ -42,11 +42,11 @@ exit $testExit
 | 停用与重启 | enabled从true变false，重启保持，来源/资格不变 |
 | 保存/重启、归档、删除恢复 | 实际EXE全集通过 |
 | 关键词性能 | 百万统计字/千条知识、200正式样本、20预热另计；P95=174.60ms≤1秒，不是语义性能 |
-| 固定来源/转换链 | 缺证据，正式捆绑阻断 |
+| 当时固定来源/转换链 | 当时缺证据并阻断；本轮政策调整及来源材料见[资格记录](retrieval-model-qualification.md) |
 | 系统观测零出站 | 未执行，渲染上下文offline不能代替 |
 | 模型加载/内存/千条索引/语义200查询 | 无模型包不适用，真实模型待验 |
 | 独立人工质量集 | 未完成 |
-| 真实云/干净Windows10/11安装升级卸载 | 未执行 |
+| 本包真实云/干净Windows10/11安装升级卸载 | 未执行；本轮开发入口部分真实云成功另见[云报告](real-cloud-validation-2026-10-13.md)，不算本包通过 |
 
 ## 持久证据与失败记录
 
@@ -58,6 +58,10 @@ exit $testExit
 
 ## 旧资格命令边界
 
-qualify-retrieval-model.mjs与qualify-retrieval-performance.mjs使用研究权重、源码Worker/适配器及开发者预标注夹具，不核验当前EXE。结果不自动放行当前来源、资源、系统隔离或独立质量。来源允许后须将来源材料、实际包/资源hash、系统网络和独立质量集身份绑定当前完整指纹重新验收。
+qualify-retrieval-model.mjs与qualify-retrieval-performance.mjs使用研究权重、源码Worker/适配器及开发者预标注夹具，不核验当前EXE。结果不自动放行当前来源、资源、系统隔离或独立质量。本轮实际包验收须绑定固定来源材料、完整manifest指纹、EXE/ASAR/运行库/WASM/权重hash及固定质量集身份；JS网络入口拦截与系统抓包分别声明。固定中文标签是开发者预标注，不能改称独立真人审核。
 
 最终源码门禁：158文件/1477测试，覆盖率93.28/88.63/95.47/98.26%；完整typecheck/Lint/build通过、Demo74通过。acceptance另保存final-coverage.log、coverage-summary.json、demo-suite.log及keyboard步骤/辅助脚本证据。源码测试未重建dist，当前包与构建摘要仍匹配。
+
+## 本轮含模型验收步骤（结果待录）
+
+先依据固定来源锚准备五文件及notices，再串行构建含模型验收包。`scripts/accept-packaged-retrieval-model.mjs` 启动指定真实EXE，在包内运行库上校验512维向量、既定阈值和固定质量夹具，前后重算包身份。推理Worker拦截fetch及Node网络入口、renderer离线只证明该观察范围；不等于全系统抓包、UI混合索引交互或NSIS安装/卸载。完整启用后的界面、索引、缓存和保存回归另验，不能以工具存在标为通过。

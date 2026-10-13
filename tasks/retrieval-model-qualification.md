@@ -1,6 +1,6 @@
 # 本机中文嵌入模型资格研究
 
-日期：2026-10-10。任务6研究与生产运行库子任务；仅公开模型，不读取作者作品。研究目录不提交。
+日期：2026-10-13更新；下方数值为2026-10-10研究证据。任务6研究与生产运行库子任务；仅公开模型，不读取作者作品。研究目录不提交。
 
 ## 状态与固定选择
 
@@ -10,12 +10,12 @@
 
 | 证据类 | 已有证据 | 后续放行条件 |
 | --- | --- | --- |
-| 来源 | 固定候选修订、实际字节与 SHA-256、许可证 | 官方原站交叉核验并确认转换源精确修订；无法确认则从固定上游自行导出，不猜测来源 |
-| 质量 | 固定中文查询、独立校准集、Recall 与误报实测 | 独立人员复核相关性标签；固定标签后复跑，不用验收集反向调整阈值 |
-| 隔离 | 纯 CPU WASM、本地加载、JS 网络入口零尝试 | 在系统级网络观测下执行加载/索引/搜索，保留实际进程和流量证据；不把 JS 拦截当抓包 |
+| 来源 | 固定候选仓库/修订、实际字节与 SHA-256、模型卡和完整MIT原文 | 按用户2026-10-13批准写入仓库锚并逐文件校验；官方交叉和精确转换链为可选补充，不把镜像标为官方证明 |
+| 质量 | 100条知识、30验收/20校准查询，开发者预标注；Recall与误报已实测 | 在新实际包固定阈值复跑，不用验收集调参；未完成人工独立复核必须披露 |
+| 隔离 | 纯 CPU WASM、本地加载、JS 网络入口零尝试 | 新实际包离线加载、索引/搜索按观察范围留证；系统级网络观测另记，未执行不称通过 |
 | 实际包 | ASAR 与实际 EXE CPU 推理、跨批稳定性及性能 | 正式包完整离线索引/搜索与并发保存验收，补干净 Windows 矩阵；研究目录成绩不能自动开启产品开关 |
 
-四类证据分别核对后才允许修改资格标志；禁止为了展示语义模式直接设为 `true`。本轮网页错误提示修复不改变这些标志。
+四类证据分别核对后才允许修改相应资格标志；禁止为了展示语义模式直接设为 `true`。来源锚 `assets/retrieval-model-provenance.json` 固定两张模型卡和MIT原文、修订与hash。转换链不足被如实保留，但不再单独阻止捆绑；新实际包结果尚未记录。
 
 真实公开量化权重、字节hash、Windows Node与Electron主进程Worker的CPU WASM执行、生产适配器和固定质量夹具均已运行。生产资格仍有阻断项，不能据此开放语义入口或宣称任务6整体完成。
 
@@ -25,7 +25,7 @@
 - ONNX实际`model_quantized.onnx`，CLS池化、L2归一化；未使用随机向量。Transformers.js4.3.1仅用于隔离对照研究，没有进入生产依赖链。
 - BAAI参考修订不是已证明的Xenova转换源修订。转换仓库卡只声明base_model，精确转换源修订尚未核验。
 
-## 获取与实际文件清单
+## 历史获取与实际文件清单（2026-10-10）
 
 HF官方API两次连接超时；固定修订文件通过hf-mirror.com读取。量化权重实际24,010,842字节，其SHA256与固定修订Git LFS指针及镜像API一致。尚缺官方原站交叉核验，不能把镜像元数据当独立官方证明。
 
@@ -44,14 +44,14 @@ HF官方API两次连接超时；固定修订文件通过hf-mirror.com读取。�
 ## 许可证与分发依据
 
 - [BAAI固定模型卡](https://huggingface.co/BAAI/bge-small-zh-v1.5/blob/7999e1d3359715c523056ef9478215996d62a620/README.md)：frontmatter `license: mit`，文末说明模型可免费商业使用。实际卡27670字节，SHA256 c48a4eeea77f6b1d38b48ec1c5b8d4f86d5550cc43fa345a0db1b2ca1d082369。
-- [Xenova固定模型卡](https://huggingface.co/Xenova/bge-small-zh-v1.5/blob/75c43b069aac4d136ba6bc1122f995fedcfd2781/README.md)：明确为上述BAAI模型ONNX转换，没有独立license字段/文件。必须带上游版权与MIT原文并记录转换溯源；不能声明已完整证明转换源精确修订。若发布门禁无法核验，则自行从固定BAAI权重导出和量化。
+- [Xenova固定模型卡](https://huggingface.co/Xenova/bge-small-zh-v1.5/blob/75c43b069aac4d136ba6bc1122f995fedcfd2781/README.md)：明确为上述BAAI模型ONNX转换，没有独立license字段/文件。必须带上游版权与MIT原文并记录公开转换仓库的固定版本；不能声明已完整证明转换源精确修订。用户已批准不再强制取得精确转换链或自行导出。
 - [FlagEmbedding固定MIT原文](https://github.com/FlagOpen/FlagEmbedding/blob/fd1a2bdf69488ffebe0327999d4400d8c8058a0b/LICENSE)：实际保存1065字节，SHA256 587a673933425dbc36ec61268d3b954051b2d3ef3c9b322ede357976055ffdd5；生产模型清单已保留完整原文与固定链接。
 - [Transformers.js 4.3.1 Apache-2.0原文](https://github.com/huggingface/transformers.js/blob/4.3.1/LICENSE)：已读取许可正文，临时npm包也含LICENSE。分发保留许可及上游NOTICE（如有）。
 - ORT原生1.30.0固定许可已保存，用于早期研究，未分发原生DLL。最终ORT Web及common各固定提交MIT正文保存为版本fallback，SHA256均为`2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c`。
 - ORT Web固定提交`8d85527a010e294a26b274749f74294b2a32cec5`完整ThirdPartyNotices也取得；UTF-8文件338088字节、SHA256 `143764b952fdb1a7c69ce653bfba74a7744d6a8a573bfb73e235fba356c83de3`。15个原文分片在构建时按固定清单拼接并校验长度/hash，保持上游所有声明，不能缺失或改写。tokenizers npm包自带Apache许可正文。
 - 生产仅复制纯ORT WASM JavaScript/factory/权重引擎，并打包纯tokenizers；两npm包属于构建依赖。未分发Transformers/native/sharp/jinja/WebGL。声明收集器显式列出实际bundle模块，继续完整递归收集其他生产依赖。
 
-## 真实执行与复现
+## 历史真实执行与复现（2026-10-10）
 
 资格脚本：`scripts/qualify-retrieval-model.mjs`。隔离依赖安装在`.tmp-model-qualification/runtime`，使用精确版本、`--ignore-scripts`、未改产品依赖。Windows CPU二进制已随npm包提供，install-metadata的win32/x64下载需求为空，无需安装CUDA或执行postinstall。
 
@@ -74,15 +74,15 @@ HF官方API两次连接超时；固定修订文件通过hf-mirror.com读取。�
 
 初次Electron脚本在主模块顶层await app.whenReady造成无窗口启动等待；研究脚本改为直接运行不依赖窗口API的Worker后通过。已终止三个本次试验遗留进程；没有停止用户应用。
 
-## 零联网证据与剩余阻断
+## 历史零联网证据与边界
 
 脚本设`env.allowRemoteModels=false`、`allowLocalModels=true`、关闭浏览器/文件cache，加载传`local_files_only:true`。在库导入前拦截JS fetch/http/https/net/tls/dns常用联网入口，实际两次最终试验均为0尝试。
 
-该证据不是系统级抓包；原生DLL遥测关闭机制尚未核验，不声称已经满足“隐式请求与遥测关闭”的全部门禁。官方固定修订原站交叉核验、转换精确来源、完整依赖许可、系统级联网审计/原生遥测、实际打包EXE/干净安装、固定质量校准与并发保存性能仍阻断生产激活。
+该历史证据不是系统级抓包；早期原生DLL遥测关闭机制未核验，生产已改纯WASM。本轮不以官方原站或精确转换链为硬阻断，仍要求固定公开材料、依赖许可、离线加载、实际含权重EXE、固定中文质量和并发保存证据。系统网络与干净安装未执行时单独保持待验，不把JS零请求改称系统审计成功。
 
 早期原生库Windows ETW默认开启；固定源码明确`ORT_DISABLE_TELEMETRY`仅适用于POSIX1DS，不能伪称该环境变量关闭Windows ETW。生产因此使用WASM，构建不引入原生ORT绑定或DLL。纯WASM入口和本地factory不包含Windows ETW接口；固定平台源码对非`USE_POSIX_TELEMETRY`使用基础Telemetry，完整系统级流量审计仍未执行，不据JS入口0次声明网络门禁通过。
 
-## 最终生产适配器与稳定性
+## 已有生产适配器与历史稳定性证据
 
 `src/workers/retrieval/model.ts`默认加载同目录`retrieval-runtime.cjs`；`runtime.ts`仅读取固定目录的tokenizer和ONNX字节。构建输出纯`retrieval-ort-wasm.cjs`以及`retrieval-wasm/`中factory/WASM；后两文件按asarUnpack配置从`app.asar.unpacked`加载，无CDN或隐式下载后备。
 
@@ -100,7 +100,7 @@ HF官方API两次连接超时；固定修订文件通过hf-mirror.com读取。�
 
 仍是文件缓存可能已预热的新进程，不能代替生产打包/干净机器/千条索引及200查询P95验收。
 
-## 固定质量与独立校准
+## 历史固定质量与独立校准
 
 100条原创中文写作知识、30个验收查询（15改写、10关键词、5无相关）和20个独立校准查询（10正例、10无相关）在推理前固定相关ID。夹具SHA256 `787abac3aaaed9ddd30ca2e49b24da979d504ceecda88dd0e750c8a7789f2c61`；知识均小于400token；评估调用实际`ranking.ts`的复合身份/最大chunk余弦/RRF60。
 
@@ -113,7 +113,7 @@ HF官方API两次连接超时；固定修订文件通过hf-mirror.com读取。�
 | 15改写混合Recall@5 | 13/15=0.8667 |
 | 5无相关查询误报 | 1/5 |
 
-失败q3（潜台词）、q6（转场）和q28（阑尾炎麻醉误匹配写作呼吸节奏）。数值达到约定目标，但真人相关性审核、官方固定原站核验、精确转换源、系统网络审计和打包运行门禁未全部通过。清单只记录阈值，五资格旗标维持false。
+失败q3（潜台词）、q6（转场）和q28（阑尾炎麻醉误匹配写作呼吸节奏）。历史数值达到约定目标，当时真人相关性审核、官方原站核验、精确转换源、系统网络审计和打包门禁未齐，旧清单五项false。本轮来源政策已调整；新包结果与当前旗标以本记录开头和实际包记录为准。
 
 TDD覆盖adapter/runtime/安装存储/许可收集共26专项测试通过；运行库两模块覆盖Statements96.26%、Branches95.52%、Functions92.30%、Lines100%。专项ESLint、构建和diff检查通过。主任务进行完整测试/静态/实际包门禁与规范提交，临时权重/运行库/日志不提交。
 
@@ -153,8 +153,14 @@ TDD覆盖adapter/runtime/安装存储/许可收集共26专项测试通过；运�
 
 TDD定向33测试与后续2个状态/字节回归通过，新增网络和管理三模块逐文件覆盖均超过80%四维：commands97.09/93.96/95.45/100、download92.52/88.46/89.47/98，store92.55/87.15/92.59/100。owned文件ESLint无警告；全局类型检查曾通过，后续同行编辑AI审稿props的中间状态出现类型错误，由主代理完成最终全局验证。按gstack review清单复核SSRF、DNS重绑定、取消竞态、路径和原子激活，修复旧资格状态一致性问题。完整构建/桌面/全套验证由主代理串行执行，避免并行构建删除产物。五资格旗标、阈值与实际推理开关保持原状。
 
-## 最终实际EXE的CPU运行库证据
+## 历史实际EXE的CPU运行库证据（2026-10-10）
 
 2026-10-10串行生成`release/source-intelligence-20261010/RainSoul Setup 1.3.0.exe`成功。在其实际`win-unpacked/RainSoul.exe`中加载`app.asar/dist/desktop/retrieval-runtime.cjs`，隔离用户资料，仅读取固定公开研究权重；两个合成文本输出[2,512]有限Float32，同一文本另次推理最大差0，拦截的JS fetch尝试0，factory/WASM解包资源齐全。结果保存在该目录`packaged-runtime-report.json`，没有修改五资格旗标或产品激活配置。
 
 49个构建文件逐一SHA-256匹配，7423个包成员未混入作者库、归档、凭据配置或研究权重；Electron/Chromium及额外第三方许可文件存在。安装器133339238字节，SHA-256`b1ff4a7e5d1e577881c5b1cf106bb1a1cc82b27074a3c75ee20b5bfe2351ea88`，实查NotSigned。包完整性和CPU冒烟通过不能代替完整离线语义客户端、系统网络抓包、官方固定来源/转换溯源、真人质量审核或干净Windows安装矩阵，因此资格继续保持false。
+
+## 新含模型实际包验收（2026-10-13，待录结果）
+
+先准备已记录的固定权重和notices，构建资格未放行的含模型验收包，再启动指定真实EXE测量。报告绑定完整清单、固定质量夹具、EXE、ASAR、包内运行库、旁树WASM和五文件hash；运行前后身份必须一致。旧研究目录、模拟向量、小样本或更改过标签的夹具不能替代本次资格证据。
+
+本轮允许精确转换链缺失，未取消离线/质量/包测试。JS入口拦截证明范围必须写入报告，系统抓包未执行就保持未执行；独立真人审核同理。最新产物与状态以[bundled-model-acceptance.md](bundled-model-acceptance.md)记录为准，不能从本节步骤推导已通过。
