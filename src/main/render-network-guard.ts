@@ -97,7 +97,7 @@ export async function installRenderNetworkGuard(session: Session, broker: Broker
         else resource = await broker.fetch(url, entry.type, controller.signal, request.method);
         const headers = new Headers(resource.headers); headers.append('content-security-policy', restrictiveCsp);
         headers.set('x-content-type-options', 'nosniff');
-        return new Response(new Uint8Array(resource.bytes), { status: 200, headers });
+        return new Response(new Uint8Array(resource.bodyBytes ?? resource.bytes), { status: 200, headers });
       } catch {
         if (type === 'stylesheet' && !closed && !failed && !signal.aborted) {
           try { broker.assertHealthy(); proxy.assertHealthy(); warn('样式未完整加载。'); return new Response(null, { status: 403 }); } catch { /* 安全或预算失败必须终止。 */ }

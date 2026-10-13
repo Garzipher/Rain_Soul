@@ -17,6 +17,13 @@ function fixture(){
   const renderer=new RestrictedWebRenderer(dependencies);
   return {renderer,dependencies,window,contents,broker,guard,observer};
 }
+it('规范浏览器正文不会替换原始解压HTML证据', async () => {
+  const f=fixture(),raw=Buffer.from('d6d0cec4','hex');
+  const initial={bytes:raw,bodyBytes:Buffer.from('中文'),finalUrl:'https://article.example.com/page',contentType:'text/html; charset=utf-8',headers:{}};
+  f.broker.initialize.mockResolvedValue(initial);
+  const result=await f.renderer.render(initial.finalUrl,new AbortController().signal);
+  expect(result.rawBytes).toEqual(raw); expect(f.dependencies.installGuard).toHaveBeenCalledWith(expect.anything(),expect.anything(),expect.any(AbortSignal),initial);
+});
 it('捕获前建立观察与独立进程核对，等待安静；保留原HTML和独立DOM哈希并清理',async()=>{
   const f=fixture(),result=await f.renderer.render('https://article.example.com/page',new AbortController().signal);
   expect(result.rawBytes.toString()).toBe('原始HTML');expect(result.domBytes.toString()).toContain('动态正文');

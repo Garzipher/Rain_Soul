@@ -2,11 +2,12 @@ import { EventEmitter } from 'node:events';
 import type { Session, WebContents, OnBeforeRequestListenerDetails } from 'electron';
 import { afterEach, expect, it, vi } from 'vitest';
 import { installRenderNetworkGuard, type RenderNetworkGuard } from '../../src/main/render-network-guard';
+import type { RenderResource } from '../../src/main/render-resource-broker';
 
 const guards: RenderNetworkGuard[] = [];
 afterEach(async () => { await Promise.allSettled(guards.splice(0).map(guard => guard.close())); });
 const initial = { finalUrl: 'https://article.example.com/page', bytes: Buffer.from('<p>文章</p>'), contentType: 'text/html; charset=utf-8', headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "script-src 'none'" } };
-function fixture() {
+function fixture(resource: RenderResource & { finalUrl: string } = initial) {
   const events = new EventEmitter(), steps: string[] = [];
   let before: ((details: OnBeforeRequestListenerDetails, callback: (value: { cancel?: boolean }) => void) => void) | null = null;
   let handler: ((request: Request) => Response | Promise<Response>) | undefined;
@@ -22,12 +23,21 @@ function fixture() {
   const broker = { fetch: vi.fn(async () => ({ bytes: Buffer.from('const 文章=1;'), contentType: 'text/javascript', headers: { 'content-type': 'text/javascript' } })), assertHealthy: vi.fn(), close: vi.fn(async () => { steps.push('broker'); }) };
   const contents = Object.assign(new EventEmitter(), { session, setWindowOpenHandler: vi.fn() });
   const controller = new AbortController();
-  return { session, broker, controller, steps, contents, async install(attach = true) { const guard = await installRenderNetworkGuard(session as unknown as Session, broker, controller.signal, initial); guards.push(guard); if (attach) guard.attachWebContents(contents as unknown as WebContents); return guard; },
+  return { session, broker, controller, steps, contents, async install(attach = true) { const guard = await installRenderNetworkGuard(session as unknown as Session, broker, controller.signal, resource); guards.push(guard); if (attach) guard.attachWebContents(contents as unknown as WebContents); return guard; },
     request(url: string, resourceType = 'script', method = 'GET', id = 1) { const result = vi.fn(); before!({ id, url, method, resourceType } as OnBeforeRequestListenerDetails, result); return result.mock.calls[0][0]; },
     serve(url: string, method = 'GET') { return handler!(new Request(url, { method })); },
     complete(id: number) { session.webRequest.onCompleted.mock.calls[0][0]({ id, resourceType: 'xhr' }); },
   };
 }
+it('浏览器只读取规范body，初始原字节仍留给证据链', async () => {
+  const raw = Buffer.from('d6d0cec4', 'hex'), bodyBytes = Buffer.from('<p>中文</p>');
+  const resource = { ...initial, bytes: raw, bodyBytes, headers: { ...initial.headers, 'content-length': String(bodyBytes.length) } };
+  const f = fixture(resource); await f.install();
+  expect(f.request(initial.finalUrl, 'mainFrame')).toEqual({ cancel: false });
+  const response = await f.serve(initial.finalUrl);
+  expect(await response.text()).toBe('<p>中文</p>'); expect(response.headers.get('content-length')).toBe(String(bodyBytes.length));
+  expect(resource.bytes).toEqual(raw);
+});
 it('代理就绪且旧连接关闭后才安装正文通道，移除环回绕过且没有直连回退', async () => {
   const f = fixture(); let ready!: () => void; f.session.setProxy.mockImplementation(() => new Promise<void>(resolve => { ready = resolve; }));
   const installed = f.install(); while (!ready) await new Promise(setImmediate);

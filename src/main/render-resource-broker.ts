@@ -8,7 +8,8 @@ import { createGunzip, createBrotliDecompress, createInflate } from 'node:zlib';
 import type { PublicWebDependencies } from './public-web-transport';
 import { isPublicWebIp, publicWebAddress } from './public-web-address';
 import { renderLimits } from './restricted-render-policy';
-export interface RenderResource { bytes: Buffer; contentType: string; headers: Record<string,string> }
+import { normalizeRestrictedHtml } from './restricted-html-encoding';
+export interface RenderResource { bytes: Buffer; bodyBytes?: Buffer; contentType: string; headers: Record<string,string> }
 export interface BrokerOptions { initialUrl: string; deadline: number; signal: AbortSignal; dependencies?: PublicWebDependencies }
 export class RenderResourceBroker {
   private readonly controller = new AbortController();
@@ -101,14 +102,22 @@ export class RenderResourceBroker {
           url = new URL(location, address.url).href; continue;
         }
         if (status !== 200) throw new Error('网页资源未返回可用内容。');
-        const contentType = this.header(response, 'content-type'), mime = contentType.split(';')[0].trim().toLowerCase();
+        let contentType = this.header(response, 'content-type'); const mime = contentType.split(';')[0].trim().toLowerCase();
         const accepted = type === 'mainFrame' ? ['text/html','application/xhtml+xml'] : type === 'script' ? ['text/javascript','application/javascript','application/ecmascript','text/ecmascript'] : type === 'stylesheet' ? ['text/css'] : ['application/json','text/json','text/plain','text/html','application/xhtml+xml'];
         if (!accepted.includes(mime)) throw new Error('网页资源MIME不受支持。');
-        const headers: Record<string,string> = { 'content-type': contentType, 'content-length': String(bytes.length) };
+        let bodyBytes: Buffer | undefined;
+        if (type === 'mainFrame') {
+          const normalized = normalizeRestrictedHtml(bytes, contentType, renderLimits.maxResponseDecodedBytes);
+          bodyBytes = normalized.bytes; contentType = normalized.contentType;
+          // 原始展开字节已经计入预算，转码增长也占用任务总容量。
+          this.decoded += Math.max(0, bodyBytes.length - bytes.length);
+          if (this.decoded > renderLimits.maxTotalDecodedBytes) throw this.fatal('资源累计展开大小超限。');
+        }
+        const headers: Record<string,string> = { 'content-type': contentType, 'content-length': String((bodyBytes ?? bytes).length) };
         for (const name of ['content-security-policy','content-security-policy-report-only','x-content-type-options']) {
           const value = this.header(response,name); if (value && name !== 'content-security-policy-report-only') headers[name] = value;
         }
-        return { bytes, contentType, headers, finalUrl: address.url };
+        return { bytes, ...(bodyBytes ? { bodyBytes } : {}), contentType, headers, finalUrl: address.url };
       } finally { response.destroy(); }
     }
   }

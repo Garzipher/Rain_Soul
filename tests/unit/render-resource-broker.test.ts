@@ -22,6 +22,33 @@ function fixture(replies: Reply[] = [{}]) {
   return { broker, openRequest, resolveHost, streams };
 }
 afterEach(() => vi.useRealTimers());
+it('初始GBK原字节保留证据，浏览器响应与长度仅使用规范UTF8', async () => {
+  const raw = Buffer.concat([Buffer.from('<meta charset=gbk><p>'), Buffer.from('d6d0cec4', 'hex'), Buffer.from('</p>')]);
+  const f = fixture([{ headers: { 'content-type': 'text/html; charset=gbk', 'content-encoding': 'gzip' }, bytes: gzipSync(raw) }]);
+  try {
+    const result = await f.broker.initialize();
+    expect(result.bytes).toEqual(raw);
+    expect(result.bodyBytes?.toString()).toBe('<meta charset=utf-8><p>中文</p>');
+    expect(result.contentType).toBe('text/html; charset=utf-8');
+    expect(result.headers['content-type']).toBe(result.contentType);
+    expect(result.headers['content-length']).toBe(String(result.bodyBytes?.length));
+    expect(result.headers['content-encoding']).toBeUndefined();
+  } finally { await f.broker.close(); }
+});
+it('HTML转码增长占用单资源及任务累计展开预算，编码冲突阻断整次任务', async () => {
+  const prefix = Buffer.from('<meta charset=gbk>'), chinese = Buffer.from('d6d0', 'hex');
+  const oversized = fixture([{ headers: { 'content-type': 'text/html; charset=gbk', 'content-encoding': 'gzip' }, bytes: gzipSync(Buffer.concat([prefix, Buffer.alloc(4 * 1024 * 1024, chinese)])) }]);
+  const error = await oversized.broker.initialize().then(() => '未拒绝', (reason: Error) => reason.message);
+  expect(error).toMatch(/展开|容量|预算/); await oversized.broker.close();
+  const conflict = fixture([{ bytes: Buffer.from('<meta charset=gbk>') }]);
+  await expect(conflict.broker.initialize()).rejects.toThrow(/编码.*冲突/); expect(() => conflict.broker.assertHealthy()).toThrow(); await conflict.broker.close();
+  const cumulative = fixture([{ headers: { 'content-type': 'text/html; charset=gbk', 'content-encoding': 'gzip' }, bytes: gzipSync(Buffer.alloc(3 * 1024 * 1024, chinese)) }, ...Array.from({length:4},()=>({headers:{'content-type':'text/plain','content-encoding':'gzip'},bytes:gzipSync(Buffer.alloc(5*1024*1024))}))]);
+  try {
+    await cumulative.broker.initialize();
+    for(let i=0;i<3;i++) await cumulative.broker.fetch(`https://article.example.com/large${i}`,'xhr');
+    await expect(cumulative.broker.fetch('https://article.example.com/large3','xhr')).rejects.toThrow(/累计/);
+  } finally { await cumulative.broker.close(); }
+});
 it('初始重定向固定最终origin，脚本只读同源且固定公网IP；过滤状态头和旧长度', async () => {
   const f = fixture([{ status: 302, headers: { location: 'https://final.example.com/article' }, bytes: Buffer.from('跳转') }, { headers: { 'set-cookie': ['secret'], refresh: '0;url=https://bad.example.com', link: '<https://bad.example.com>;rel=prefetch', 'content-security-policy': "script-src 'self'", 'content-length': '999' } }, { headers: { 'content-type': 'text/javascript' }, bytes: Buffer.from('document.body.textContent="文章"') }]);
   const initial = await f.broker.initialize();
@@ -153,7 +180,7 @@ it.each([['br',brotliCompressSync],['deflate',deflateSync]] as const)('资源%s�
 it('单响应展开超过5MiB与累计压缩超过12MiB均停止，重定向计入请求数', async () => {
   const expanded=fixture([{}, {headers:{'content-type':'text/plain','content-encoding':'gzip'},bytes:gzipSync(Buffer.alloc(5*1024*1024+1))}]);
   await expanded.broker.initialize(); await expect(expanded.broker.fetch('https://article.example.com/a','xhr')).rejects.toThrow(/单资源展开/); await expanded.broker.close();
-  const compressed=fixture(Array.from({length:7},()=>({bytes:Buffer.alloc(2*1024*1024)})));
+  const compressed=fixture(Array.from({length:7},()=>({bytes:Buffer.alloc(2*1024*1024,'a')})));
   await compressed.broker.initialize(); for(let i=0;i<5;i++) await compressed.broker.fetch(`https://article.example.com/a${i}`,'xhr');
   await expect(compressed.broker.fetch('https://article.example.com/over','xhr')).rejects.toThrow(/累计压缩/); await compressed.broker.close();
   const redirects=fixture([{},...Array.from({length:78},()=>({})),{status:302,headers:{location:'/next'}}]);
