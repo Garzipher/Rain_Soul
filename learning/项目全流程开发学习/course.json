@@ -58,7 +58,9 @@
     { "key": "source-intelligence", "title": "第九卷 来源与本机检索", "chapters": [
       { "key": "source-intelligence/01", "title": "公开网页到冻结来源", "file": "09-来源与本机检索/01-公开网页到冻结来源.md" },
       { "key": "source-intelligence/02", "title": "草稿回执与跨作品证据", "file": "09-来源与本机检索/02-草稿回执与跨作品证据.md" },
-      { "key": "source-intelligence/03", "title": "本机向量与混合检索", "file": "09-来源与本机检索/03-本机向量与混合检索.md" }
+      { "key": "source-intelligence/03", "title": "本机向量与混合检索", "file": "09-来源与本机检索/03-本机向量与混合检索.md" },
+      { "key": "source-intelligence/04", "title": "受限浏览器与来源证据", "file": "09-来源与本机检索/04-受限浏览器与来源证据.md" },
+      { "key": "source-intelligence/05", "title": "内置模型资源与资格验收", "file": "09-来源与本机检索/05-内置模型资源与资格验收.md" }
     ] }
   ]
 }
