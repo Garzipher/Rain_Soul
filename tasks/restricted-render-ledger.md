@@ -56,3 +56,12 @@ Claude Mem及Compound Engineering的可调用持久化接口本轮未提供；�
 5cb0817补回归并修复观察器关闭/任务退出；正常清理也在核对独立PID与creationTime后结束任务进程，避免window.destroy后renderer暂留。主协调复验21项单元通过。91b95c3记录真实运行时夹具：2026-10-13T04:30:07.313Z六项全部passed，所有remainingTaskProcess=false；死循环取消1,149ms。开发依赖Electron二进制、注入传输与系统/实际包pending边界见[资格报告](restricted-render-qualification.md)。
 
 881971b对应UI后新增e9f4d41四项真实桌面验证通过，覆盖static、restricted-browser及旧未知捕获历史草稿；合成草稿不表示实时渲染资格。Demo74项完整回归通过（2.9分钟）。完整单元首轮在源码修复期间混用前后版本已停止，不计通过；稳定版完整门禁另记。
+
+## 边界审查补修
+
+- ce30ec1：DOM节点与属性共同占用20,000配额，NamedNodeMap逐项读取；新增三回归先失败，12项专项通过，覆盖率语句97.18%、分支92.85%、函数/行100%。
+- 48ecc2f：并发名额直接转交队首，修复微任务唤醒前新请求抢槽导致五条在途连接；原触发回归先失败，再通过。
+- c9b2e69：about:blank初始化挂起时取消也核对PID/creationTime；未知或共享进程不强杀且阻断重试，独立进程仍须证实退出。四类回归先失败再通过。
+- 主协调者对broker、renderer、observer复验51项通过；独立只读审查未发现剩余High/Medium。以上专项不是完整回归总数。
+
+另一次规格核对发现HTML编码规范尚缺，f6c676f抽取严格解码原语，678f98b补齐GBK/UTF-8转换、HTTP/BOM/meta冲突拒绝、声明数量和转码字节预算。初始解压原字节始终用于rawHash，浏览器单独使用规范正文；响应长度和类型重算。接线回归先3失败/65通过，再六文件100项通过；类型断言修订后renderer18项通过，限定ESLint和类型检查通过。独立复读无确认High/Medium。正式资格仍保持关闭；源码冻结后的完整门禁另行记录。
