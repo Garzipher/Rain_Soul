@@ -23,18 +23,20 @@ npx playwright test --config playwright.desktop.config.cjs tests/desktop/restric
 
 21 项定向单元通过，覆盖关闭顺序、取消终止模式、一秒清理期限、正常结束任务进程、身份或共享关系变化时不得误杀作者进程，以及生产适配器窗口配置。类型检查和定向 ESLint 通过。实际并发运行曾触发一秒清理门禁，未将这些清理错误计为负向隔离通过；停止并发验证后保持原期限串行复核，六项全部通过。
 
-最终运行：`2026-10-13T04:30:07.313Z`；Playwright `1 passed (20.6s)`。原始报告：`test-results-restricted-runtime/restricted-web-runtime-真实Electron动态正文、CSP提前拒绝与死循环取消清理/restricted-render-runtime-report.json`。测试 bundle SHA256：`30e1e7f665df69242b88016747ea3a9fb73675fd59fe9a62210397076a139837`；该轮输入夹具 hash：`c81f256040491a8051df91ffcd39f00cac29102936af6cdf9c9bde9a70b67bb0`（包含随机监听端口）。
+最终运行：`2026-10-13T06:04:56.492Z`，纳入32场景完整桌面回归，该运行时场景包含六夹具全部通过。原始报告：`test-results-final-research-pack/restricted-web-runtime-真实Electron动态正文、CSP提前拒绝与死循环取消清理/restricted-render-runtime-report.json`，另持久保存于研究包 `release/research-without-model/35492ba6-3fc7-4034-a7e3-c2230f157386/acceptance/`。测试 bundle SHA256：`fdaf69bc4d606046625c261792d6847e341cb202e8b0c9ef4a2860313a0cc839`；该轮输入夹具 hash：`e88429d4c80db4225a9ec51061c19306a37d0099311a10da62d0672db81060b0`（包含随机监听端口）。
 
 | 夹具 | 结果 | 耗时 | 任务进程/窗口剩余 |
 | --- | --- | --- | --- |
-| 内联脚本生成正文 | passed | 4637ms | 0 / 0 |
-| 同源外部 script/fetch/XHR 正文 | passed | 920ms | 0 / 0 |
-| CSP 跨源脚本提前拒绝 | passed | 266ms | 0 / 0 |
-| CSP 跨源 fetch 即使被页面 catch | passed | 225ms | 0 / 0 |
-| 私网 HTTPS POST 拒绝 | passed | 168ms | 0 / 0 |
-| 无限循环文档取消 | passed | 1149ms | 0 / 0 |
+| 内联脚本生成正文 | passed | 9413ms | 0 / 0 |
+| 同源外部 script/fetch/XHR 正文 | passed | 891ms | 0 / 0 |
+| CSP 跨源脚本提前拒绝 | passed | 250ms | 0 / 0 |
+| CSP 跨源 fetch 即使被页面 catch | passed | 186ms | 0 / 0 |
+| 私网 HTTPS POST 拒绝 | passed | 165ms | 0 / 0 |
+| 无限循环文档取消 | passed | 1132ms | 0 / 0 |
 
 六项受控 TCP 连接、上传字节、UDP 包计数均为 0。输出保留 `productionCapability.enabled=false`，未据此提升生产资格。日志中的 `NO_COLOR`/`FORCE_COLOR` 冲突是 Playwright 终端色彩环境提示，不影响机制验证。
+
+虽在指定新实际EXE的桌面全集中执行，运行时脚本依然启动开发依赖Electron与独立测试bundle；报告保存到研究包不改变其证据归属。产品EXE验证的是静态入口可用、受限入口资格禁用、旧来源/审核草稿兼容与小窗口交互。产品内实际动态渲染资格继续pending。
 
 ## 证据边界与剩余门禁
 

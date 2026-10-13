@@ -18,15 +18,15 @@
 
 来源脚本经历固定长度读取的RED→GREEN：stat后readFile会被并发增长绕过预算，改为最多声明长度+1字节。正式CLI/env不能传入可信锚；fixture注入仅用于纯函数验证。
 
-独立审查发现首次安装无selection时可能将资格false写成偏好false；补回归并保持默认作者偏好，资格继续独立阻断推理。最终修复提交与验证在完整验证后更新。
+独立审查发现首次安装无selection时可能将资格false写成偏好false；已补回归修复并保持默认作者偏好，最终新包实际IPC也验证偏好true/资格false。
 
-审查修复已提交：ddca699保持首次导入默认偏好（39项专项）；6ee801f提供旧指纹的显式维护，核验合法结构、保留enabled并备份旧原字节（48项专项）；d93f54f挂接默认builder拒绝hook，授权入口显式替换并复核来源（主复验15项专项）。以上限定lint与typecheck已通过。进一步实际包成员白名单检查进行中，未宣称全包敏感成员审计完成。
+审查修复已提交：ddca699保持默认偏好（39项专项）；6ee801f维护旧指纹、保留enabled及备份（48项专项）；d93f54f默认builder拒绝hook（15项专项），静态检查通过。当时成员审计尚未完成；后续实际成员与敏感资源检查已实现，并在最新研究包独立重算通过，见本记录末尾。
 
 ## 真实产物证据
 
-本轮显式无模型研究包：release/research-without-model/03cd3b17-c92c-4abb-b36a-327785535dc8/win-unpacked/RainSoul.exe。实际EXE/ASAR哈希、Electron44.7.0、截图和通过场景见[bundled-model-acceptance.md](bundled-model-acceptance.md)。报告持久保存在产物同级acceptance。
+历史无模型目录包：release/research-without-model/03cd3b17-c92c-4abb-b36a-327785535dc8/win-unpacked/RainSoul.exe，其报告保存在旧产物acceptance。最新35492ba6研究安装器/EXE/hash与32场景结果见[bundled-model-acceptance.md](bundled-model-acceptance.md)。
 
-通过内容为：资源与ASAR无权重、真实IPC关键词与混合/语义回退、停用重启保持、写作保存读回。打包后新增源码修复不属于该旧哈希产物；最终完整构建后应生成新独立研究包，按新哈希重验。
+旧包通过资源无权重、IPC回退、偏好重启及写作保存；新增源码不属于旧哈希。已生成最终新研究包并按新hash重验，不能沿用旧专项代替新全集。
 
 ## 来源与资格
 
@@ -59,3 +59,19 @@ Claude Mem及Compound Engineering未提供可调用持久化接口，未写入�
 4a97835补齐实际作者资料、云配置、草稿、索引及原子写临时文件的拒绝；解包文件独立读取长度和SHA-256，ASAR声明空文件不能掩盖非空物理字节。d537676将报告改为同目录临时写入、同步、关闭后原子替换，重复打包不因旧报告必失败；失败保留旧报告和其他证据，未知文件与junction拒绝。触发点均有RED→GREEN，主复验三个文件69项通过；audit与policy各四维覆盖率均≥80%，独立审查未发现剩余High/Medium。
 
 成员审计与模型来源校验职责独立。实际新包仍须按最终构建重新生成和验收，旧03cd3b17目录的证据不自动延伸到新提交。来源锚及五资格未改变。
+
+## 最终研究安装器与源码回归（2026-10-13）
+
+b764989关闭更新推断、3b8749f补EBUSY/open有界重试、a452161关闭普通用户提权助手、56445dd构建结束复审最终资源。先失败再修复，42项定向GREEN、完整typecheck/Lint/build及独立review通过；来源锚与五资格未改。
+
+最终研究安装器UUID35492ba6-3fc7-4034-a7e3-c2230f157386生成，32场景桌面全集全部通过（5.4分钟）；实际包独立重算6805文件/119解包成员并核对savedAudit。首次偏好true与资格false独立，停用跨启动保持，keyword ready、hybrid/semantic fallback，正文重启保持。Demo74通过；实际EXE小窗口设置/键盘检查通过。关键词200样本P95=174.60ms，不是模型质量或向量性能。
+
+真实云、来源/转换链、系统网络、有模型实际包冷加载/内存/索引与独立人工质量、干净Windows矩阵仍待验。验收报告、包hash、签名及全部失败尝试见bundled-model-acceptance.md。最终源码覆盖率见下方最终完整源码门禁，旧专项和旧包结果不合并为当前完整门禁。
+
+## 最终完整源码门禁
+
+冻结代码全套覆盖率复验：158文件、1477测试通过，455.20秒，日志.p0-final4-all-coverage.log；语句93.28%、分支88.63%、函数95.47%、行98.26%。受限渲染/模型/最终审计新增核心模块各四维≥80%；最终审计与Windows重试四维100%，model-pack-policy分支80%，CLI包校验四维100%。早期1456/1465全套和17专项只属当时证据，不相加为1477。
+
+静态检查.p0-final3-typecheck.log、.p0-final3-lint.log与生产构建.p0-final3-build.log通过。当前实际研究包32场景和Demo74通过，新包小窗口键盘路径保存于acceptance/narrow-ui-check-source.cjs、narrow-ui-steps.txt；只证明记录操作，不当作完整WCAG验收。独立审查无确认High/Medium，教材九卷43章26图编译通过。
+
+开发门禁已通过，功能状态仍是研究交付：实际产品渲染资格、可信来源与有模型实际包/独立质量/系统网络、真实云及干净Windows矩阵未完成，最终发布门禁不得标为全部通过。

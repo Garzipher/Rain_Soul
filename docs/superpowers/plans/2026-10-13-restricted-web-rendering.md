@@ -8,9 +8,9 @@
 
 **Tech Stack:** Electron 44.7.0、Node HTTPS、React/TypeScript、SQLite、Readability worker、Vitest、Playwright。
 
-**Spec:** [已确认规格](../specs/2026-10-12-restricted-web-rendering-design.md)。状态：用户已批准并授权实施；实现与专项验证进行中，逐项证据见 tasks/restricted-render-ledger.md。
+**Spec:** [已确认规格](../specs/2026-10-12-restricted-web-rendering-design.md)。状态：用户已批准并授权实施；实现与独立审查完成，最新研究包回归通过、正式资格待验，逐项证据见 tasks/restricted-render-ledger.md。
 
-**进度口径（2026-10-13）：** 勾选表示已有实现、提交或对应专项证据，不表示全部最终门禁通过。原始 RED 命令无独立失败记录时保留未勾选，不能从后续 GREEN 反推；各批专项数字有重叠，不相加。完整稳定版测试、最终构建/实际包及系统网络验收仍待主协调者统一记录。HTML 编码规范补修已通过六文件100项专项、类型及独立审查（678f98b），完整回归仍在执行。
+**进度口径（2026-10-13）：** 勾选仅表示已有实现或对应证据；原始RED缺记录不从GREEN反推，专项不相加。最新研究安装器及实际EXE32桌面场景、74Demo、最终资源审计和小窗口检查通过，独立代码review完成；最终源码158文件/1477测试及核心覆盖率门禁通过，详见ledger。模型来源/五资格、系统网络、产品EXE实际动态渲染、真实云和干净Windows继续pending。
 
 ## Global Constraints
 
@@ -106,7 +106,7 @@ GSD Core 波次：任务 1→2→3→4；任务 5 在任务 1 后可独立进行
 
 ### 任务 7：实际 Electron/EXE 隔离验收
 
-**Files:** 新建 tests/desktop/restricted-web-rendering.spec.cjs（产品UI/历史草稿）、tests/desktop/restricted-web-runtime.spec.cjs（真实渲染运行时）、scripts/qualify-restricted-render.mjs、tasks/restricted-render-qualification.md；新增核心模块已纳入 Vitest coverage 配置，完整覆盖率门禁待最终运行。
+**Files:** 新建 tests/desktop/restricted-web-rendering.spec.cjs（产品UI/历史草稿）、tests/desktop/restricted-web-runtime.spec.cjs（真实渲染运行时）、scripts/qualify-restricted-render.mjs、tasks/restricted-render-qualification.md；新增核心模块已纳入 Vitest coverage 配置，最终158文件1477测试及核心覆盖率门禁通过。
 
 **Interfaces:** 资格脚本只通过测试入口使用受控 DNS/监听目标，正式构建不存在旁路配置。输出记录包 SHA256、系统、Electron 版本、policyVersion、输入、网络连接/上传证据和清理结果；缺证据结果为 pending。
 
@@ -123,9 +123,9 @@ GSD Core 波次：任务 1→2→3→4；任务 5 在任务 1 后可独立进行
 **Files:** 更新 docs/Rain_Soul_PRD.md、docs/Rain_Soul_技术方案.md、docs/Rain_Soul_项目立项方案_V2.0.md；新增 learning/项目全流程开发学习/09-来源与本机检索/04-受限浏览器与来源证据.md，更新 course.json；新增 tasks/restricted-render-ledger.md。
 
 - [x] 教材/课程/产品文档与ledger已追加（`b674914`、`1169996`）；真实桌面截图来自隔离临时作品，保留旧教材；ledger区分已有RED/GREEN、提交与门禁边界。
-- [ ] 运行 npm run typecheck、npm run lint、npm test、npm run build；coverage 所有阈值≥80%，评估全部构建警告。
+- [x] 全项目typecheck/Lint/build、最终158文件1477测试通过，新增核心覆盖率≥80%；实际EXE32桌面与Demo74通过，构建提示已评估。
 - [x] 已做独立专项审查并修复观察器清理、DOM属性、并发名额与初始化取消退出；对应回归/提交有证据。
-- [ ] 最终稳定分支完整diff独立复核，修复后重复受影响验证；编码补修独立复读无High/Medium，六文件100项专项通过，完整稳定门禁仍在执行。
-- [ ] 必要 UI 手动验证键盘、确认/取消/失败、窄窗；实际包 SHA256 与资格记录一致。
+- [x] 稳定分支与最终编码/打包增量已独立复读，无确认High/Medium，受影响定向及全套门禁通过。
+- [x] 新实际EXE720×540网页入口及键盘返回通过，无横向溢出/pageerror；32桌面场景含禁用能力与历史草稿取消/恢复。实际包hash见acceptance，可信渲染资格仍null，不能伪造启用。
 - [x] 已有文档与教材中文独立提交；Claude Mem/Compound Engineering接口本轮不可用已如实记录，经验保存在教材/ledger，不写休眠gbrain。
-- [ ] 最终文档复核后提交并交付当前功能状态/实际包/剩余门禁；真实云、系统及干净Windows待验仍单列，不标最终发布完成。
+- [x] 最终文档核对当前包/hash/数字和证据边界，中文原子提交后本地合并main；真实云、系统/实际产品渲染及干净Windows仍待验，不标最终发布完成。

@@ -26,7 +26,7 @@
 
 资源预算在入队前预留，避免只限制执行队列而无限排队；broker安全拒绝传播到整个任务。初始与子资源共同计数解压/压缩字节，CSS容量或私网拒绝不能误报成普通样式警告。
 
-取消后迟到的guard/observer安装也纳入清理；核对独立PID与creationTime，并有界等待销毁后的真实退出，避免立即查看metrics误判。真实Electron测试发现观察器协议清理与window.destroy竞态：正常动态正文也会因target closed被覆写为失败。回归先失败，再调整清理顺序；最终结果在完整验证后更新。
+取消后迟到的guard/observer安装也纳入清理；核对独立PID与creationTime，并有界等待销毁后的真实退出，避免立即查看metrics误判。真实Electron测试发现观察器协议清理与window.destroy竞态：正常动态正文也会因target closed被覆写为失败。回归先失败，再调整清理顺序；历史待办已完成，最终六夹具证据见下文。
 
 UI首次RED为2文件8失败/19通过；GREEN新增逐次确认、资格查询失败禁用、URL改变不得发送、草稿保护与旧来源未知展示。主协调复验2文件28项通过；对话框已有独立2项验证。
 
@@ -39,7 +39,7 @@ UI首次RED为2文件8失败/19通过；GREEN新增逐次确认、资格查询�
 | 门槛 | 当前状态 |
 | --- | --- |
 | 单元/组件及来源迁移专项 | 已有逐批证据；新增模块纳入完整覆盖率门禁 |
-| 真实Electron反例、错误观察、清理 | 六夹具全部通过，20.6秒；仅运行时及受控靶证据 |
+| 真实Electron反例、错误观察、清理 | 历史专项20.6秒；最新06:04六夹具通过，见qualification，仅独立运行时证据 |
 | 当前实际产品包隔离运行 | 未完成 |
 | 全系统网络审计 | 未执行 |
 | 干净Windows安装/升级/卸载 | 未执行 |
@@ -65,3 +65,19 @@ Claude Mem及Compound Engineering的可调用持久化接口本轮未提供；�
 - 主协调者对broker、renderer、observer复验51项通过；独立只读审查未发现剩余High/Medium。以上专项不是完整回归总数。
 
 另一次规格核对发现HTML编码规范尚缺，f6c676f抽取严格解码原语，678f98b补齐GBK/UTF-8转换、HTTP/BOM/meta冲突拒绝、声明数量和转码字节预算。初始解压原字节始终用于rawHash，浏览器单独使用规范正文；响应长度和类型重算。接线回归先3失败/65通过，再六文件100项通过；类型断言修订后renderer18项通过，限定ESLint和类型检查通过。独立复读无确认High/Medium。正式资格仍保持关闭；源码冻结后的完整门禁另行记录。
+
+## 最终打包与实际程序回归（2026-10-13）
+
+打包期间进一步发现builder更新推断（b764989）、Windows EBUSY/open（3b8749f）、NSIS晚加elevate.exe（a452161）及afterPack不是最后修改阶段（56445dd）。均以真实失败或RED回归定位，修复后42项定向通过，独立审查无确认High/Medium；最终完整typecheck/Lint/build通过。新研究安装器及最终资源审计通过，UUID35492ba6-3fc7-4034-a7e3-c2230f157386，实际EXE/ASAR/hash见bundled-model-acceptance.md。
+
+指定实际EXE的32桌面场景全部通过（5.4分钟）、Demo74全部通过（2.0分钟）；受限运行时六夹具独立Electron证据为2026-10-13T06:04:56.492Z，不归为产品EXE渲染资格。新EXE验证了资格禁用/静态入口及三类历史来源/草稿兼容；720×540小窗口和键盘实测通过，无横向溢出或pageerror。关键词200样本P95=174.60ms，20预热另计，不是语义性能。
+
+日志：.p0-final3-real-desktop.log、.p0-final3-demo.log、.p0-final3-build.log、.p0-final3-typecheck.log、.p0-final3-lint.log、.p0-final3-research-installer.log。小窗口辅助脚本首轮路径错误不计通过，修正后.p0-final-narrow-ui-recheck.log通过。最终源码覆盖率见下方最终完整源码门禁；旧运行/包hash只作历史，未据此开放生产资格。
+
+## 最终完整源码门禁
+
+冻结代码全套覆盖率复验：158文件、1477测试通过，455.20秒，日志.p0-final4-all-coverage.log；语句93.28%、分支88.63%、函数95.47%、行98.26%。受限渲染/模型/最终审计新增核心模块各四维≥80%；最终审计与Windows重试四维100%，model-pack-policy分支80%，CLI包校验四维100%。早期1456/1465全套和17专项只属当时证据，不相加为1477。
+
+静态检查.p0-final3-typecheck.log、.p0-final3-lint.log与生产构建.p0-final3-build.log通过。当前实际研究包32场景和Demo74通过，新包小窗口键盘路径保存于acceptance/narrow-ui-check-source.cjs、narrow-ui-steps.txt；只证明记录操作，不当作完整WCAG验收。独立审查无确认High/Medium，教材九卷43章26图编译通过。
+
+开发门禁已通过，功能状态仍是研究交付：实际产品渲染资格、可信来源与有模型实际包/独立质量/系统网络、真实云及干净Windows矩阵未完成，最终发布门禁不得标为全部通过。
