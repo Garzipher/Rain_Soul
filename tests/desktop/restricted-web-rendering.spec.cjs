@@ -7,6 +7,8 @@ const { activate, temporaryDirectory, dataDirectory, launch, offlineWindow, clos
 test.setTimeout(120000);
 const hash = value => createHash('sha256').update(value).digest('hex');
 async function openBook(page) {
+  // 作品打开是异步业务操作；正文就绪后再导航，避免请求被操作门禁拒绝。
+  await expect(page.getByRole('textbox', { name: '章节标题', exact: true })).toBeEnabled();
   const expand = page.getByRole('button', { name: '展开侧栏', exact: true });
   if (await expand.isVisible()) await activate(expand);
   await activate(page.getByRole('button', { name: '知识库', exact: true }));
