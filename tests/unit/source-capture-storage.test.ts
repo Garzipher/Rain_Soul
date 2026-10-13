@@ -52,7 +52,7 @@ it('新payload3恢复证据且历史导出先校验捕获关联', () => {
 it.each([1, 2])('旧payload%s只在内存补空捕获关系且不改历史字节hash', version => {
   const { db } = fixture(), source = freezeSource(input); db.transaction(() => commitSourceAssets(db, source, [], []))();
   const snapshot = createSnapshot(db, '旧来源');
-  const current = db.prepare('SELECT * FROM snapshot WHERE id=?').get(snapshot.id) as { payload_json: string; payload_hash: string; schema_version: number };
+  const current = db.prepare('SELECT * FROM snapshot WHERE id=?').get(snapshot.id) as { id: string; title: string; payload_json: string; payload_hash: string; schema_version: number };
   const payload = JSON.parse(current.payload_json); delete payload.source_capture;
   if (version === 1) for (const name of ['source_document', 'source_segment', 'knowledge_source', 'learning_annotation']) delete payload[name];
   const bytes = JSON.stringify(payload), legacy = { ...current, payload_json: bytes, payload_hash: hash(bytes), schema_version: version };
@@ -63,7 +63,7 @@ it.each([1, 2])('旧payload%s只在内存补空捕获关系且不改历史字节
 });
 it.each(['extra', 'identity', 'kind', 'static-dom', 'duplicate'])('payload3捕获%s损坏即使重签hash也拒绝', mode => {
   const { db } = fixture(), source = freezeSource({ ...input, capture: restricted }); db.transaction(() => commitSourceAssets(db, source, [], []))();
-  const snapshot = createSnapshot(db, '证据'), row = db.prepare('SELECT * FROM snapshot WHERE id=?').get(snapshot.id) as { payload_json: string; payload_hash: string; schema_version: number };
+  const snapshot = createSnapshot(db, '证据'), row = db.prepare('SELECT * FROM snapshot WHERE id=?').get(snapshot.id) as { id: string; title: string; payload_json: string; payload_hash: string; schema_version: number };
   const payload = JSON.parse(row.payload_json), capture = payload.source_capture[0];
   if (mode === 'extra') capture.unknown = true;
   if (mode === 'identity') capture.source_id = randomUUID();

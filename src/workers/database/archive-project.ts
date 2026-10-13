@@ -10,7 +10,7 @@ import { countDocumentWords, validateDocument } from '../../shared/document';
 import { initializeSchema } from './schema';
 import { readAssets } from './assets';
 import { rebuildAssetSearch } from './assets-search';
-import { sourceAssetTables, sourceSchema as legacySourceSchema } from './source-schema';
+import { sourceAssetTables, legacySourceAssetTables, sourceSchema as legacySourceSchema } from './source-schema';
 import { readSourceAssets, normalizeSourceCoordinates } from './source-document';
 import { validateLearningPayload } from './snapshots';
 
@@ -31,13 +31,14 @@ function safePath(path: string) {
   let current = resolve(path);
   while (true) { if (lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('归档路径不允许符号链接。'); const parent = dirname(current); if (parent === current) break; current = parent; }
 }
-function trustedDb(path = ':memory:', portable = false, schemaVersion = 7): Database.Database {
+function trustedDb(path = ':memory:', portable = false, schemaVersion = 8): Database.Database {
   const db = new Database(path);
   try {
     initializeSchema(db, 'project');
     if (portable) db.exec('DROP TRIGGER search_insert; DROP TRIGGER search_delete; DROP TRIGGER search_update; DROP TABLE search_fts; DROP TABLE search_document; DROP TABLE operation_log; DROP TABLE conversation_operation;');
     if (schemaVersion < 6) { for (const table of [...sourceAssetTables].reverse()) db.exec(`DROP TABLE ${table}`); db.pragma(`user_version=${schemaVersion}`); }
     if (schemaVersion === 6) { for (const table of [...sourceAssetTables].reverse()) db.exec(`DROP TABLE ${table}`); db.exec(legacySourceSchema); db.pragma('user_version=6'); }
+    if (schemaVersion === 7) { db.exec('DROP TABLE source_capture'); db.pragma('user_version=7'); }
     if (schemaVersion === 4) {
       db.exec('DROP TABLE conversation_message; DROP TABLE conversation;'); db.pragma('user_version=4');
     }
@@ -136,6 +137,7 @@ type SourceIdentityMap = Map<string, string>;
 function remapSources(payload: Payload, identities: SourceIdentityMap) {
   const mapped = (id: string | number | null) => { const key = String(id); if (!identities.has(key)) identities.set(key, randomUUID()); return identities.get(key)!; };
   for (const row of payload.source_document) row.id = mapped(row.id);
+  for (const row of payload.source_capture) row.source_id = mapped(row.source_id);
   for (const row of payload.source_segment) { row.id = mapped(row.id); row.source_id = mapped(row.source_id); }
   for (const row of payload.knowledge_source) { row.source_id = mapped(row.source_id); row.segment_id = mapped(row.segment_id); }
   for (const row of payload.learning_annotation) row.id = mapped(row.id);
@@ -146,16 +148,16 @@ function copySnapshots(source: Database.Database, target: Database.Database, old
   const insert = target.prepare('INSERT INTO snapshot VALUES(?,?,?,?,?,?,?,?,?)');
   for (const row of rows) {
     checkRow(target, 'snapshot', row);
-    if (![1, 2].includes(row.schema_version as number) || hash(row.payload_json as string) !== row.payload_hash || (row.source_snapshot_id !== null && !ids.has(row.source_snapshot_id))) throw new Error('归档快照版本、来源或 hash 校验失败。');
+    if (![1, 2, 3].includes(row.schema_version as number) || hash(row.payload_json as string) !== row.payload_hash || (row.source_snapshot_id !== null && !ids.has(row.source_snapshot_id))) throw new Error('归档快照版本、来源或 hash 校验失败。');
     let payload: Payload;
     try { payload = JSON.parse(row.payload_json as string) as Payload; } catch { throw new Error('归档快照格式无效。'); }
-    const allowed = row.schema_version === 1 ? oldTables : tables;
+    const allowed = row.schema_version === 1 ? oldTables : row.schema_version === 2 ? [...oldTables, ...legacySourceAssetTables] : tables;
     if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).some(key => ![...allowed, ...learning].includes(key))
       || allowed.some(table => !Array.isArray(payload[table]))) throw new Error('归档快照表集合无效。');
     validateLearningPayload(payload);
     for (const table of learning) delete payload[table];
     for (const table of sourceAssetTables) if (!Object.hasOwn(payload, table)) payload[table] = [];
-    normalizeSourceCoordinates(payload);
+    if (row.schema_version === 2) normalizeSourceCoordinates(payload);
     const check = trustedDb();
     try { check.transaction(() => { insertRows(check, payload); checkGraph(check, oldId); })(); }
     catch (error) { throw new Error(`归档快照关系校验失败：${error instanceof Error ? error.message : '无效内容'}`, { cause: error }); }
@@ -163,6 +165,7 @@ function copySnapshots(source: Database.Database, target: Database.Database, old
     payload.work_meta[0].id = newId;
     if (oldId !== newId) remapSources(payload, identities);
     if (row.schema_version === 1) for (const table of sourceAssetTables) delete payload[table];
+    if (row.schema_version === 2) delete payload.source_capture;
     const rewritten = JSON.stringify(payload);
     insert.run(row.id, row.title, row.kind, row.created_at, row.source_snapshot_id, rewritten, hash(rewritten), row.source_revision, row.schema_version);
   }
@@ -200,12 +203,12 @@ export async function exportProjectDatabase(projects: string, workId: string, ex
     source = new Database(file, { readonly: true, fileMustExist: true }); source.pragma('trusted_schema=OFF');
     source.prepare('VACUUM INTO ?').run(join(temporary, 'source.sqlite'));
     copy = new Database(join(temporary, 'source.sqlite'), { readonly: true }); copy.pragma('trusted_schema=OFF');
-    if (copy.pragma('user_version', { simple: true }) !== 7) throw new Error('归档 schema 版本不支持。');
+    if (copy.pragma('user_version', { simple: true }) !== 8) throw new Error('归档 schema 版本不支持。');
     clean = trustedDb(join(temporary, 'portable.sqlite'), true); checkSchema(copy, clean, false);
     const payload = readRows(copy);
     if (payload.work_meta.length !== 1 || payload.work_meta[0].revision !== expectedRevision) throw new Error('作品版本已变化。');
     const destination = clean;
-    destination.transaction(() => { insertRows(destination, payload); checkGraph(destination, workId); copySnapshots(copy!, destination, workId, workId); copyConversations(copy!, destination, 7); assertIntegrity(destination); })();
+    destination.transaction(() => { insertRows(destination, payload); checkGraph(destination, workId); copySnapshots(copy!, destination, workId, workId); copyConversations(copy!, destination, 8); assertIntegrity(destination); })();
     destination.pragma('wal_checkpoint(TRUNCATE)'); destination.close(); clean = undefined;
     return readFileSync(join(temporary, 'portable.sqlite'));
   } finally { clean?.close(); copy?.close(); source?.close(); rmSync(temporary, { recursive: true, force: true }); }
@@ -214,7 +217,7 @@ export async function exportProjectDatabase(projects: string, workId: string, ex
 /** 校验后写全新暂存库，原作品不覆盖；operationId兼任新作品ID和重放键。 */
 export function importArchivedProject(projects: string, input: ParsedProjectArchive, operationId: string): string {
   const id = uuid(operationId), manifest = archiveManifestSchema.parse(input.manifest);
-  if (![4, 5, 6, 7].includes(manifest.schemaVersion) || input.database.length > 256 * 1024 * 1024 || hash(input.database) !== manifest.databaseSha256) throw new Error('归档 hash 或 schema 版本无效。');
+  if (![4, 5, 6, 7, 8].includes(manifest.schemaVersion) || input.database.length > 256 * 1024 * 1024 || hash(input.database) !== manifest.databaseSha256) throw new Error('归档 hash 或 schema 版本无效。');
   const receiptHash = hash(JSON.stringify(manifest));
   const destination = join(projects, id); safePath(destination);
   if (existsSync(destination)) {
@@ -237,7 +240,7 @@ export function importArchivedProject(projects: string, input: ParsedProjectArch
     reference = trustedDb(':memory:', true, manifest.schemaVersion); checkSchema(source, reference, true); assertIntegrity(source);
     target = trustedDb(join(staging, 'project.sqlite'));
     const payload = readRows(source);
-    normalizeSourceCoordinates(payload);
+    if (manifest.schemaVersion === 6) normalizeSourceCoordinates(payload);
     const db = target;
     const identities: SourceIdentityMap = new Map();
     db.transaction(() => {

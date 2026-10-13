@@ -17,7 +17,7 @@ function setup() {
   const repository = new WorkRepository(directory), work = repository.createWork('会话作品'); repository.close();
   return { directory, work, projects: join(directory, 'Projects'), file: join(directory, 'Projects', work.id, 'project.sqlite') };
 }
-function input(workId: string, database: Buffer, schemaVersion = 7): ParsedProjectArchive {
+function input(workId: string, database: Buffer, schemaVersion = 8): ParsedProjectArchive {
   return { database, manifest: { formatVersion: 1, projectId: workId, schemaVersion, databaseSha256: hash(database) } };
 }
 function mutate(bytes: Buffer, change: (db: Database.Database) => void) {
@@ -38,18 +38,18 @@ describe('会话归档与正文快照边界', () => {
     importArchivedProject(projects, input(work.id, bytes), importedId);
     const imported = new Database(join(projects, importedId, 'project.sqlite'));
     try {
-      expect(imported.pragma('user_version', { simple: true })).toBe(7);
+      expect(imported.pragma('user_version', { simple: true })).toBe(8);
       expect(imported.prepare('SELECT title,draft FROM conversation WHERE id=?').get(id)).toEqual({ title: '离线讨论', draft: '未发送草稿' });
       expect(imported.prepare('SELECT content FROM conversation_message').all()).toEqual([{ content: '我的想法' }]);
       expect(imported.prepare('SELECT * FROM conversation_operation').all()).toEqual([]);
     } finally { imported.close(); }
   });
-  it('真实V4归档兼容导入为V6空会话；版本伪装与未知会话schema拒绝', async () => {
+  it('真实V4归档兼容导入为V8空会话；版本伪装与未知会话schema拒绝', async () => {
     const { projects, work } = setup(); const bytes = await exportProjectDatabase(projects, work.id, 1);
-    const legacy = mutate(bytes, db => { db.exec('DROP TABLE learning_annotation; DROP TABLE knowledge_source; DROP TABLE source_segment; DROP TABLE source_document; DROP TABLE conversation_message; DROP TABLE conversation;'); db.pragma('user_version=4'); });
+    const legacy = mutate(bytes, db => { db.exec('DROP TABLE source_capture; DROP TABLE learning_annotation; DROP TABLE knowledge_source; DROP TABLE source_segment; DROP TABLE source_document; DROP TABLE conversation_message; DROP TABLE conversation;'); db.pragma('user_version=4'); });
     const id = randomUUID(); importArchivedProject(projects, input(work.id, legacy, 4), id);
     const imported = new Database(join(projects, id, 'project.sqlite'));
-    try { expect(imported.pragma('user_version', { simple: true })).toBe(7); expect(imported.prepare('SELECT * FROM conversation').all()).toEqual([]); }
+    try { expect(imported.pragma('user_version', { simple: true })).toBe(8); expect(imported.prepare('SELECT * FROM conversation').all()).toEqual([]); }
     finally { imported.close(); }
     expect(() => importArchivedProject(projects, input(work.id, bytes, 4), randomUUID())).toThrow(/清单不一致/);
     const malicious = mutate(legacy, db => db.exec('CREATE TABLE conversation(id TEXT)'));

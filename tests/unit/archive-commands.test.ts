@@ -15,11 +15,11 @@ it('归档预览不会写入项目，只有确认同token才导入新作品，�
   await service.execute('confirmProjectArchive', request); await service.execute('confirmProjectArchive', request);
   expect(requests).toHaveLength(2); expect(requests[0]).toEqual(requests[1]);
 });
-it('当前项目归档清单标注真实V6，避免新数据库被误标旧版本', async () => {
+it('当前项目归档清单标注真实V8，避免新数据库被误标旧版本', async () => {
   const db = new Database(':memory:'); db.exec('CREATE TABLE example (id TEXT)'); const bytes = db.serialize(); db.close();
   const workId = randomUUID(); let saved!: Buffer;
   const service = new ArchiveCommands({ execute: async command => command === 'freezeWork' ? { id: workId, title: '来源作品', revision: 2 } : bytes },
     { choose: async () => null, save: async (_name, value) => { saved = value; return true; } });
   await service.execute('exportProjectArchive', { workId });
-  expect((await parseProjectArchive(saved)).manifest.schemaVersion).toBe(7);
+  expect((await parseProjectArchive(saved)).manifest.schemaVersion).toBe(8);
 });
