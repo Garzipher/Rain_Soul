@@ -29,7 +29,7 @@ beforeEach(()=> {
 afterEach(()=>{repository.close();rmSync(directory,{recursive:true,force:true});});
 function setup(onScopeRead?:()=>void) {
   const status:RetrievalModelStatus={state:'ready',modelId:'test',fingerprint:'qualified-fingerprint',installed:true,qualified:true,bytes:100};
-  const models={getStatus:vi.fn(async()=>structuredClone(status)),getActiveDirectory:vi.fn(async()=> 'trusted-model'),setEnabled:vi.fn(async()=>{}),install:vi.fn(async()=>{})};
+  const models={getStatus:vi.fn(async()=>structuredClone(status)),getActiveDirectory:vi.fn(async()=> 'trusted-model'),setEnabled:vi.fn(async()=>{}),selectSource:vi.fn(async()=>{}),install:vi.fn(async()=>{})};
   const client={search:vi.fn(async()=>first.assets!.knowledge.map(entry=>({workId:first.id,entryId:entry.id,bodyHash:createHash('sha256').update(entry.body).digest('hex'),
     excerpt:entry.body,source:entry.source,matchedBy:['semantic' as const],reliable:true}))),index:vi.fn(async()=>{}),close:vi.fn(),invalidateWork:vi.fn(),isIndexing:()=>false,cancel:vi.fn()};
   const transport=onScopeRead?{execute:async(command:string,value:unknown)=>{const result=await store.execute(command,value);if(command==='readKnowledgeScope')onScopeRead();return result;}}:store;

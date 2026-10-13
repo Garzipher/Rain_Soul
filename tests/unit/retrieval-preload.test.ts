@@ -18,6 +18,7 @@ it('本机检索桥接仅发送查询与受限安装命令，不接受模型路�
   await api.downloadRetrievalModel(operation); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'downloadRetrievalModel', operation);
   await api.cancelRetrievalModelInstall(operation); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'cancelRetrievalModelInstall', operation);
   await api.setRetrievalModelEnabled(false); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'setRetrievalModelEnabled', { enabled: false });
+  await api.selectRetrievalModelSource({ source: 'bundled' }); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'selectRetrievalModelSource', { source: 'bundled' });
   await api.rebuildKnowledgeIndex(query.workId); expect(bridge.invoke).toHaveBeenLastCalledWith('rainsoul:command', 'rebuildKnowledgeIndex', { workId: query.workId });
   bridge.invoke.mockResolvedValue({ ok: false, message: '本机模型未就绪' });
   await expect(api.queryKnowledge(query)).rejects.toThrow('未就绪');

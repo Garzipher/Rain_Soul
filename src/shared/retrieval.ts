@@ -24,5 +24,6 @@ export interface RetrievalApi {
   downloadRetrievalModel?(request: { operationId: string }): Promise<RetrievalModelStatus>;
   cancelRetrievalModelInstall?(request: { operationId: string }): Promise<void>;
   setRetrievalModelEnabled?(enabled: boolean): Promise<RetrievalModelStatus>;
+  selectRetrievalModelSource?(request: { source: 'bundled' | 'user' }): Promise<RetrievalModelStatus>;
   rebuildKnowledgeIndex?(workId: string | null): Promise<void>;
 }

@@ -19,6 +19,7 @@ export class RetrievalClient {
   private directory: string | null = null;
   private loading: Promise<void> | null = null;
   private indexing = 0;
+  private generation = 0;
   private readonly activeQueries = new Map<string, object>();
   private monitor?: ReturnType<typeof setInterval>;
   private readonly pending = new Map<string, { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>; queryId?: string }>();
@@ -63,14 +64,19 @@ export class RetrievalClient {
     if (this.activeQueries.has(queryId)) throw new Error('检索查询身份重复。');
     this.activeQueries.set(queryId, identity);
     try {
-      await this.start(directory);
+      const starting = this.start(directory), worker = this.worker, generation = this.generation;
+      await starting;
+      if (worker !== this.worker || generation !== this.generation) throw new Error('本机检索状态已变化。');
       if (this.activeQueries.get(queryId) !== identity) throw new Error('检索已取消。');
       return await this.send('search', request, this.dependencies.queryTimeout ?? 30000, queryId) as RetrievalHit[];
     } finally { if (this.activeQueries.get(queryId) === identity) this.activeQueries.delete(queryId); }
   }
   async index(entries: IndexEntry[], directory: string, workIds=[...new Set(entries.map(entry=>entry.workId))]): Promise<void> {
-    await this.start(directory); this.indexing++;
-    try { await this.send('index', {entries,workIds}, 30 * 60 * 1000); } finally { this.indexing = Math.max(0, this.indexing - 1); }
+    const starting = this.start(directory), worker = this.worker, generation = this.generation;
+    await starting;
+    if (worker !== this.worker || generation !== this.generation) throw new Error('本机检索状态已变化。');
+    this.indexing++;
+    try { await this.send('index', {entries,workIds}, 30 * 60 * 1000); } finally { if (worker === this.worker && generation === this.generation) this.indexing = Math.max(0, this.indexing - 1); }
   }
   isIndexing() { return this.indexing > 0; }
   invalidateWork(workId: string): void { this.worker?.postMessage({ id: randomUUID(), command: 'invalidate', payload: workId }); }
@@ -83,6 +89,7 @@ export class RetrievalClient {
   }
   close() { this.fail(new Error('本机检索已关闭。')); }
   private fail(error: Error) {
+    this.generation++;
     const worker = this.worker; this.worker = null; this.directory = null; this.loading = null; this.indexing = 0;
     clearInterval(this.monitor);
     for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(error); }

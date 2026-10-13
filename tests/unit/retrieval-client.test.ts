@@ -85,3 +85,18 @@ it('发送异常与退出拒绝等待者，旧Worker错误不干扰新进程', a
   await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ command: 'search' })));
   worker.emit('exit', 1); await failed; client.close();
 });
+it('加载回执后立即换源，旧索引不能发给新 worker 或改变新代索引计数', async () => {
+  class DeferredWorker extends EventEmitter { terminate = vi.fn(async () => 0); postMessage = vi.fn(); }
+  const oldWorker = new DeferredWorker(), nextWorker = new DeferredWorker();
+  const client = new RetrievalClient('cache', { createWorker: directory => directory === '旧' ? oldWorker : nextWorker });
+  const oldIndex = client.index([], '旧', ['旧作品']), rejected = expect(oldIndex).rejects.toThrow(/关闭|变化/);
+  oldWorker.emit('message', { id: oldWorker.postMessage.mock.calls[0][0].id, ok: true });
+  client.close();
+  const nextIndex = client.index([], '新', ['新作品']);
+  nextWorker.emit('message', { id: nextWorker.postMessage.mock.calls[0][0].id, ok: true });
+  await rejected;
+  await vi.waitFor(() => expect(nextWorker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ command: 'index' })));
+  const request = nextWorker.postMessage.mock.calls.find(([message]) => message.command === 'index')![0];
+  expect(request.payload.workIds).toEqual(['新作品']); expect(client.isIndexing()).toBe(true);
+  nextWorker.emit('message', { id: request.id, ok: true }); await nextIndex; client.close();
+});

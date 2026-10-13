@@ -4,7 +4,7 @@ import { RetrievalCommands } from '../../src/main/retrieval-commands';
 import type { RetrievalModelStatus } from '../../src/shared/retrieval-model';
 function fixture(choose = async (): Promise<string | null> => 'trusted-directory') {
   const status: RetrievalModelStatus = { state: 'ready', installed: true, qualified: true, modelId: 'fixed', fingerprint: 'fixed', bytes: 1 };
-  const models = { getStatus: vi.fn(async () => status), getActiveDirectory: vi.fn(async (): Promise<string | null> => 'trusted'), setEnabled: vi.fn(async () => {}), install: vi.fn(async (_request: unknown, _signal?: AbortSignal) => {}) };
+  const models = { getStatus: vi.fn(async () => status), getActiveDirectory: vi.fn(async (): Promise<string | null> => 'trusted'), setEnabled: vi.fn(async () => {}), selectSource: vi.fn(async () => {}), install: vi.fn(async (_request: unknown, _signal?: AbortSignal) => {}) };
   const client = { close: vi.fn(), search: vi.fn(async () => []), index: vi.fn(async () => {}), invalidateWork: vi.fn(), isIndexing: () => false, cancel: vi.fn() };
   const workId = randomUUID(), entryId = randomUUID();
   const store = { execute: vi.fn(async (command: string) => command === 'readKnowledgeScope' ? { knowledge: [{ id: entryId, body: '雨声', deletedAt: null, categoryId: null, tagIds: [] }], categories: [], entryOwners: { [entryId]: { workId, sourceEntryId: entryId, sourceRevision: 1 } } } : [{ id: workId }]) };

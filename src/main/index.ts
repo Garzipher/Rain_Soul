@@ -26,6 +26,7 @@ import { ExtractionDraftCoordinator } from './extraction-draft-coordinator';
 import { RetrievalModelStore } from './retrieval-model-store';
 import { RetrievalClient } from './retrieval-client';
 import { RetrievalCommands } from './retrieval-commands';
+import { fixedManifest } from '../shared/retrieval-model';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'rainsoul', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const testDirectory = !app.isPackaged ? process.env.RAINSOUL_TEST_DIRECTORY : undefined;
@@ -60,7 +61,7 @@ else {
     database = new DatabaseClient(directory);
     const store = new StoreService((command, payload) => database!.request(command, payload));
     retrievalClient = new RetrievalClient(join(directory, 'RetrievalCache'));
-    const retrieval = new RetrievalCommands(store, new RetrievalModelStore(join(directory, 'RetrievalModels')), retrievalClient, async () => {
+    const retrieval = new RetrievalCommands(store, new RetrievalModelStore(join(directory, 'RetrievalModels'), { bundledDirectory: join(process.resourcesPath, 'retrieval-model', fixedManifest.revision, 'weights') }), retrievalClient, async () => {
       const selection = await dialog.showOpenDialog(window!, { title: '选择固定本机模型目录', properties: ['openDirectory'] });
       return selection.canceled ? null : selection.filePaths[0] ?? null;
     });

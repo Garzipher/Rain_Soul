@@ -11,6 +11,7 @@ interface Store { execute(command: string, payload: unknown): Promise<unknown> }
 interface Models {
   getStatus(): Promise<RetrievalModelStatus>; getActiveDirectory(): Promise<string | null>;
   setEnabled(enabled: boolean): Promise<void>; install(request: { operationId: string; source: 'local' | 'download'; directory?: string }, signal?: AbortSignal): Promise<void>;
+  selectSource(source: 'bundled' | 'user'): Promise<void>;
 }
 interface Client {
   search(request: EngineQuery, directory: string, queryId: string): Promise<RetrievalHit[]>;
@@ -22,10 +23,21 @@ export class RetrievalCommands {
   private readonly queries = new Map<string, object>();
   private readonly indexed = new Map<string, string>();
   private modelGeneration = 0;
+  private changing = false;
   private installation: { operationId: string; controller: AbortController } | null = null;
   constructor(private readonly store: Store, private readonly models: Models, private readonly client: Client,
     private readonly chooseDirectory: () => Promise<string | null>) {}
-  accepts(command: string) { return ['queryKnowledge', 'cancelKnowledgeQuery', 'getRetrievalModelStatus', 'importRetrievalModel', 'downloadRetrievalModel', 'cancelRetrievalModelInstall', 'setRetrievalModelEnabled', 'rebuildKnowledgeIndex'].includes(command); }
+  accepts(command: string) { return ['queryKnowledge', 'cancelKnowledgeQuery', 'getRetrievalModelStatus', 'importRetrievalModel', 'downloadRetrievalModel', 'cancelRetrievalModelInstall', 'setRetrievalModelEnabled', 'selectRetrievalModelSource', 'rebuildKnowledgeIndex'].includes(command); }
+  private modelChanged() { this.modelGeneration++; this.client.close(); this.indexed.clear(); }
+  private async changeModel(action: () => Promise<void>) {
+    if (this.changing || this.installation) throw new Error('模型变更正在进行，请稍后重试。');
+    this.changing = true;
+    try { this.modelChanged(); await action(); return await this.models.getStatus(); }
+    finally { this.changing = false; }
+  }
+  private sameModel(before: RetrievalModelStatus, after: RetrievalModelStatus, generation: number): boolean {
+    return !this.changing && !this.installation && generation === this.modelGeneration && after.qualified && after.state === 'ready' && after.enabled !== false && after.fingerprint === before.fingerprint && after.source === before.source;
+  }
   async execute(command: string, value: unknown): Promise<unknown> {
     if (command === 'queryKnowledge') return this.query(retrievalQuerySchema.parse(value));
     if (command === 'cancelKnowledgeQuery') {
@@ -42,30 +54,38 @@ export class RetrievalCommands {
       return this.install(command === 'importRetrievalModel' ? 'local' : 'download', operationId ?? randomUUID());
     }
     if (command === 'setRetrievalModelEnabled') {
-      const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(value), status = await this.models.getStatus();
-      if (enabled && !status.qualified) throw new Error('模型资格核验尚未完成，关键词检索仍可使用。');
-      this.modelGeneration++; this.client.close(); this.indexed.clear(); await this.models.setEnabled(enabled); return this.models.getStatus();
+      const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(value);
+      return this.changeModel(async () => {
+        const status = await this.models.getStatus();
+        if (enabled && !status.qualified) throw new Error('模型资格核验尚未完成，关键词检索仍可使用。');
+        await this.models.setEnabled(enabled);
+      });
+    }
+    if (command === 'selectRetrievalModelSource') {
+      const { source } = z.object({ source: z.enum(['bundled', 'user']) }).strict().parse(value);
+      return this.changeModel(() => this.models.selectSource(source));
     }
     if (command === 'rebuildKnowledgeIndex') {
       const { workId } = z.object({ workId: z.uuid().nullable() }).strict().parse(value);
-      const status = await this.models.getStatus();
+      const generation = this.modelGeneration, status = await this.models.getStatus();
       if (!status.qualified || status.state !== 'ready') throw new Error('本机模型尚未就绪，请使用关键词检索。');
       const { entries,workIds } = await this.snapshot(workId), directory = await this.models.getActiveDirectory();
       if (!directory) throw new Error('本机模型校验失败。');
+      if (!this.sameModel(status, await this.models.getStatus(), generation)) throw new Error('模型状态已变化，请重新重建。');
       for (const id of workIds) this.indexed.delete(id);
       await this.client.index(entries, directory,workIds); return;
     }
     throw new Error('未知检索命令。');
   }
   private async install(source: 'local' | 'download', operationId: string) {
-    if (this.installation) throw new Error('模型安装正在进行，请勿重复安装。');
+    if (this.installation || this.changing) throw new Error('模型变更正在进行，请勿重复安装。');
     const installation = { operationId, controller: new AbortController() }; this.installation = installation;
     const signal = installation.controller.signal;
     try {
       const directory = source === 'local' ? await this.chooseDirectory() : undefined;
       if (signal.aborted) throw new Error('模型安装已取消，原模型保持。');
       if (source === 'local' && !directory) return this.models.getStatus();
-      this.modelGeneration++; this.client.close(); this.indexed.clear();
+      this.modelChanged();
       await this.models.install({ operationId, source, ...(directory ? { directory } : {}) }, signal);
       return this.models.getStatus();
     } finally { if (this.installation === installation) this.installation = null; }
@@ -101,24 +121,26 @@ export class RetrievalCommands {
       const input: EngineQuery = { entries: frozen.entries, categories, keywords: rows.map(row => ({ workId: row.workId, entryId: frozen.scope.entryOwners[row.id]?.sourceEntryId ?? row.id })),
         text: request.query, mode: request.mode, filter: { workId: request.workId, categoryId: request.categoryId, tagIds: request.tagIds } };
       const keyword = () => rankKnowledge({ ...input, mode: 'keyword', threshold: 1, queryVector: [], chunks: [] });
-      let hits: RetrievalHit[] = keyword(), status: RetrievalReply['status'] = 'ready', fingerprint: string | null = null, message: string | undefined;
+      let hits: RetrievalHit[] = keyword(), status: RetrievalReply['status'] = 'ready', fingerprint: string | null = null, selectedModel: RetrievalModelStatus | null = null, message: string | undefined;
       if (request.mode !== 'keyword') {
         const model = await this.models.getStatus(); current();
-        const directory = model.qualified && model.state === 'ready' ? await this.models.getActiveDirectory() : null;
+        let directory = !this.changing && !this.installation && model.qualified && model.state === 'ready' && model.enabled !== false ? await this.models.getActiveDirectory() : null;
+        current();
+        if (directory && !this.sameModel(model, await this.models.getStatus(), modelGeneration)) directory = null;
         current();
         if (!directory) { status = 'fallback'; message = model.qualified ? '本机模型未就绪，当前显示关键词结果。' : '模型资格核验尚未完成，当前显示关键词结果。'; }
         else try {
           for (const workId of frozen.workIds) {
             const entries=frozen.entries.filter(entry=>entry.workId===workId);
-            const key = `${model.fingerprint}/${JSON.stringify(entries.map(({entryId,bodyHash})=>[entryId,bodyHash]).sort((a,b)=>a[0].localeCompare(b[0])))}`;
+            const key = `${modelGeneration}/${model.source ?? ''}/${model.fingerprint}/${JSON.stringify(entries.map(({entryId,bodyHash})=>[entryId,bodyHash]).sort((a,b)=>a[0].localeCompare(b[0])))}`;
             if (this.indexed.get(workId) !== key) {
               this.indexed.set(workId, key);
               void this.client.index(entries, directory,[workId]).catch(() => {if(this.indexed.get(workId)===key)this.indexed.delete(workId);});
             }
           }
-          hits = await this.client.search(input, directory, request.queryId); current(); fingerprint = model.fingerprint;
+          hits = await this.client.search(input, directory, request.queryId); current(); fingerprint = model.fingerprint; selectedModel = model;
           const after = await this.models.getStatus(); current();
-          if (!after.qualified || after.state !== 'ready' || after.fingerprint !== model.fingerprint) {
+          if (!this.sameModel(model, after, modelGeneration)) {
             hits = keyword(); status = 'fallback'; fingerprint = null; message = '模型状态已变化，当前显示关键词结果。';
           }
           else if (this.client.isIndexing()) { status = 'indexing'; message = '本机索引正在更新，可稍后重试。'; }
@@ -130,7 +152,7 @@ export class RetrievalCommands {
       }
       const verified = await this.snapshot(request.workId); current();
       const finalModel = fingerprint ? await this.models.getStatus() : null; current();
-      if (fingerprint && (modelGeneration !== this.modelGeneration || !finalModel?.qualified || finalModel.state !== 'ready' || finalModel.fingerprint !== fingerprint)) {
+      if (fingerprint && (!selectedModel || !finalModel || !this.sameModel(selectedModel, finalModel, modelGeneration))) {
         hits = keyword(); status = 'fallback'; fingerprint = null; message = '模型状态已变化，当前显示关键词结果。';
       }
       if (frozen.ledger !== verified.ledger || JSON.stringify(frozen.revisions) !== JSON.stringify(verified.revisions) || JSON.stringify(frozen.entries) !== JSON.stringify(verified.entries)) {

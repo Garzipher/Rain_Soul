@@ -15,6 +15,7 @@ const api: DesktopApi = {
   downloadRetrievalModel: request => invoke('downloadRetrievalModel', request),
   cancelRetrievalModelInstall: request => invoke('cancelRetrievalModelInstall', request),
   setRetrievalModelEnabled: enabled => invoke('setRetrievalModelEnabled', { enabled }),
+  selectRetrievalModelSource: request => invoke('selectRetrievalModelSource', request),
   rebuildKnowledgeIndex: workId => invoke('rebuildKnowledgeIndex', { workId }),
   readExtractionDraft: workId => invoke('readExtractionDraft', { workId }),
   discardExtractionDraft: (workId, token) => invoke('discardExtractionDraft', { workId, token }),

@@ -11,12 +11,12 @@ function setup(qualified = false) {
     knowledge: [knowledge], categories: [{ id: categoryId, parentId: null, deletedAt: null }], tags: [],
     entryOwners: { [entryId]: { workId, sourceRevision: revision, workTitle: '作品', sourceEntryId: entryId } },
   } : command === 'listWorks' ? [{ id: workId, revision, title: '作品' }] : [{ id: entryId, workId }]) };
-  const status: RetrievalModelStatus = { state: 'ready', modelId: 'fixed', fingerprint: 'fingerprint', installed: true, qualified, bytes: 123 };
-  const models = { getStatus: vi.fn(async () => status), getActiveDirectory: vi.fn(async () => 'trusted'), setEnabled: vi.fn(async () => {}), install: vi.fn(async () => {}) };
+  const status: RetrievalModelStatus = { state: 'ready', modelId: 'fixed', fingerprint: 'fingerprint', installed: true, qualified, bytes: 123, source: 'bundled', enabled: true };
+  const models = { getStatus: vi.fn(async () => ({ ...status })), getActiveDirectory: vi.fn(async () => 'trusted'), setEnabled: vi.fn(async () => {}), install: vi.fn(async () => {}), selectSource: vi.fn(async (source: 'bundled' | 'user') => { status.source = source; }) };
   const client = { search: vi.fn(async () => [{ workId, entryId, bodyHash: hash(knowledge.body), excerpt: knowledge.body, source: knowledge.source, matchedBy: ['semantic' as const], reliable: true }]), index: vi.fn(async () => {}), close: vi.fn(), invalidateWork: vi.fn(), isIndexing: () => false, cancel: vi.fn() };
   const commands = new RetrievalCommands(store, models, client, async () => null);
   const query = { workId, queryId: randomUUID(), query: '雨', mode: 'hybrid' as const, tagIds: [], page: 1, pageSize: 20 };
-  return { commands, models, client, store, query, knowledge, change: () => { revision++; } };
+  return { commands, models, client, store, query, knowledge, status, change: () => { revision++; } };
 }
 it('未资格模型只返回关键词，知识正文不进入模型，也不能提供渲染层路径', async () => {
   const { commands, client, query, models } = setup();
@@ -25,6 +25,52 @@ it('未资格模型只返回关键词，知识正文不进入模型，也不能�
   expect(client.search).not.toHaveBeenCalled(); expect(client.index).not.toHaveBeenCalled();
   await expect(commands.execute('importRetrievalModel', { directory: 'arbitrary' })).rejects.toThrow();
   expect(models.install).not.toHaveBeenCalled();
+});
+it('换源命令仅接受内置或手动枚举，先关闭旧 worker 再保存来源', async () => {
+  const { commands, models, client } = setup(true);
+  expect(commands.accepts('selectRetrievalModelSource')).toBe(true);
+  for (const payload of [{ source: 'bundled', directory: '任意路径' }, { source: 'remote' }, {}]) await expect(commands.execute('selectRetrievalModelSource', payload)).rejects.toThrow();
+  models.selectSource.mockImplementationOnce(async source => { expect(client.close).toHaveBeenCalledOnce(); expect(source).toBe('user'); });
+  await commands.execute('selectRetrievalModelSource', { source: 'user' });
+  expect(models.selectSource).toHaveBeenCalledOnce();
+});
+it('目录校验期间换源，旧查询不启动推理或索引', async () => {
+  const { commands, models, client, query } = setup(true);
+  models.getActiveDirectory.mockImplementationOnce(async () => { await commands.execute('selectRetrievalModelSource', { source: 'user' }); return '旧目录'; });
+  expect(await commands.execute('queryKnowledge', query)).toMatchObject({ status: 'fallback', modelFingerprint: null });
+  expect(client.search).not.toHaveBeenCalled(); expect(client.index).not.toHaveBeenCalled();
+});
+it('相同指纹但来源后验变化，迟到语义结果回退关键词', async () => {
+  const { commands, client, query, status } = setup(true);
+  const original = client.search.getMockImplementation()!;
+  client.search.mockImplementationOnce(async () => { const hits = await original(); status.source = 'user'; return hits; });
+  expect(await commands.execute('queryKnowledge', query)).toMatchObject({ status: 'fallback', modelFingerprint: null, hits: [expect.objectContaining({ matchedBy: ['keyword'] })] });
+});
+it('换源往返后旧索引失败不能删除新代索引记录', async () => {
+  const { commands, client, query } = setup(true); let rejectOld!: (error: Error) => void;
+  client.index.mockImplementationOnce(() => new Promise<void>((_resolve, reject) => { rejectOld = reject; }));
+  await commands.execute('queryKnowledge', query);
+  await commands.execute('selectRetrievalModelSource', { source: 'user' });
+  await commands.execute('selectRetrievalModelSource', { source: 'bundled' });
+  await commands.execute('queryKnowledge', { ...query, queryId: randomUUID() });
+  rejectOld(new Error('旧索引取消')); await Promise.resolve();
+  await commands.execute('queryKnowledge', { ...query, queryId: randomUUID() });
+  expect(client.index).toHaveBeenCalledTimes(2);
+});
+it('主动重建快照期间换源，旧重建不向 worker 提交', async () => {
+  const { commands, client, store, query } = setup(true), original = store.execute.getMockImplementation()!;
+  store.execute.mockImplementationOnce(async command => { await commands.execute('selectRetrievalModelSource', { source: 'user' }); return original(command); });
+  await expect(commands.execute('rebuildKnowledgeIndex', { workId: query.workId })).rejects.toThrow(/变化/);
+  expect(client.index).not.toHaveBeenCalled();
+});
+it('来源保存尚未完成时，新查询保持关键词且拒绝并发模型变更', async () => {
+  const { commands, models, client, query } = setup(true); let complete!: () => void;
+  models.selectSource.mockImplementationOnce(() => new Promise<void>(resolve => { complete = resolve; }));
+  const selecting = commands.execute('selectRetrievalModelSource', { source: 'user' });
+  expect(await commands.execute('queryKnowledge', query)).toMatchObject({ status: 'fallback', modelFingerprint: null });
+  expect(client.search).not.toHaveBeenCalled(); expect(client.index).not.toHaveBeenCalled();
+  await expect(commands.execute('setRetrievalModelEnabled', { enabled: false })).rejects.toThrow(/进行/);
+  complete(); await selecting;
 });
 it('接收结果后再次核对作品修订和正文哈希，过期回执不交给界面', async () => {
   const { commands, client, query, change } = setup(true);
