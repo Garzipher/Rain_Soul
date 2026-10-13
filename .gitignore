@@ -46,3 +46,4 @@ coverage/
 /.coverage-render-*/
 /.coverage-dom-attributes/
 /.coverage-package-audit-fixes/
+/.coverage-bundled-package-cli/

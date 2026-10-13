@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { afterEach, expect, it } from 'vitest';
+import { dirname, join, resolve } from 'node:path';
+import { afterEach, expect, it, vi } from 'vitest';
 import { checkBundledModelPackage } from '../../scripts/check-bundled-model-package.mjs';
 import { prepareBundledRetrievalModel, type ModelProvenance } from '../../scripts/prepare-bundled-retrieval-model.mjs';
 import { fixedManifest } from '../../src/shared/retrieval-model';
 
 const roots: string[] = [], hash = (value: string) => createHash('sha256').update(value).digest('hex');
+const originalArgv = [...process.argv], originalExitCode = process.exitCode;
 async function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'rainsoul-package-')); roots.push(root);
   const manifest = structuredClone(fixedManifest), inputDirectory = join(root, 'input'), evidenceDirectory = join(root, 'evidence'), resources = join(root, 'resources');
@@ -22,7 +23,11 @@ async function fixture() {
   await prepareBundledRetrievalModel({ inputDirectory, evidenceDirectory, outputDirectory, manifest, trustedAnchor });
   return { root, resources, outputDirectory, manifest, trustedAnchor };
 }
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => {
+  process.argv.splice(0, process.argv.length, ...originalArgv); process.exitCode = originalExitCode;
+  vi.restoreAllMocks(); vi.resetModules();
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 it('实际resources中的精确版本、五文件和独立声明通过', async () => {
   const value = await fixture(); await expect(checkBundledModelPackage(value.resources, value.manifest, value.trustedAnchor)).resolves.toBeUndefined();
 });
@@ -42,4 +47,34 @@ it('包中的模型根目录链接拒绝，缺可信锚不能借用产物放行'
   await expect(checkBundledModelPackage(value.resources, value.manifest)).rejects.toThrow(/可信|来源/);
   const other = join(value.root, 'elsewhere'); mkdirSync(other); rmSync(join(value.resources, 'retrieval-model'), { recursive: true }); symlinkSync(other, join(value.resources, 'retrieval-model'), 'junction');
   await expect(checkBundledModelPackage(value.resources, value.manifest, value.trustedAnchor)).rejects.toThrow(/链接/);
+});
+it('模型根目录为普通文件时拒绝，不把文件当作资源树', async () => {
+  const value = await fixture(), root = join(value.resources, 'retrieval-model');
+  rmSync(root, { recursive: true }); writeFileSync(root, '普通文件');
+  await expect(checkBundledModelPackage(value.resources, value.manifest, value.trustedAnchor)).rejects.toThrow(/资源目录缺失/);
+});
+it.each(['weights', 'notices'])('版本目录缺少%s且仍有两个成员时拒绝', async missing => {
+  const value = await fixture(); rmSync(join(value.outputDirectory, missing), { recursive: true }); mkdirSync(join(value.outputDirectory, 'unexpected'));
+  await expect(checkBundledModelPackage(value.resources, value.manifest, value.trustedAnchor)).rejects.toThrow(/weights和notices/);
+});
+async function runCli(args: string[]) {
+  const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  process.argv.splice(0, process.argv.length, process.execPath, resolve('scripts/check-bundled-model-package.mjs'), ...args);
+  process.exitCode = undefined; vi.resetModules();
+  await import('../../scripts/check-bundled-model-package.mjs');
+  return stderr;
+}
+it.each([{ args: [] }, { args: ['relative/resources'] }, { args: [resolve('dist'), '--trusted-anchor', '{}'] }])('CLI拒绝缺参、相对路径及额外来源参数：$args', async ({ args }) => {
+  const stderr = await runCli(args);
+  expect(process.exitCode).toBe(1); expect(stderr).toHaveBeenCalledWith(expect.stringMatching(/用法.*绝对resources目录/));
+});
+it('CLI真实核验资源，夹具来源不能替代仓库锚放行', async () => {
+  const value = await fixture(), stderr = await runCli([value.resources]);
+  expect(process.exitCode).toBe(1); expect(stderr).toHaveBeenCalledWith(expect.stringMatching(/可信锚.*禁止正式捆绑/));
+});
+it('作为库加载且没有argv入口时不运行CLI或改退出码', async () => {
+  const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  process.argv.splice(0, process.argv.length, process.execPath); process.exitCode = undefined; vi.resetModules();
+  await import('../../scripts/check-bundled-model-package.mjs');
+  expect(stderr).not.toHaveBeenCalled(); expect(process.exitCode).toBeUndefined();
 });
