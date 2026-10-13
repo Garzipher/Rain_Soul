@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { assertSafeLocalPath, bundledManifest } from './prepare-bundled-retrieval-model.mjs';
 import { checkBundledModelPackage } from './check-bundled-model-package.mjs';
@@ -7,6 +7,26 @@ import { auditDesktopPackage, checkDesktopBuild } from './desktop-package-audit.
 
 function contains(parent, child) { const path = relative(parent, child); return path === '' || (!path.startsWith('..') && !isAbsolute(path)); }
 async function exists(path) { return !!await lstat(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; }); }
+/** 同目录临时文件完成写入后再替换；失败保留旧审计，未知文件不能覆盖。 */
+async function writeAuditReport(report, data) {
+  assertSafeLocalPath(report);
+  const previous = await lstat(report).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+  if (previous) {
+    if (!previous.isFile() || previous.size > 16 * 1024 * 1024) throw new Error('已有审计记录目标无效，原内容已保留。');
+    let saved; try { saved = JSON.parse(await readFile(report, 'utf8')); } catch { throw new Error('已有文件不是审计记录，原内容已保留。'); }
+    if (saved?.schemaVersion !== 1 || !['research-without-model', 'formal-bundled'].includes(saved.mode) || !['asarSha256', 'membersSha256', 'buildMembersSha256'].every(key => typeof saved[key] === 'string' && /^[a-f0-9]{64}$/.test(saved[key])) || !Array.isArray(saved.files) || !Array.isArray(saved.resourceFiles)) throw new Error('已有文件不是审计记录，原内容已保留。');
+  }
+  const temporary = `${report}.${randomUUID()}.tmp`; assertSafeLocalPath(temporary);
+  let handle, created = false;
+  try {
+    handle = await open(temporary, 'wx'); created = true;
+    await handle.writeFile(JSON.stringify(data, null, 2), 'utf8'); await handle.sync(); await handle.close(); handle = null;
+    assertSafeLocalPath(report); await rename(temporary, report);
+  } finally {
+    try { await handle?.close(); }
+    finally { if (created) await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
+  }
+}
 /** 正式路径只使用仓库默认可信锚；CLI和环境变量没有来源放行接口。 */
 export async function createModelPackConfiguration({ projectDirectory, args = [], outputDirectory }) {
   if (args.some(arg => !['--installer', '--without-bundled-model'].includes(arg)) || new Set(args).size !== args.length) throw new Error('打包参数无效。');
@@ -45,7 +65,7 @@ export async function createModelPackConfiguration({ projectDirectory, args = []
         const audit = await auditDesktopPackage(resources, buildMembers, { vendorDefaultAsar: join(root, 'node_modules', 'electron', 'dist', 'resources', 'default_app.asar'), allowModel: !research });
         const acceptance = join(output, 'acceptance'); assertSafeLocalPath(acceptance); await mkdir(acceptance, { recursive: true });
         const report = join(acceptance, 'desktop-package-audit.json'); assertSafeLocalPath(report);
-        await writeFile(report, JSON.stringify({ ...audit, mode: research ? 'research-without-model' : 'formal-bundled' }, null, 2), { flag: 'wx' });
+        await writeAuditReport(report, { ...audit, mode: research ? 'research-without-model' : 'formal-bundled' });
       },
     },
   };

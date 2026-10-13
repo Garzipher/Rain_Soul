@@ -1,16 +1,24 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { createPackage } from '@electron/asar';
 import { createModelPackConfiguration } from '../../scripts/model-pack-policy.mjs';
 
 const roots: string[] = [];
+const failures = vi.hoisted(() => ({ rename: false }));
+vi.mock('node:fs/promises', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return { ...actual, rename: async (...args: Parameters<typeof actual.rename>) => {
+    if (failures.rename) throw new Error('模拟原子替换失败');
+    return actual.rename(...args);
+  } };
+});
 const require = createRequire(import.meta.url);
 const minimatch = require('minimatch').minimatch as (path: string, pattern: string) => boolean;
 const fixture = () => { const root = mkdtempSync(join(tmpdir(), 'rainsoul-pack-policy-')); roots.push(root); mkdirSync(join(root, 'dist')); return root; };
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => { failures.rename = false; for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 it('默认builder配置实际挂接拒绝旁路门禁，显式研究配置替换该门禁', async () => {
   const packageConfig = JSON.parse(readFileSync('package.json', 'utf8')).build;
   expect(typeof packageConfig.beforePack).toBe('string');
@@ -59,6 +67,49 @@ it('afterPack再次核对输入，构建期间出现未知日志即使未入ASAR
   mkdirSync(stage); writeFileSync(join(stage, 'package.json'), '{}'); await createPackage(stage, join(appOutDir, 'resources', 'app.asar'));
   writeFileSync(join(root, 'dist', 'research.log'), '意外研究日志');
   await expect(packing.config.afterPack({ appOutDir })).rejects.toThrow(/构建|成员/);
+});
+it('同一打包任务可原子更新审计记录，后续验收失败时保留上次完整记录', async () => {
+  const root = fixture(), packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model'] });
+  const appOutDir = join(root, 'package'), stage = join(root, 'stage'); mkdirSync(join(appOutDir, 'resources'), { recursive: true });
+  mkdirSync(stage); writeFileSync(join(stage, 'package.json'), '{}'); await createPackage(stage, join(appOutDir, 'resources', 'app.asar'));
+  await packing.config.afterPack({ appOutDir });
+  const acceptance = join(packing.config.directories.output, 'acceptance'), report = join(acceptance, 'desktop-package-audit.json');
+  const first = readFileSync(report, 'utf8'); writeFileSync(join(acceptance, '保留.txt'), '其他已有证据');
+  writeFileSync(join(stage, 'package.json'), '{"name":"second"}'); await createPackage(stage, join(appOutDir, 'resources', 'app.asar'));
+  await expect(packing.config.afterPack({ appOutDir })).resolves.toBeUndefined();
+  const second = readFileSync(report, 'utf8'); expect(JSON.parse(second).asarSha256).not.toBe(JSON.parse(first).asarSha256);
+  writeFileSync(join(root, 'dist', 'unexpected.log'), '验收失败');
+  await expect(packing.config.afterPack({ appOutDir })).rejects.toThrow(); expect(readFileSync(report, 'utf8')).toBe(second);
+  expect(readFileSync(join(acceptance, '保留.txt'), 'utf8')).toBe('其他已有证据');
+  expect(readdirSync(acceptance).sort()).toEqual(['desktop-package-audit.json', '保留.txt'].sort());
+});
+it('审计记录目标若为作者文件或目录必须拒绝并保持原内容', async () => {
+  const root = fixture(), packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model'] });
+  const appOutDir = join(root, 'package'), stage = join(root, 'stage'); mkdirSync(join(appOutDir, 'resources'), { recursive: true });
+  mkdirSync(stage); writeFileSync(join(stage, 'package.json'), '{}'); await createPackage(stage, join(appOutDir, 'resources', 'app.asar'));
+  const acceptance = join(packing.config.directories.output, 'acceptance'), report = join(acceptance, 'desktop-package-audit.json'); mkdirSync(acceptance, { recursive: true });
+  writeFileSync(report, '作者原稿'); await expect(packing.config.afterPack({ appOutDir })).rejects.toThrow(); expect(readFileSync(report, 'utf8')).toBe('作者原稿');
+  rmSync(report); mkdirSync(report); writeFileSync(join(report, '保留.txt'), '作者资料');
+  await expect(packing.config.afterPack({ appOutDir })).rejects.toThrow(); expect(readFileSync(join(report, '保留.txt'), 'utf8')).toBe('作者资料');
+  expect(readdirSync(acceptance)).toEqual(['desktop-package-audit.json']);
+});
+it('原子替换失败时旧记录字节保持不变，清理本次临时文件', async () => {
+  const root = fixture(), packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model'] });
+  const appOutDir = join(root, 'package'), stage = join(root, 'stage'); mkdirSync(join(appOutDir, 'resources'), { recursive: true });
+  mkdirSync(stage); writeFileSync(join(stage, 'package.json'), '{}'); await createPackage(stage, join(appOutDir, 'resources', 'app.asar'));
+  await packing.config.afterPack({ appOutDir });
+  const acceptance = join(packing.config.directories.output, 'acceptance'), report = join(acceptance, 'desktop-package-audit.json'), before = readFileSync(report, 'utf8');
+  failures.rename = true; await expect(packing.config.afterPack({ appOutDir })).rejects.toThrow(/模拟原子替换失败/);
+  expect(readFileSync(report, 'utf8')).toBe(before); expect(readdirSync(acceptance)).toEqual(['desktop-package-audit.json']);
+});
+it('审计记录目标为junction时拒绝，不写入链接指向的作者目录', async () => {
+  const root = fixture(), packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model'] });
+  const appOutDir = join(root, 'package'), stage = join(root, 'stage'); mkdirSync(join(appOutDir, 'resources'), { recursive: true });
+  mkdirSync(stage); writeFileSync(join(stage, 'package.json'), '{}'); await createPackage(stage, join(appOutDir, 'resources', 'app.asar'));
+  const acceptance = join(packing.config.directories.output, 'acceptance'), outside = join(root, 'author'); mkdirSync(acceptance, { recursive: true }); mkdirSync(outside);
+  writeFileSync(join(outside, '保留.txt'), '作者资料'); symlinkSync(outside, join(acceptance, 'desktop-package-audit.json'), 'junction');
+  await expect(packing.config.afterPack({ appOutDir })).rejects.toThrow(/链接/);
+  expect(readdirSync(outside)).toEqual(['保留.txt']); expect(readFileSync(join(outside, '保留.txt'), 'utf8')).toBe('作者资料');
 });
 it.each(['release/current', 'release', 'dist', 'dist/retrieval-model'])('研究输出%s不能覆盖正式包或构建输入', async output => {
   const root = fixture();
