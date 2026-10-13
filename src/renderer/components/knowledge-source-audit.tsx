@@ -1,5 +1,17 @@
 import { useState } from 'react';
 import type { KnowledgeSourceAuditRecord } from '../../shared/knowledge-source';
+import type { FrozenSourceDocument } from '../../shared/source-document';
+
+/** 只展示冻结证据字段，不读取或执行网页 HTML。 */
+export function WebSourceAudit({ source }: { source: FrozenSourceDocument }) {
+  if (source.kind !== 'web') return null;
+  const capture = source.capture;
+  return <details><summary>网页来源记录</summary><p>原始地址：{source.originalUrl}<br />最终地址：{source.finalUrl}<br />获取时间：{source.fetchedAt}<br />
+    捕获方式：{capture ? capture.captureMethod === 'static' ? '静态获取' : '受限浏览器' : '未知（旧记录）'}<br />
+    {capture && <>捕获时间：{capture.capturedAt}<br />政策版本：{capture.policyVersion}<br /></>}
+    {capture?.captureMethod === 'restricted-browser' && <>渲染 DOM SHA-256：{capture.renderedDomHash}<br /></>}
+    原始 HTML SHA-256：{source.rawHash}<br />正文 SHA-256：{source.bodyHash}</p></details>;
+}
 
 export function KnowledgeSourceAudit({ records }: { records: KnowledgeSourceAuditRecord[] }) {
   const [open, setOpen] = useState(false);

@@ -3,12 +3,26 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PlotWorkspace } from '../../src/renderer/components/plot-workspace';
-import { KnowledgeSourceAudit } from '../../src/renderer/components/knowledge-source-audit';
+import { KnowledgeSourceAudit, WebSourceAudit } from '../../src/renderer/components/knowledge-source-audit';
+import { freezeSource } from '../../src/main/freeze-source';
 import type { AssetState } from '../../src/shared/assets';
 import type { WorkDetail } from '../../src/shared/contracts';
 import { auditedKnowledgeSource } from './knowledge-source-helper';
 
 afterEach(cleanup);
+it.each(['static', 'restricted-browser', 'legacy'] as const)('网页%s证据详情只显示捕获记录，旧来源不补造时间', method => {
+  const source = freezeSource({ kind: 'web', title: '网页', rawBytes: Buffer.from('<script>秘密HTML</script>'), originalUrl: 'https://example.com/start',
+    finalUrl: 'https://example.com/end', fetchedAt: '2026-10-10T00:00:00Z', segments: [{ text: '原文' }],
+    ...(method === 'legacy' ? {} : { capture: method === 'static' ? { captureMethod: method, capturedAt: '2026-10-13T00:00:00Z', policyVersion: 1 }
+      : { captureMethod: method, capturedAt: '2026-10-13T00:00:00Z', policyVersion: 1, renderedDomHash: 'd'.repeat(64) } }) });
+  const { container } = render(<WebSourceAudit source={source} />);
+  expect(container).toHaveTextContent(method === 'legacy' ? '捕获方式：未知（旧记录）' : method === 'static' ? '捕获方式：静态获取' : '捕获方式：受限浏览器');
+  expect(container).toHaveTextContent(source.originalUrl!); expect(container).toHaveTextContent(source.bodyHash); expect(container).not.toHaveTextContent('秘密HTML');
+  if (method === 'legacy') { expect(container).not.toHaveTextContent('捕获时间：'); expect(container).not.toHaveTextContent('政策版本：'); }
+  else { expect(container).toHaveTextContent('捕获时间：2026-10-13T00:00:00Z'); expect(container).toHaveTextContent('政策版本：1'); }
+  if (method === 'restricted-browser') expect(container).toHaveTextContent('渲染 DOM SHA-256：' + 'd'.repeat(64));
+  else expect(container).not.toHaveTextContent('渲染 DOM SHA-256：');
+});
 it('剧情关联知识的选择与已选详情均显示可读出处', () => {
   const { source } = auditedKnowledgeSource();
   const assets = { outlines: [{ id: 'plot', title: '剧情', type: 'chapter', parentId: null, summary: '', chapterId: null, knowledgeIds: ['k'], sortOrder: 0, deletedAt: null }],

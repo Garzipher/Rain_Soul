@@ -6,6 +6,8 @@ import { StructureDialog } from './structure-dialog';
 import { BookExtractionAiPanel } from './book-extraction-ai-panel';
 import type { BookExtractionAiApi, BookExtractionAiSuggestion } from '../../shared/book-extraction-ai';
 import type { ExtractionDraft } from '../../shared/extraction-draft';
+import type { RenderCapability } from '../../shared/source-capture';
+import { WebSourceAudit } from './knowledge-source-audit';
 import './book-extraction-workspace.css';
 
 interface Annotation { technique: string; usage: string; exercise: string }
@@ -20,6 +22,8 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
   const [replacement, setReplacement] = useState<{ suggestion: BookExtractionAiSuggestion; revalidate: () => Promise<boolean> } | null>(null);
   const [page, setPage] = useState(0), [leaving, setLeaving] = useState(false);
   const [changingSource, setChangingSource] = useState(false);
+  const [renderCapability, setRenderCapability] = useState<RenderCapability | null>(null);
+  const [renderConfirmation, setRenderConfirmation] = useState<{ url: string; workId: string } | null>(null);
   const [readerPage, setReaderPage] = useState(0), [sourceKind, setSourceKind] = useState<'file' | 'web' | 'paste'>('file');
   const [restoring, setRestoring] = useState(!!api.readExtractionDraft), [restoreFailed, setRestoreFailed] = useState(false);
   const busy = fileBusy || aiBusy || restoring;
@@ -35,6 +39,13 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
   useEffect(() => () => { onDirtyChange?.(false); }, [onDirtyChange]);
   useEffect(() => () => { void persistReviews().catch(() => {}); }, []);
   useEffect(() => () => { sourceEpoch.current++; if (webOperation.current) void api.cancelWebExtraction?.(webOperation.current).catch(() => {}); }, [api]);
+  useEffect(() => {
+    let active = true;
+    if (api.getWebRenderCapability) void api.getWebRenderCapability().then(value => { if (active) setRenderCapability(value); })
+      .catch(failure => { if (active) setRenderCapability({ enabled: false, policyVersion: 1, message: failure instanceof Error ? failure.message : '无法确认当前构建资格，请使用静态获取、粘贴或本地文件。' }); });
+    else setRenderCapability({ enabled: false, policyVersion: 1, message: '当前版本未提供受限渲染，请使用静态获取、粘贴或本地文件。' });
+    return () => { active = false; };
+  }, [api]);
   useEffect(() => {
     let active = true;
     if (!api.readExtractionDraft) return;
@@ -105,8 +116,9 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
     } catch (failure) { setError(failure instanceof Error ? failure.message : '无法读取文件，请重试。'); }
     finally { locked.current = false; setBusy(false); }
   }
-  async function importSource() {
+  async function importSource(mode: 'static' | 'restricted-browser' = 'static', confirmedUrl?: string) {
     if (locked.current || restoreFailed || preview || sourceKind === 'file') return;
+    if (mode === 'restricted-browser' && (!renderCapability?.enabled || sourceKind !== 'web' || confirmedUrl !== url.trim())) return;
     const serial = ++sourceEpoch.current;
     locked.current = true; onDirtyChange?.(true); setBusy(true); setError('');
     try {
@@ -114,7 +126,7 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
       if (sourceKind === 'web') {
         if (!api.fetchWebExtraction) throw new Error('当前版本暂不支持网页获取。');
         const operationId = crypto.randomUUID(); webOperation.current = operationId;
-        result = await api.fetchWebExtraction({ workId: work.id, operationId, url: url.trim() });
+        result = await api.fetchWebExtraction({ workId: work.id, operationId, url: url.trim(), mode });
       } else {
         if (!api.previewPastedExtraction) throw new Error('当前版本暂不支持粘贴预览。');
         result = await api.previewPastedExtraction({ workId: work.id, title: pasteTitle, text: pasteText });
@@ -194,11 +206,12 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
     {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}{restoring && <p role="status">正在读取本机拆书草稿…</p>}{restoreFailed && <p role="status">原草稿已保留，本工作区不会自动覆盖；请先处理恢复错误再选择新素材。</p>}
     <fieldset className="book-extraction-import" disabled={restoring || restoreFailed}>
       <div className="book-extraction-source-tabs" role="group" aria-label="素材来源">{([['file', '本地文件'], ['web', '网页文章'], ['paste', '粘贴正文']] as const).map(([kind, label]) => <button key={kind} aria-pressed={sourceKind === kind} disabled={busy || !!preview} onClick={() => setSourceKind(kind)}>{label}</button>)}</div>
-      <div className="book-extraction-toolbar">{sourceKind === 'file' ? <><label>TXT 编码<select value={encoding} disabled={busy || !!preview} onChange={event => setEncoding(event.target.value as typeof encoding)}><option value="utf-8">UTF-8</option><option value="gb18030">GB18030</option></select></label><button className="primary" disabled={busy || !!preview} onClick={() => void choose()}>选择 TXT / DOCX</button></> : sourceKind === 'web' ? <><label className="book-extraction-address">公开网页地址<input type="url" value={url} disabled={busy || !!preview} onChange={event => setUrl(event.target.value)} placeholder="https://" /></label><button className="primary" disabled={busy || !!preview || !url.trim()} onClick={() => void importSource()}>获取并预览</button>{fileBusy && webOperation.current && <button onClick={() => void cancelFetch()}>取消获取</button>}</> : <div className="book-extraction-paste"><label>素材标题<input value={pasteTitle} maxLength={200} disabled={busy || !!preview} onChange={event => setPasteTitle(event.target.value)} /></label><label>粘贴原文<textarea value={pasteText} disabled={busy || !!preview} onChange={event => setPasteText(event.target.value)} /></label><button className="primary" disabled={busy || !!preview || !pasteTitle.trim() || !pasteText.trim()} onClick={() => void importSource()}>预览粘贴内容</button></div>}</div>
+      <div className="book-extraction-toolbar">{sourceKind === 'file' ? <><label>TXT 编码<select value={encoding} disabled={busy || !!preview} onChange={event => setEncoding(event.target.value as typeof encoding)}><option value="utf-8">UTF-8</option><option value="gb18030">GB18030</option></select></label><button className="primary" disabled={busy || !!preview} onClick={() => void choose()}>选择 TXT / DOCX</button></> : sourceKind === 'web' ? <><label className="book-extraction-address">公开网页地址<input type="url" value={url} disabled={busy || !!preview} onChange={event => setUrl(event.target.value)} placeholder="https://" /></label><button className="primary" disabled={busy || !!preview || !url.trim()} onClick={() => void importSource()}>获取并预览</button><button disabled={busy || !!preview || !url.trim() || !renderCapability?.enabled} aria-describedby="web-render-capability" onClick={() => setRenderConfirmation({ url: url.trim(), workId: work.id })}>受限渲染并预览</button>{fileBusy && webOperation.current && <button onClick={() => void cancelFetch()}>取消获取</button>}</> : <div className="book-extraction-paste"><label>素材标题<input value={pasteTitle} maxLength={200} disabled={busy || !!preview} onChange={event => setPasteTitle(event.target.value)} /></label><label>粘贴原文<textarea value={pasteText} disabled={busy || !!preview} onChange={event => setPasteText(event.target.value)} /></label><button className="primary" disabled={busy || !!preview || !pasteTitle.trim() || !pasteText.trim()} onClick={() => void importSource()}>预览粘贴内容</button></div>}</div>
+      {sourceKind === 'web' && <p id="web-render-capability" role="status">{renderCapability?.message ?? '正在确认受限渲染资格…'}</p>}
     </fieldset>
     {!preview && <p className="book-extraction-empty">选择有权使用的本地作品，逐段审核内容、分类和标签后入库。DOCX 图片与表格不作为摘选内容。</p>}
     {preview && <><div className="book-extraction-source"><p>{preview.filename} · {preview.segments.length} 段 · 默认不选中任何内容</p>
-      {preview.source?.finalUrl && <details><summary>网页来源记录</summary><p>原始地址：{preview.source.originalUrl}<br />最终地址：{preview.source.finalUrl}<br />获取时间：{preview.source.fetchedAt}<br />正文 SHA-256：{preview.source.bodyHash}</p></details>}
+      {preview.source?.kind === 'web' && <WebSourceAudit source={preview.source} />}
       <label>来源作品名<input aria-label="来源作品名" value={sourceTitle} maxLength={200} disabled={busy} onChange={event => setSourceTitle(event.target.value)} /></label>
       <label>来源作者<input aria-label="来源作者" value={sourceAuthor} maxLength={200} disabled={busy} onChange={event => setSourceAuthor(event.target.value)} placeholder="未知可留空" /></label>
       <label><input type="checkbox" aria-label="确认有权使用摘选内容" checked={permission} disabled={busy} onChange={event => setPermission(event.target.checked)} />我确认有权使用这些摘选内容；仅整理已审核的写作参考。</label>
@@ -216,6 +229,9 @@ export function BookExtractionWorkspace({ work, api, onClose, onCommitted, onDir
         <label><input type="checkbox" aria-label={`审核通过段落 ${number}`} disabled={!item.body.trim() || !categories.some(category => category.id === item.categoryId)} checked={item.checked} onChange={event => update(segment.id, { checked: event.target.checked })} />审核通过，加入知识库</label>
       </fieldset>;
     })}</div></div><footer className="book-extraction-footer"><button disabled={busy || page === 0} onClick={() => setPage(page - 1)}>上一页</button><span>第 {page + 1} / {Math.ceil(preview.segments.length / 20)} 页</span><button disabled={busy || (page + 1) * 20 >= preview.segments.length} onClick={() => setPage(page + 1)}>下一页</button><button className="primary" disabled={busy || !permission || !sourceTitle.trim() || !chosen.length || chosen.length > 100} onClick={() => void commit()}>确认入库（{chosen.length}）</button></footer>{chosen.length > 100 && <p role="alert">每次最多审核 100 段，请减少选择。</p>}</section></div></>}
+    {renderConfirmation && <StructureDialog busy={busy} onClose={() => setRenderConfirmation(null)} submitDisabled={!renderCapability?.enabled || renderConfirmation.workId !== work.id || renderConfirmation.url !== url.trim() || sourceKind !== 'web'} state={{ heading: '确认受限网页渲染', submitLabel: '确认渲染', submitTone: 'primary', onSubmit: async () => {
+      const confirmed = renderConfirmation; setRenderConfirmation(null); void importSource('restricted-browser', confirmed.url); return true;
+    } }}><p>本次网址：{renderConfirmation.url}</p><p>将联网打开该网页并执行页面脚本，最多等待 40 秒。只加载同一网站的正文资源。</p><p>不支持登录、验证码或跨站正文接口；不会自动滚动、翻页或点击。正文脚本失败时请改用粘贴或本地文件。</p></StructureDialog>}
     {leaving && <StructureDialog busy={busy} onClose={() => setLeaving(false)} state={{ heading: api.saveExtractionReview ? '保存草稿并返回？' : '放弃本次摘选？', description: api.saveExtractionReview ? '审核草稿将先保存在本机，下次进入可继续；未审核内容不会加入知识库。' : '尚未入库的审核内容将被放弃，原有知识库保持不变。', submitLabel: api.saveExtractionReview ? '保存草稿并返回' : '放弃摘选并返回', onSubmit: close }} />}
     {replacement && <StructureDialog busy={busy} onClose={() => setReplacement(null)} state={{ heading: '替换本段审核内容？', description: '本段已有手工修改或审核。替换后保留文件原文，但本次审核内容将改为AI建议，并需要重新审核。', submitLabel: '替换并重新审核', submitTone: 'primary', onSubmit: async () => await replacement.revalidate() && applySuggestion(replacement.suggestion) }} />}
     {changingSource && <StructureDialog busy={busy} onClose={() => setChangingSource(false)} state={{ heading: '更换拆书素材？', description: '本次尚未入库的审核草稿与批次候选将被放弃，已入库知识保持不变。入库回执尚未核对时不能更换。', submitLabel: '放弃草稿并更换', onSubmit: replaceSource }} />}
