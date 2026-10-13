@@ -20,6 +20,8 @@
 
 独立审查发现首次安装无selection时可能将资格false写成偏好false；补回归并保持默认作者偏好，资格继续独立阻断推理。最终修复提交与验证在完整验证后更新。
 
+审查修复已提交：ddca699保持首次导入默认偏好（39项专项）；6ee801f提供旧指纹的显式维护，核验合法结构、保留enabled并备份旧原字节（48项专项）；d93f54f挂接默认builder拒绝hook，授权入口显式替换并复核来源（主复验15项专项）。以上限定lint与typecheck已通过。进一步实际包成员白名单检查进行中，未宣称全包敏感成员审计完成。
+
 ## 真实产物证据
 
 本轮显式无模型研究包：release/research-without-model/03cd3b17-c92c-4abb-b36a-327785535dc8/win-unpacked/RainSoul.exe。实际EXE/ASAR哈希、Electron44.7.0、截图和通过场景见[bundled-model-acceptance.md](bundled-model-acceptance.md)。报告持久保存在产物同级acceptance。

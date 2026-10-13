@@ -21,13 +21,26 @@ npx playwright test --config playwright.desktop.config.cjs tests/desktop/restric
 - 无限循环页面取消时，主进程仍执行取消，任务独立 renderer 被结束，窗口销毁。正式完整回归结果见下方运行记录。
 - 测试发现正常 CDP 清理与窗口销毁并行导致 `target closed while handling command`；已增加回归测试并改为等待观察器关闭。死循环页面还会阻塞同步 debugger.detach，取消改为移除宿主观察监听，再结束已核对的任务进程并销毁窗口。
 
-21 项定向单元通过，覆盖关闭顺序、取消终止模式、一秒清理期限、正常结束任务进程、身份或共享关系变化时不得误杀作者进程，以及生产适配器窗口配置。实际并发运行曾触发一秒清理门禁，未将这些清理错误计为负向隔离通过；正式运行需在验证资源空闲时重复，保持原期限。
+21 项定向单元通过，覆盖关闭顺序、取消终止模式、一秒清理期限、正常结束任务进程、身份或共享关系变化时不得误杀作者进程，以及生产适配器窗口配置。类型检查和定向 ESLint 通过。实际并发运行曾触发一秒清理门禁，未将这些清理错误计为负向隔离通过；停止并发验证后保持原期限串行复核，六项全部通过。
+
+最终运行：`2026-10-13T04:30:07.313Z`；Playwright `1 passed (20.6s)`。原始报告：`test-results-restricted-runtime/restricted-web-runtime-真实Electron动态正文、CSP提前拒绝与死循环取消清理/restricted-render-runtime-report.json`。测试 bundle SHA256：`30e1e7f665df69242b88016747ea3a9fb73675fd59fe9a62210397076a139837`；该轮输入夹具 hash：`c81f256040491a8051df91ffcd39f00cac29102936af6cdf9c9bde9a70b67bb0`（包含随机监听端口）。
+
+| 夹具 | 结果 | 耗时 | 任务进程/窗口剩余 |
+| --- | --- | --- | --- |
+| 内联脚本生成正文 | passed | 4637ms | 0 / 0 |
+| 同源外部 script/fetch/XHR 正文 | passed | 920ms | 0 / 0 |
+| CSP 跨源脚本提前拒绝 | passed | 266ms | 0 / 0 |
+| CSP 跨源 fetch 即使被页面 catch | passed | 225ms | 0 / 0 |
+| 私网 HTTPS POST 拒绝 | passed | 168ms | 0 / 0 |
+| 无限循环文档取消 | passed | 1149ms | 0 / 0 |
+
+六项受控 TCP 连接、上传字节、UDP 包计数均为 0。输出保留 `productionCapability.enabled=false`，未据此提升生产资格。日志中的 `NO_COLOR`/`FORCE_COLOR` 冲突是 Playwright 终端色彩环境提示，不影响机制验证。
 
 ## 证据边界与剩余门禁
 
 | 验证项 | 状态 | 适用边界 |
 | --- | --- | --- |
-| 实际 Chromium 动态正文、CSP 与取消机制 | 最近整轮失败，待串行复核 | 最近一次 5/6 通过，inline 清理期限超时；动态脚本/fetch/XHR、两 CSP、私网 POST、死循环取消通过，所有任务进程均已退出 |
+| 实际 Chromium 动态正文、CSP 与取消机制 | passed | 最终串行六项通过；证明表列机制与清理结果 |
 | 受控私网 TCP 目标零连接/零上传 | 已观察 | 仅指定本机目标和六类夹具，不等于全系统无出站 |
 | UDP 监听零包 | 观察值 | 未主动执行 STUN/QUIC 探针，不能作为 WebRTC/QUIC 隔离证明 |
 | 生产 broker HTTPS 固定 IP 真实传输 | 待验证 | 夹具替换 DNS/传输；独立传输单元覆盖不代替系统证据 |
