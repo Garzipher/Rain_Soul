@@ -1,9 +1,15 @@
 import { connect } from 'node:net';
-import { afterEach, expect, it } from 'vitest';
+import { createServer, type Server } from 'node:http';
+import { afterEach, expect, it, vi } from 'vitest';
 import { createRenderDenyProxy, type RenderDenyProxy } from '../../src/main/render-deny-proxy';
+const servers=vi.hoisted(()=>({last:null as Server|null}));
+vi.mock('node:http',async importOriginal=>{
+  const actual=await importOriginal<typeof import('node:http')>();
+  return {...actual,createServer:vi.fn((...args:Parameters<typeof actual.createServer>)=>{servers.last=actual.createServer(...args);return servers.last;})};
+});
 
 const proxies: RenderDenyProxy[] = [];
-afterEach(async () => { await Promise.all(proxies.splice(0).map(proxy => proxy.close())); });
+afterEach(async () => { await Promise.all(proxies.splice(0).map(proxy => proxy.close())); vi.restoreAllMocks(); });
 async function proxy() { const value = await createRenderDenyProxy(); proxies.push(value); return value; }
 function exchange(port: number, bytes: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -45,4 +51,32 @@ it('第17条未完成连接被立即拒绝，已有客户端仍能得到拒绝�
     });
     value.assertHealthy();
   } finally { for (const socket of sockets) socket.destroy(); }
+});
+it.each([
+  'GET / HTTP/1.1\r\nHost: public.example.com\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n',
+  '无效HTTP请求\r\n\r\n',
+])('升级与损坏请求立即关闭，不产生可用隧道：%s', async bytes => {
+  const value=await proxy(); expect(await exchange(value.port,bytes)).toBe(''); value.assertHealthy();
+});
+it('闲置连接超时关闭，关闭幂等并立即失去健康状态', async () => {
+  const value=await proxy(), socket=connect(value.port,'127.0.0.1');
+  await new Promise<void>((resolve,reject)=>{socket.once('connect',resolve);socket.once('error',reject);});
+  await new Promise<void>(resolve=>socket.once('close',()=>resolve()));
+  value.assertHealthy(); const first=value.close(), second=value.close(); expect(first).toBe(second);
+  expect(()=>value.assertHealthy()).toThrow(/失效/); await first;
+});
+it('运行中的服务错误关闭全部连接并撤销健康状态，清理错误传给调用方', async () => {
+  const value=await createRenderDenyProxy(), server=servers.last!, socket=connect(value.port,'127.0.0.1');
+  await new Promise<void>((resolve,reject)=>{socket.once('connect',resolve);socket.once('error',reject);});
+  const ended=new Promise<void>(resolve=>socket.once('close',()=>resolve()));
+  server.emit('error',new Error('模拟监听故障')); await ended;
+  expect(()=>value.assertHealthy()).toThrow(/失效/); await expect(value.close()).rejects.toThrow();
+});
+it('绑定失败拒绝创建代理，不能报告就绪或留下监听端口', async () => {
+  vi.mocked(createServer).mockImplementationOnce((...args:Parameters<typeof createServer>)=>{
+    const server=servers.last=createServer(...args);
+    vi.spyOn(server,'listen').mockImplementation(()=>{queueMicrotask(()=>server.emit('error',new Error('模拟端口绑定失败')));return server;});
+    return server;
+  });
+  await expect(createRenderDenyProxy()).rejects.toThrow('模拟端口绑定失败'); expect(servers.last!.listening).toBe(false);
 });

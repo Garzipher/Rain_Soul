@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { gzipSync } from 'node:zlib';
+import { gzipSync, brotliCompressSync, deflateSync } from 'node:zlib';
 import type { ClientRequest, IncomingMessage } from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
 import { RenderResourceBroker } from '../../src/main/render-resource-broker';
@@ -124,4 +124,57 @@ it('宿主能复核代理健康，取消或安全拒绝后不能报告成功', a
   const f=fixture(); await f.broker.initialize(); expect(()=>f.broker.assertHealthy()).not.toThrow();
   await expect(f.broker.fetch('https://other.example.com/a','stylesheet')).rejects.toThrow();
   expect(()=>f.broker.assertHealthy()).toThrow(); await f.broker.close();
+});
+it('初始阶段未完成不能获取资源，重复初始化不重新联网，空DNS拒绝', async () => {
+  const f=fixture(); await expect(f.broker.fetch('https://article.example.com/a','xhr')).rejects.toThrow(/尚未/);
+  await f.broker.initialize(); await expect(f.broker.initialize()).rejects.toThrow(/已获取/);
+  expect(f.openRequest).toHaveBeenCalledTimes(1); await f.broker.close();
+  const empty=fixture(); empty.resolveHost.mockResolvedValue([]);
+  await expect(empty.broker.initialize()).rejects.toThrow(/公开/); expect(empty.openRequest).not.toHaveBeenCalled(); await empty.broker.close();
+});
+it.each([
+  [{status:302}, /缺少地址/],
+  [{status:302,headers:{location:'/'}}, /循环/],
+  [{status:503}, /可用内容/],
+  [{headers:{'content-type':['text/html','text/plain']}}, /响应头/],
+  [{headers:{'content-encoding':'unknown'}}, /压缩格式/],
+  [{headers:{'content-encoding':'gzip'},bytes:Buffer.from('损坏压缩')}, /header|gzip|compression|incorrect/i],
+] as const)('初始响应失败后所有资源停用：%o', async (reply,message) => {
+  const f=fixture([reply as Reply]); await expect(f.broker.initialize()).rejects.toThrow(message);
+  expect(()=>f.broker.assertHealthy()).toThrow(); await f.broker.close(); expect(f.streams.every(stream=>stream.destroyed)).toBe(true);
+});
+it.each([['br',brotliCompressSync],['deflate',deflateSync]] as const)('资源%s解压保留正文与nosniff，过滤报告CSP', async (encoding,compress) => {
+  const bytes=Buffer.from('{"正文":"中文"}');
+  const f=fixture([{}, {headers:{'content-type':'application/json','content-encoding':encoding,'x-content-type-options':'nosniff','content-security-policy-report-only':"default-src 'none'"},bytes:compress(bytes)}]);
+  await f.broker.initialize(); const result=await f.broker.fetch('https://article.example.com/api','fetch');
+  expect(result.bytes).toEqual(bytes); expect(result.headers['x-content-type-options']).toBe('nosniff');
+  expect(result.headers['content-security-policy-report-only']).toBeUndefined(); await f.broker.close();
+});
+it('单响应展开超过5MiB与累计压缩超过12MiB均停止，重定向计入请求数', async () => {
+  const expanded=fixture([{}, {headers:{'content-type':'text/plain','content-encoding':'gzip'},bytes:gzipSync(Buffer.alloc(5*1024*1024+1))}]);
+  await expanded.broker.initialize(); await expect(expanded.broker.fetch('https://article.example.com/a','xhr')).rejects.toThrow(/单资源展开/); await expanded.broker.close();
+  const compressed=fixture(Array.from({length:7},()=>({bytes:Buffer.alloc(2*1024*1024)})));
+  await compressed.broker.initialize(); for(let i=0;i<5;i++) await compressed.broker.fetch(`https://article.example.com/a${i}`,'xhr');
+  await expect(compressed.broker.fetch('https://article.example.com/over','xhr')).rejects.toThrow(/累计压缩/); await compressed.broker.close();
+  const redirects=fixture([{},...Array.from({length:78},()=>({})),{status:302,headers:{location:'/next'}}]);
+  await redirects.broker.initialize(); for(let i=0;i<78;i++) await redirects.broker.fetch(`https://article.example.com/a${i}`,'xhr');
+  await expect(redirects.broker.fetch('https://article.example.com/redirect','xhr')).rejects.toThrow(/请求总数/);
+  expect(redirects.openRequest).toHaveBeenCalledTimes(80); await redirects.broker.close();
+});
+it('资源自身取消使挂起连接与后续请求失效，已经取消的信号不建连接', async () => {
+  const f=fixture([{}, {hanging:true}]); await f.broker.initialize();
+  const signal=new AbortController(), pending=f.broker.fetch('https://article.example.com/a','xhr',signal.signal).catch(error=>error);
+  await new Promise(resolve=>setImmediate(resolve)); signal.abort(); expect((await pending).message).toMatch(/取消/);
+  expect(()=>f.broker.assertHealthy()).toThrow(); expect(f.streams.every(stream=>stream.destroyed)).toBe(true); await f.broker.close();
+  const g=fixture(); await g.broker.initialize(); await expect(g.broker.fetch('https://article.example.com/a','xhr',signal.signal)).rejects.toThrow(/取消/);
+  expect(g.openRequest).toHaveBeenCalledTimes(1); await g.broker.close();
+});
+it('IPv6固定IP支持all查询，连接异常与主进程期限拒绝后不返回假成功', async () => {
+  const f=fixture(); f.resolveHost.mockResolvedValue(['2606:4700:4700::1111']); await f.broker.initialize();
+  const options=f.openRequest.mock.calls[0][1] as {lookup:(host:string,options:object,callback:(...args:unknown[])=>void)=>void};
+  const callback=vi.fn(); options.lookup('rebound',{all:true},callback); expect(callback).toHaveBeenCalledWith(null,[{address:'2606:4700:4700::1111',family:6}]); await f.broker.close();
+  const broken=fixture(); broken.openRequest.mockImplementationOnce(()=>{throw new Error('连接不可用');});
+  await expect(broken.broker.initialize()).rejects.toThrow(/连接失败/); await broken.broker.close();
+  vi.useFakeTimers(); const expired=fixture(); await expired.broker.initialize(); await vi.advanceTimersByTimeAsync(40000);
+  expect(()=>expired.broker.assertHealthy()).toThrow(/总期限/); await expired.broker.close();
 });

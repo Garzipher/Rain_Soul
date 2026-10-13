@@ -31,3 +31,23 @@ it('深层节点用有界迭代遍历，空文档与非法限额拒绝', () => {
   expect(captureBoundedDom(document,{maxDomNodes:2000,maxDomBytes:20000})).toContain('<div>');
   expect(()=>captureBoundedDom(document,{maxDomNodes:0,maxDomBytes:10})).toThrow();
 });
+it('忽略注释且void元素无闭合标签，代理对跨4096边界仍精确计算UTF8', () => {
+  const { document }=parseHTML('<html><body><!--不属于正文--><br><img src="x"><p></p></body></html>');
+  const paragraph=document.querySelector('p')!; paragraph.textContent='a'.repeat(4095)+'😀汉字';
+  const html=captureBoundedDom(document,{maxDomNodes:20,maxDomBytes:10000});
+  expect(html).toContain('a'.repeat(4095)+'😀汉字'); expect(html).not.toContain('不属于正文'); expect(html).not.toContain('</br>');
+  const bytes=Buffer.byteLength(html); expect(captureBoundedDom(document,{maxDomNodes:20,maxDomBytes:bytes})).toBe(html);
+  expect(()=>captureBoundedDom(document,{maxDomNodes:20,maxDomBytes:bytes-1})).toThrow(/容量/);
+});
+it.each([{maxDomNodes:1.5,maxDomBytes:10},{maxDomNodes:1,maxDomBytes:0},{maxDomNodes:1,maxDomBytes:NaN}])('无效预算拒绝：%o', limits => {
+  const { document }=parseHTML('<html></html>'); expect(()=>captureBoundedDom(document,limits)).toThrow(/限额/);
+});
+it('空文档与非法元素或属性名称拒绝，不能序列化为注入标记', () => {
+  const { document }=parseHTML('<html><body>正文</body></html>');
+  expect(()=>captureBoundedDom({documentElement:null} as unknown as Document,{maxDomNodes:20,maxDomBytes:1000})).toThrow(/文档/);
+  Object.defineProperty(document.body,'localName',{value:'bad tag',configurable:true});
+  expect(()=>captureBoundedDom(document,{maxDomNodes:20,maxDomBytes:1000})).toThrow(/元素名称/);
+  Object.defineProperty(document.body,'localName',{value:'body'});
+  Object.defineProperty(document.body,'attributes',{value:[{name:'bad attr',value:'正文'}]});
+  expect(()=>captureBoundedDom(document,{maxDomNodes:20,maxDomBytes:1000})).toThrow(/属性名称/);
+});
