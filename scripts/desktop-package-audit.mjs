@@ -44,7 +44,7 @@ function packageMember(path, directory) {
   if (path === 'package.json' && !directory) return true;
   if (path === 'node_modules' && directory) return true;
   // 依赖有合法许可证、类型声明等；拒绝数据库、日志、凭据及作者文档。
-  return path.startsWith('node_modules/') && !/\.(?:(?:sqlite(?:3)?|db)(?:-(?:wal|shm|journal))?|log(?:\.\d+)?|docx|doc|odt)$/i.test(path) && !/(?:^|\/)(?:Projects|credentials(?:\.json)?|\.env(?:\..*)?)$/i.test(path);
+  return path.startsWith('node_modules/') && !/\.(?:(?:sqlite(?:3)?|db)(?:-(?:wal|shm|journal))?|log(?:\.\d+)?|docx|doc|odt)$/i.test(path) && !/(?:^|\/)(?:Projects|ExtractionDrafts|Avatars|RetrievalCache|RetrievalModels|(?:ai-settings|author-profile)\.json|\.(?:ai-settings|author-profile)-[^/]+\.tmp|credentials(?:\.json)?|\.env(?:\..*)?)$/i.test(path);
 }
 /** 校验真实ASAR及解包旁树，不信任头内摘要来代替文件字节。 */
 export async function auditDesktopPackage(resources, expected, options = {}) {
@@ -70,8 +70,17 @@ export async function auditDesktopPackage(resources, expected, options = {}) {
     const info = statFile(archive, native, false), directory = 'files' in info;
     if ('link' in info || !packageMember(path, directory)) throw new Error(`ASAR存在未授权成员：${path}`);
     if (directory) continue;
-    if (info.unpacked) { assertSafeLocalPath(join(side, native)); unpacked.add(path); }
-    const bytes = extractFile(archive, native, false), file = { path, bytes: bytes.length, sha256: digest(bytes), unpacked: !!info.unpacked };
+    let file;
+    if (info.unpacked) {
+      const physical = join(side, native); assertSafeLocalPath(physical);
+      const beforeFile = await lstat(physical);
+      if (!beforeFile.isFile() || beforeFile.size !== info.size) throw new Error('解包实际文件长度与ASAR声明不符。');
+      const hash = await sha256(physical), afterFile = await lstat(physical);
+      if (afterFile.size !== beforeFile.size || afterFile.mtimeMs !== beforeFile.mtimeMs) throw new Error('审计期间解包内容发生变化。');
+      file = { path, bytes: beforeFile.size, sha256: hash, unpacked: true }; unpacked.add(path);
+    } else {
+      const bytes = extractFile(archive, native, false); file = { path, bytes: bytes.length, sha256: digest(bytes), unpacked: false };
+    }
     if (info.integrity && (info.integrity.algorithm !== 'SHA256' || info.integrity.hash !== file.sha256)) throw new Error('实际ASAR或解包文件内容摘要不匹配。');
     files.push(file);
     if (path.startsWith('dist/')) actualBuild.push({ path: path.slice(5), bytes: file.bytes, sha256: file.sha256 });

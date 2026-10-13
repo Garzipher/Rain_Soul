@@ -48,6 +48,21 @@ it('实际ASAR审计绑定字节摘要，核对构建内容和解包旁树', asy
 it.each(['Projects/project.sqlite', 'dist/desktop/research.log', 'dist/renderer/作者.docx', 'dist/retrieval-model/revision/model.onnx', 'node_modules/valid/research.log', 'node_modules/valid/project.sqlite-wal', 'node_modules/valid/project.db-shm', 'node_modules/valid/research.log.1', 'credentials.json'])('实际ASAR拒绝未授权成员 %s', async addition => {
   const input = build(), resources = await pack(input, [addition]); await expect(auditDesktopPackage(resources, await checkDesktopBuild(input))).rejects.toThrow();
 });
+it.each(['node_modules/valid/ai-settings.json', 'node_modules/valid/author-profile.json', 'node_modules/valid/ExtractionDrafts/work.json'])('依赖目录也拒绝项目实际敏感存储成员 %s', async addition => {
+  const input = build(), resources = await pack(input, [addition]);
+  await expect(auditDesktopPackage(resources, await checkDesktopBuild(input))).rejects.toThrow(/未授权/);
+});
+it.each(['node_modules/valid/Avatars/author.png', 'node_modules/valid/RetrievalCache/empty.json', 'node_modules/valid/RetrievalModels/preference.json', 'node_modules/valid/.ai-settings-123.tmp', 'node_modules/valid/.author-profile-123.tmp'])('依赖目录拒绝用户资源目录及实际原子写入临时文件 %s', async addition => {
+  const input = build(), resources = await pack(input, [addition]);
+  await expect(auditDesktopPackage(resources, await checkDesktopBuild(input))).rejects.toThrow(/未授权/);
+});
+it('ASAR声明空文件时仍核对解包实际字节，非空旁树不能冒充空内容', async () => {
+  const input = build(); put(input, 'desktop/retrieval-wasm/ort-wasm-simd-threaded.wasm', '');
+  const expected = await checkDesktopBuild(input), resources = await pack(input);
+  await expect(auditDesktopPackage(resources, expected)).resolves.toMatchObject({ unpackedFiles: 2 });
+  put(join(resources, 'app.asar.unpacked'), 'dist/desktop/retrieval-wasm/ort-wasm-simd-threaded.wasm', '意外非空文件');
+  await expect(auditDesktopPackage(resources, expected)).rejects.toThrow(/摘要|内容|解包/);
+});
 it('拒绝遗漏构建成员、打包期间内容变化以及外加解包数据库', async () => {
   const input = build(), expected = await checkDesktopBuild(input); put(input, 'desktop/main.cjs', '打包期间更改');
   let resources = await pack(input); await expect(auditDesktopPackage(resources, expected)).rejects.toThrow(/内容|摘要/);
