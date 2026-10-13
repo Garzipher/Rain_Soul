@@ -24,7 +24,17 @@ CREATE INDEX learning_annotation_entry ON learning_annotation(entry_id);
 `;
 
 /** 建库与迁移由调用方控制版本、备份及事务，本模块不改user_version。 */
-export function initializeSourceSchema(db: Database.Database): void { db.exec(sourceSchema); initializeSourceCoordinates(db); }
+export function initializeSourceSchema(db: Database.Database): void { db.exec(sourceSchema); initializeSourceCoordinates(db); initializeSourceCapture(db); }
+/** v8 独立捕获关系；旧来源保持没有记录，不能推断历史捕获时间。 */
+export function initializeSourceCapture(db: Database.Database): void {
+  db.exec(`CREATE TABLE source_capture (
+    source_id TEXT PRIMARY KEY REFERENCES source_document(id),
+    method TEXT NOT NULL CHECK(method IN ('static','restricted-browser')),
+    captured_at TEXT NOT NULL, rendered_dom_hash TEXT, policy_version INTEGER NOT NULL CHECK(policy_version=1),
+    CHECK((method='static' AND rendered_dom_hash IS NULL) OR
+      (method='restricted-browser' AND rendered_dom_hash IS NOT NULL AND length(rendered_dom_hash)=64 AND rendered_dom_hash NOT GLOB '*[^a-f0-9]*'))
+  );`);
+}
 /** 追加可空坐标，不推测旧素材的章节位置。成对约束同时保护直接SQLite写入。 */
 export function initializeSourceCoordinates(db: Database.Database): void {
   db.exec(`ALTER TABLE source_segment ADD COLUMN chapter_index INTEGER CHECK(chapter_index IS NULL OR chapter_index>0);
