@@ -142,9 +142,10 @@ describe('真实桌面写作界面', () => {
     body.focus();
     fireEvent.keyDown(body, { key: 'ArrowRight' });
     await waitFor(() => expect(screen.getByRole('tab', { name: '剧情架构' }).getAttribute('aria-selected')).toBe('true'));
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: '剧情架构' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('tab', { name: '剧情架构' })));
     fireEvent.keyDown(screen.getByRole('tab', { name: '剧情架构' }), { key: 'Home' });
     await screen.findByRole('textbox', { name: '章节标题' });
+    await waitFor(() => expect((screen.getByRole('textbox', { name: '章节标题' }) as HTMLInputElement).disabled).toBe(false));
     adapter.failSave(true);
     fireEvent.change(screen.getByRole('textbox', { name: '章节标题' }), { target: { value: '留在正文' } });
     fireEvent.keyDown(screen.getByRole('tab', { name: '正文' }), { key: 'ArrowRight' });

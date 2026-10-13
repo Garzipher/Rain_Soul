@@ -186,7 +186,7 @@ describe('知识编辑与跨作品权限', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存知识' }));
     await waitFor(() => expect(screen.queryByLabelText('知识内容')).not.toBeInTheDocument());
     expect(onAction).toHaveBeenLastCalledWith({ type: 'createKnowledge', body: '雨落在站台上。', source: '自己的练习', categoryId: 'unc', tagIds: ['rain'] });
-    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
   });
   it('删除先确认；失败留在确认框，不提前移除卡片', async () => {
     const onAction = vi.fn(async () => false); setup({ onAction });
