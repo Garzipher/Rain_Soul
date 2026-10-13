@@ -12,7 +12,10 @@ export interface BookExtractionPreview {
   warnings: ManuscriptWarning[]; segments: BookExtractionSegment[];
   source?: FrozenSourceDocument;
 }
-export interface WebImportRequest { workId: string; operationId: string; url: string }
+export const webImportRequestSchema = z.object({ workId: z.uuid(), operationId: z.uuid(), url: z.string().min(1).max(2048),
+  mode: z.enum(['static', 'restricted-browser']).default('static'),
+}).strict();
+export type WebImportRequest = z.input<typeof webImportRequestSchema>;
 export interface PastedImportRequest { workId: string; text: string; title: string }
 const text = z.string().trim().min(1).max(20000);
 const tags = z.array(z.uuid()).max(100).refine(ids => new Set(ids).size === ids.length);

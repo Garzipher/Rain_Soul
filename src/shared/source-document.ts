@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sourceCaptureSchema } from './source-capture';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const boundedText = (max: number) => z.string().refine(value => [...value].length <= max, `文本最多 ${max} 个字符`);
@@ -28,12 +29,15 @@ export const frozenSourceDocumentSchema = z.object({
   originalUrl: sourceUrlSchema.nullable(), finalUrl: sourceUrlSchema.nullable(),
   title: boundedText(200).refine(value => value.trim().length > 0, '来源标题不能为空'),
   fetchedAt: z.iso.datetime({ offset: true }).nullable(), rawHash: hash, bodyHash: hash,
+  capture: sourceCaptureSchema.optional(),
   segments: z.array(sourceSegmentSchema).min(1).max(2000),
 }).strict().superRefine((source, context) => {
   const metadataValid = source.kind === 'web'
     ? source.originalUrl !== null && source.finalUrl !== null && source.fetchedAt !== null
     : source.originalUrl === null && source.finalUrl === null && source.fetchedAt === null;
   if (!metadataValid) context.addIssue({ code: 'custom', message: '来源种类与网页元信息不匹配' });
+  if (source.capture && (source.kind !== 'web' || source.capture.sourceId !== source.id))
+    context.addIssue({ code: 'custom', path: ['capture'], message: '捕获证据必须属于同一网页来源' });
   if (source.segments.reduce((size, segment) => size + [...segment.text].length, 0) > 200000)
     context.addIssue({ code: 'custom', path: ['segments'], message: '来源正文最多二十万字符' });
   if (new Set(source.segments.map(segment => segment.id)).size !== source.segments.length
