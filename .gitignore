@@ -42,3 +42,7 @@ coverage/
 
 # 本机模型资格试验的权重和隔离运行库
 /.tmp-model-qualification/
+/.tmp-render-*/
+/.coverage-render-*/
+/.coverage-dom-attributes/
+/.coverage-package-audit-fixes/
