@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { RetrievalModelPanel } from '../../src/renderer/components/retrieval-model-panel';
 import { fixedManifest, type RetrievalModelStatus } from '../../src/shared/retrieval-model';
 afterEach(cleanup);
@@ -105,4 +106,66 @@ it('下载失败说明原因并释放保护，保留原模型状态', async () =
   expect(screen.getByText('现有模型已停用')).toBeInTheDocument();
   expect(busy).toHaveBeenLastCalledWith(false);
   expect(screen.getByRole('button', { name: '下载固定版本模型' })).toBeEnabled();
+});
+it('未捆绑构建明确说明内置缺失，保持关键词并禁止选择不存在的内置来源', async () => {
+  render(<RetrievalModelPanel api={{ getRetrievalModelStatus: async () => ({ ...status, source: 'bundled', bundledPresent: false, enabled: true }), selectRetrievalModelSource: async () => status }} busy={false} workId="work" />);
+  expect(await screen.findByText('本构建未捆绑模型')).toBeInTheDocument();
+  expect(screen.getByText('内置来源')).toBeInTheDocument();
+  expect(screen.getByText('偏好开启')).toBeInTheDocument();
+  expect(screen.getByText('当前使用关键词')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '改用内置模型' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '重建当前作品索引' })).toBeDisabled();
+});
+it('内置待验分别显示文件校验和资格，已开启偏好仍可停用', async () => {
+  const candidate: RetrievalModelStatus = { ...status, state: 'disabled', installed: true, source: 'bundled', bundledPresent: true, enabled: true, message: undefined };
+  const api = { getRetrievalModelStatus: async () => candidate, setRetrievalModelEnabled: async (enabled: boolean) => ({ ...candidate, enabled }) };
+  render(<RetrievalModelPanel api={api} busy={false} workId="work" />);
+  expect(await screen.findByText('内置模型待验收，当前使用关键词')).toBeInTheDocument();
+  expect(screen.getByText('文件校验通过')).toBeInTheDocument();
+  expect(screen.getByText('资格待核验')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '停用语义检索' }));
+  expect(await screen.findByText('偏好停用')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '启用语义检索' })).toBeDisabled();
+});
+it('旧禁用来源说明保留，不把资格状态当作作者主动停用', async () => {
+  render(<RetrievalModelPanel api={{ getRetrievalModelStatus: async () => ({ ...status, source: 'user', installed: true, state: 'disabled', enabled: false, legacyDisabled: true, bundledPresent: true }) }} busy={false} workId="work" />);
+  expect(await screen.findByText(/保留旧禁用记录/)).toBeInTheDocument();
+  expect(screen.getByText('手动副本')).toBeInTheDocument();
+  expect(screen.getByText('偏好停用')).toBeInTheDocument();
+});
+it('可用内置只读无需下载，键盘可显式选择手动来源且保持停用偏好', async () => {
+  const user = userEvent.setup();
+  const bundled: RetrievalModelStatus = { ...status, source: 'bundled', bundledPresent: true, state: 'ready', installed: true, qualified: true, enabled: true, message: undefined };
+  const api = { getRetrievalModelStatus: async () => bundled, selectRetrievalModelSource: async ({ source }: { source: 'bundled' | 'user' }) => ({ ...bundled, source, state: 'disabled' as const, enabled: false }) };
+  render(<RetrievalModelPanel api={api} busy={false} workId="work" />);
+  expect(await screen.findByText(/内置模型直接读取安装资源，无需重新下载/)).toBeInTheDocument();
+  expect(screen.getByText('语义检索可用')).toBeInTheDocument();
+  expect(screen.getByText('索引状态未读取，查询时显示进度')).toBeInTheDocument();
+  const button = screen.getByRole('button', { name: '改用手动副本' }); button.focus();
+  await user.keyboard('{Enter}');
+  expect(await screen.findByText('手动副本')).toBeInTheDocument();
+  expect(screen.getByText('偏好停用')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '重建当前作品索引' })).toBeDisabled();
+});
+it('手动来源损坏不显示语义可用，换源失败保留当前来源和偏好', async () => {
+  const damaged: RetrievalModelStatus = { ...status, state: 'error', source: 'user', bundledPresent: true, qualified: true, enabled: false, message: '手动副本损坏' };
+  const api = { getRetrievalModelStatus: async () => damaged, selectRetrievalModelSource: async () => { throw new Error('内置模型校验失败'); } };
+  render(<RetrievalModelPanel api={api} busy={false} workId="work" />);
+  await screen.findByText('手动副本损坏');
+  expect(screen.queryByText('语义检索可用')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '改用内置模型' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('内置模型校验失败');
+  expect(screen.getByText('手动副本')).toBeInTheDocument();
+  expect(screen.getByText('偏好停用')).toBeInTheDocument();
+});
+it('来源切换未完成时锁住维护操作，完成后显示经校验的新来源', async () => {
+  let complete!: (value: RetrievalModelStatus) => void;
+  const damaged: RetrievalModelStatus = { ...status, state: 'error', source: 'user', bundledPresent: true, enabled: false };
+  const api = { getRetrievalModelStatus: async () => damaged, selectRetrievalModelSource: () => new Promise<RetrievalModelStatus>(resolve => { complete = resolve; }), importRetrievalModel: async () => status };
+  render(<RetrievalModelPanel api={api} busy={false} workId="work" />);
+  fireEvent.click(await screen.findByRole('button', { name: '改用内置模型' }));
+  expect(screen.getByRole('button', { name: '导入本机模型目录' })).toBeDisabled();
+  await act(async () => complete({ ...damaged, source: 'bundled', installed: true, state: 'disabled' }));
+  expect(screen.getByText('内置来源')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '导入本机模型目录' })).toBeEnabled();
 });
