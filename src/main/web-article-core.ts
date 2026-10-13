@@ -1,5 +1,6 @@
 import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
+import { decodeHtmlText } from './web-html-encoding';
 
 export interface ArticleText { title: string; paragraphs: string[] }
 const invalidText = (text: string) => text.includes('\uFFFD') || Array.from(text).some(char => {
@@ -13,11 +14,7 @@ function decodeHtml(bytes: Uint8Array, contentType: string): string {
   const declaration = /<meta\b[^>]*charset\s*=\s*["']?([\w-]+)/i.exec(Buffer.from(bytes.subarray(0, 4096)).toString('latin1'))?.[1];
   const encoding = (header ?? declaration ?? 'utf-8').toLowerCase();
   if (!['utf-8', 'utf8', 'gb18030', 'gbk', 'gb2312'].includes(encoding)) throw new Error('网页编码不支持，请粘贴正文或导入本地文件。');
-  try {
-    const result = new TextDecoder(encoding.startsWith('gb') ? 'gb18030' : 'utf-8', { fatal: true }).decode(bytes);
-    if (invalidText(result)) throw new Error();
-    return result;
-  } catch { throw new Error('网页编码无效或出现乱码，请粘贴正文。'); }
+  return decodeHtmlText(bytes, encoding);
 }
 
 /** 仅在隔离Worker中调用；linkedom不会执行脚本或加载网页资源。 */
