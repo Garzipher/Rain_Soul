@@ -104,7 +104,17 @@ it('预检可用空间不足时不访问下载器、不替换旧模型，状态�
   await expect(store.install({ operationId: randomUUID(), source: 'download' })).rejects.toThrow(/空间不足/);
   expect(attempts).toBe(0); expect(await store.getStatus()).toMatchObject({ installed: false, availableSpaceBytes: 1 });
 });
-it('安装进度绑定操作身份与准确字节，可取消本地导入，未资格新模型默认停用', async () => {
+it.each([true, false])('首次内置来源存在=%s时未资格安装保留默认开启偏好且不暴露推理目录', async bundledPresent => {
+  const { manifest, source, target } = fixture(false);
+  const store = new RetrievalModelStore(target, { manifest, ...(bundledPresent ? { bundledDirectory: source } : {}) });
+  expect(readdirSync(target)).toEqual([]);
+  expect(await store.getStatus()).toMatchObject({ source: 'bundled', enabled: true, qualified: false });
+  await store.install({ operationId: randomUUID(), source: 'local', directory: source });
+  expect(await store.getStatus()).toMatchObject({ source: 'user', enabled: true, state: 'disabled', qualified: false, installed: true });
+  expect(await store.getActiveDirectory()).toBeNull();
+  expect(await new RetrievalModelStore(target, { manifest }).getStatus()).toMatchObject({ source: 'user', enabled: true, qualified: false });
+});
+it('安装进度绑定操作身份与准确字节，可取消本地导入，未资格新模型不能推理', async () => {
   const { manifest, source, target } = fixture(false), operationId = randomUUID();
   const store = new RetrievalModelStore(target, { manifest });
   await store.install({ operationId, source: 'local', directory: source });

@@ -138,7 +138,7 @@ export class RetrievalModelStore {
     const generation = randomUUID(), stage = join(this.root, `.stage-${generation}`), destination = join(this.root, generation);
     let activated = false;
     try {
-      const selection = await this.selection();
+      const selection = await this.selection() ?? this.defaultSelection();
       cancelled(signal); if (await this.availableSpace() < this.requiredSpace()) throw new Error('模型安装磁盘空间不足，原模型保持。'); cancelled(signal);
       safePath(this.root); mkdirSync(this.root, { recursive: true }); safePath(this.root);
       await mkdir(stage); safePath(stage);
@@ -171,7 +171,7 @@ export class RetrievalModelStore {
       cancelled(signal); this.progress.phase = 'verifying'; await validateModelDirectory(stage, this.manifest); cancelled(signal);
       safePath(destination); await rename(stage, destination); cancelled(signal);
       this.progress.phase = 'activating';
-      await writeModelSelection(this.root, { schemaVersion: 1, source: 'user', userGeneration: generation, fingerprint: modelFingerprint(this.manifest), enabled: selection?.enabled ?? Object.values(this.manifest.qualification).every(Boolean), legacyDisabled: selection?.legacyDisabled }, signal); activated = true;
+      await writeModelSelection(this.root, { schemaVersion: 1, source: 'user', userGeneration: generation, fingerprint: modelFingerprint(this.manifest), enabled: selection.enabled, legacyDisabled: selection.legacyDisabled }, signal); activated = true;
     } finally {
       this.installing = false;
       this.progress = null;
