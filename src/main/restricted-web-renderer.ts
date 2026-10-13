@@ -76,6 +76,8 @@ export class RestrictedWebRenderer {
         try{await Promise.race([operation(),new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error('清理超时。')),1000);})]);}catch{cleanupFailure=true;}finally{clearTimeout(timeout);}
       };
       if(context){
+        // about:blank尚未完成也可能已有renderer；未知/共享身份不能强杀或放行重试。
+        if(!identity){try{identity=this.identity(context);}catch{cleanupFailure=true;}}
         context.window.webContents.removeListener('render-process-gone',crash);
         const currentObserver=observer;if(currentObserver)await cleanup(()=>currentObserver.close(controller.signal.aborted?'terminate':undefined));
         if(identity&&!context.window.isDestroyed()){

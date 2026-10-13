@@ -6,7 +6,7 @@ import { RestrictedWebRenderer } from '../../src/main/restricted-web-renderer';
 afterEach(()=>vi.useRealTimers());
 function fixture(){
   let destroyed=false, running=true;
-  const contents=Object.assign(new EventEmitter(),{id:7,getOSProcessId:()=>222,isDestroyed:()=>destroyed,
+  const contents=Object.assign(new EventEmitter(),{id:7,getOSProcessId:():number=>222,isDestroyed:()=>destroyed,
     forcefullyCrashRenderer:vi.fn(()=>{running=false;}),executeJavaScriptInIsolatedWorld:vi.fn(async()=>'<html><body><article>动态正文</article></body></html>')});
   const window={webContents:contents as unknown as WebContents,loadURL:vi.fn(async()=>undefined),destroy:vi.fn(()=>{destroyed=true;running=false;}),isDestroyed:()=>destroyed} as unknown as BrowserWindow;
   const broker={initialize:vi.fn(async()=>({bytes:Buffer.from('原始HTML'),finalUrl:'https://article.example.com/page',contentType:'text/html',headers:{}})),fetch:vi.fn(async()=>({bytes:Buffer.alloc(0),contentType:'text/plain',headers:{}})),assertHealthy:vi.fn(),close:vi.fn(async()=>undefined)};
@@ -26,7 +26,7 @@ it('捕获前建立观察与独立进程核对，等待安静；保留原HTML和
 });
 it('与作者界面共享进程时拒绝导航且绝不强制结束作者进程',async()=>{
   const f=fixture();f.dependencies.allContents=()=>[{id:7,pid:222},{id:1,pid:222}];
-  await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/独立/);
+  await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/清理/);
   expect(f.window.loadURL).not.toHaveBeenCalled();expect(f.contents.forcefullyCrashRenderer).not.toHaveBeenCalled();
 });
 it('正文脚本死循环不会阻塞主进程期限，取消只终止已核对的任务进程',async()=>{
@@ -104,5 +104,35 @@ it('清理前身份或共享关系变化时绝不结束作者进程，拒绝结�
   const f=fixture();f.observer.close.mockImplementation(async()=>{f.dependencies.allContents=()=>[{id:7,pid:222},{id:1,pid:222}];});
   await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/清理/);
   expect(f.contents.forcefullyCrashRenderer).not.toHaveBeenCalled();
+  await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/清理/);
+});
+it('初始化挂起时取消仍核对并结束独立任务进程，退出证实后才允许重试',async()=>{
+  vi.useFakeTimers();const f=fixture(),controller=new AbortController();
+  f.dependencies.createContext=()=>({window:f.window,session:{} as Session,initialize:()=>new Promise<void>(()=>{})});
+  const result=f.renderer.render('https://article.example.com/page',controller.signal).catch(error=>error);
+  await vi.advanceTimersByTimeAsync(0);controller.abort();await vi.advanceTimersByTimeAsync(1001);
+  expect((await result).message).toMatch(/取消/);expect(f.contents.forcefullyCrashRenderer).toHaveBeenCalledOnce();
+  expect(f.dependencies.installGuard).not.toHaveBeenCalled();
+  const next=fixture();f.dependencies.createContext=next.dependencies.createContext;f.dependencies.processes=next.dependencies.processes;
+  await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).resolves.toHaveProperty('domBytes');
+});
+it.each(['未知','共享'])('初始化取消时%s身份不得强杀，无法核验退出则阻断重试',async kind=>{
+  vi.useFakeTimers();const f=fixture(),controller=new AbortController();
+  f.dependencies.createContext=()=>({window:f.window,session:{} as Session,initialize:()=>new Promise<void>(()=>{})});
+  if(kind==='未知')f.contents.getOSProcessId=()=>0;else f.dependencies.allContents=()=>[{id:7,pid:222},{id:1,pid:222}];
+  const result=f.renderer.render('https://article.example.com/page',controller.signal).catch(error=>error);
+  await vi.advanceTimersByTimeAsync(0);controller.abort();await vi.advanceTimersByTimeAsync(1001);
+  expect((await result).message).toMatch(/清理/);expect(f.contents.forcefullyCrashRenderer).not.toHaveBeenCalled();
+  await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/清理/);
+  expect(f.broker.initialize).toHaveBeenCalledOnce();
+});
+it('初始化取消后窗口销毁但任务进程仍在，清理期限届满后阻断重试',async()=>{
+  vi.useFakeTimers();const f=fixture(),controller=new AbortController();
+  f.dependencies.createContext=()=>({window:f.window,session:{} as Session,initialize:()=>new Promise<void>(()=>{})});
+  f.contents.forcefullyCrashRenderer.mockImplementation(()=>{});vi.mocked(f.window.destroy).mockImplementation(()=>{});
+  f.window.isDestroyed=()=>vi.mocked(f.window.destroy).mock.calls.length>0;
+  const result=f.renderer.render('https://article.example.com/page',controller.signal).catch(error=>error);
+  await vi.advanceTimersByTimeAsync(0);controller.abort();await vi.advanceTimersByTimeAsync(1001);
+  expect((await result).message).toMatch(/清理/);
   await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/清理/);
 });
