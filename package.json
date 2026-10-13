@@ -21,6 +21,7 @@
     "start": "npm run build && electron .",
     "pack": "npm run build && node scripts/pack-desktop.mjs",
     "pack:installer": "npm run build && node scripts/pack-desktop.mjs --installer",
+    "pack:research": "npm run build && node scripts/pack-desktop.mjs --without-bundled-model",
     "verify": "npm run typecheck && npm run lint && npm test"
   },
   "repository": {
@@ -95,6 +96,8 @@
     },
     "files": [
       "dist/**/*",
+      "!dist/retrieval-model",
+      "!dist/retrieval-model/**/*",
       "package.json"
     ],
     "extraResources": [
