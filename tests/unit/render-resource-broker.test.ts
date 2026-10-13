@@ -178,3 +178,17 @@ it('IPv6固定IP支持all查询，连接异常与主进程期限拒绝后不返�
   vi.useFakeTimers(); const expired=fixture(); await expired.broker.initialize(); await vi.advanceTimersByTimeAsync(40000);
   expect(()=>expired.broker.assertHealthy()).toThrow(/总期限/); await expired.broker.close();
 });
+it('释放并发槽时队首先获得名额，完成回调里的新请求不能使连接超过四个',async()=>{
+  const f=fixture([{},...Array.from({length:6},()=>({hanging:true,headers:{'content-type':'application/json'}}))]);
+  await f.broker.initialize();
+  const first=f.broker.fetch('https://article.example.com/first','xhr');
+  const replacement=first.then(()=>f.broker.fetch('https://article.example.com/new','xhr')).catch(error=>error);
+  const others=Array.from({length:3},(_,i)=>f.broker.fetch(`https://article.example.com/active${i}`,'xhr').catch(error=>error));
+  const queued=f.broker.fetch('https://article.example.com/queued','xhr').catch(error=>error);
+  try{
+    await new Promise(resolve=>setImmediate(resolve));expect(f.openRequest).toHaveBeenCalledTimes(5);
+    (f.streams[1] as unknown as PassThrough).end('{}');await new Promise(resolve=>setImmediate(resolve));
+    expect(f.streams.slice(1).filter(stream=>!stream.destroyed)).toHaveLength(4);
+    expect(f.openRequest.mock.calls.slice(5).map(call=>call[0])).toEqual(['https://article.example.com/queued']);
+  }finally{await f.broker.close();await Promise.all([replacement,queued,...others]);}
+});

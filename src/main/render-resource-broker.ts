@@ -73,9 +73,12 @@ export class RenderResourceBroker {
     this.check();
     if (++this.requests > renderLimits.maxRequests) throw this.fatal('网页请求总数超过80次。');
     if (this.active >= renderLimits.maxConcurrentRequests) await this.interrupt(new Promise<void>(resolve => this.queue.push(resolve)));
-    this.check(); this.active++;
-    try { return await this.requestChain(url, type); }
-    finally { this.active--; this.queue.shift()?.(); }
+    else this.active++;
+    try { this.check(); return await this.requestChain(url, type); }
+    finally {
+      // 保留已占用名额并直接交给队首，唤醒微任务前新请求不能抢走空槽。
+      const next = this.queue.shift(); if (next) next(); else this.active--;
+    }
   }
   private async requestChain(url: string, type: string): Promise<RenderResource & { finalUrl: string }> {
     const visited = new Set<string>();
