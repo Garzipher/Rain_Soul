@@ -51,3 +51,24 @@ it('空文档与非法元素或属性名称拒绝，不能序列化为注入标�
   Object.defineProperty(document.body,'attributes',{value:[{name:'bad attr',value:'正文'}]});
   expect(()=>captureBoundedDom(document,{maxDomNodes:20,maxDomBytes:1000})).toThrow(/属性名称/);
 });
+it('属性计入整体节点预算，超限前不读取或物化属性集合', () => {
+  const { document }=parseHTML('<html><body></body></html>');
+  const attributes={length:1000000,get 0(){throw new Error('不应读取超限属性');}};
+  Object.defineProperty(document.body,'attributes',{value:attributes});
+  expect(()=>captureBoundedDom(document,{maxDomNodes:20,maxDomBytes:1000})).toThrow(/节点/);
+});
+it('逐项读取属性，字节预算用尽后不访问后续属性', () => {
+  const { document }=parseHTML('<html><body></body></html>');
+  const attributes={length:2,0:{name:'title',value:'汉'.repeat(100)},get 1(){throw new Error('不应读取后续属性');}};
+  Object.defineProperty(document.body,'attributes',{value:attributes});
+  expect(()=>captureBoundedDom(document,{maxDomNodes:20,maxDomBytes:30})).toThrow(/容量/);
+});
+it('节点与属性共同预算的精确边界可捕获，少一个配额则拒绝', () => {
+  const { document }=parseHTML('<html lang="zh"><body title="汉字" data-source="&"></body></html>');
+  const html=captureBoundedDom(document,{maxDomNodes:5,maxDomBytes:1000});
+  expect(html).toContain('title="汉字"'); expect(html).toContain('data-source="&amp;"');
+  expect(()=>captureBoundedDom(document,{maxDomNodes:4,maxDomBytes:1000})).toThrow(/节点/);
+  const bytes=Buffer.byteLength(html);
+  expect(captureBoundedDom(document,{maxDomNodes:5,maxDomBytes:bytes})).toBe(html);
+  expect(()=>captureBoundedDom(document,{maxDomNodes:5,maxDomBytes:bytes-1})).toThrow(/容量/);
+});

@@ -1,10 +1,14 @@
 /** 可在隔离世界中执行的纯函数，不依赖 Node 或页面提供的序列化器。 */
 export function captureBoundedDom(document: Document, limits: {maxDomNodes:number;maxDomBytes:number}): string {
   if (!Number.isSafeInteger(limits.maxDomNodes) || limits.maxDomNodes<1 || !Number.isSafeInteger(limits.maxDomBytes) || limits.maxDomBytes<1 || !document.documentElement) throw new Error('DOM捕获限额或文档无效。');
-  // 第一遍只计数，不创建 outerHTML；深层 DOM 也不用递归调用栈。
+  // 第一遍把节点与属性计入共同预算，不读取属性值或创建 outerHTML。
   const pending: Node[]=[document.documentElement]; let count=0;
   while(pending.length){
     const node=pending.pop()!; if(++count>limits.maxDomNodes) throw new Error('网页DOM节点超限。');
+    if(node.nodeType===1){
+      count+=(node as Element).attributes.length;
+      if(count>limits.maxDomNodes) throw new Error('网页DOM节点超限。');
+    }
     for(let child=node.lastChild;child;child=child.previousSibling) {
       if(pending.length+count>=limits.maxDomNodes) throw new Error('网页DOM节点超限。');
       pending.push(child);
@@ -35,9 +39,11 @@ export function captureBoundedDom(document: Document, limits: {maxDomNodes:numbe
     const element=item as Element, tag=element.localName;
     if(!/^[a-zA-Z][a-zA-Z0-9:_-]*$/.test(tag)) throw new Error('网页元素名称无效。');
     append('<'+tag);
-    for(const attribute of Array.from(element.attributes)){
+    const attributes=element.attributes;
+    for(let index=0;index<attributes.length;index++){
+      const attribute=attributes[index];
       if(!/^[a-zA-Z_:][a-zA-Z0-9:_.-]*$/.test(attribute.name)) throw new Error('网页属性名称无效。');
-      append(' '+attribute.name+'="'); escaped(attribute.value,true); append('"');
+      append(' '); append(attribute.name); append('="'); escaped(attribute.value,true); append('"');
     }
     append('>'); if(voidTags.has(tag.toLowerCase())) continue;
     stack.push('</'+tag+'>');
