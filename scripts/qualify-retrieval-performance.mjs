@@ -9,14 +9,16 @@ import { setInterval, clearInterval, setTimeout } from 'node:timers';
 import process from 'node:process';
 import console from 'node:console';
 import { build } from 'esbuild';
+import { readResearchModelState, assertResearchModelUnchanged } from './retrieval-research-state.mjs';
 
 // 受控研究直接调用真实适配器；不改产品资格旗标，只使用原创合成知识与隔离数据库。
 const root = resolve(import.meta.dirname, '..'), temporary = join(root, '.tmp-model-qualification');
 const runDirectory = join(temporary, `performance-${randomUUID()}`);
 await mkdir(runDirectory, { recursive: true });
+const manifestPath = join(root, 'assets/retrieval-model-manifest.json'), before = await readResearchModelState(manifestPath);
 const helper = join(runDirectory, 'helpers.cjs');
-await build({ stdin: { contents: `export { RetrievalEngine } from './src/workers/retrieval/engine'; export { RetrievalCache } from './src/workers/retrieval/cache'; export { RetrievalScheduler } from './src/workers/retrieval/scheduler'; export { createCpuEmbeddingModel } from './src/workers/retrieval/model'; export { modelFingerprint, fixedManifest } from './src/shared/retrieval-model';`, resolveDir: root }, outfile: helper, bundle: true, platform: 'node', target: 'node24', format: 'cjs', external: ['better-sqlite3'] });
-const modelFiles = JSON.parse(await readFile(join(root, 'assets/retrieval-model-manifest.json'), 'utf8'));
+await build({ stdin: { contents: `export { RetrievalEngine } from './src/workers/retrieval/engine'; export { RetrievalCache } from './src/workers/retrieval/cache'; export { RetrievalScheduler } from './src/workers/retrieval/scheduler'; export { createCpuEmbeddingModel } from './src/workers/retrieval/model'; export { modelFingerprint, fixedManifest, isRetrievalModelQualified } from './src/shared/retrieval-model';`, resolveDir: root }, outfile: helper, bundle: true, platform: 'node', target: 'node24', format: 'cjs', external: ['better-sqlite3'] });
+const modelFiles = before.manifest;
 for (const file of modelFiles.files) {
   const body = await readFile(join(temporary, 'model', file.path));
   assert.equal(body.length, file.bytes); assert.equal(createHash('sha256').update(body).digest('hex'), file.sha256);
@@ -45,7 +47,7 @@ for (const name of ['http','https','net','tls','dns']) {
   const module = require('node:' + name);
   for (const method of ['request','get','connect','createConnection','lookup','resolve']) if(typeof module[method]==='function') module[method]=()=>{network++;throw Error('性能试验禁止联网');};
 }
-const { RetrievalEngine, RetrievalCache, RetrievalScheduler, createCpuEmbeddingModel, modelFingerprint, fixedManifest } = require(workerData.helper);
+const { RetrievalEngine, RetrievalCache, RetrievalScheduler, createCpuEmbeddingModel, modelFingerprint, fixedManifest, isRetrievalModelQualified } = require(workerData.helper);
 let engine, scheduler;
 const load = (async () => {
   const started = performance.now();
@@ -53,7 +55,7 @@ const load = (async () => {
   const model = await createCpuEmbeddingModel(workerData.modelDirectory, { loadRuntime: async () => runtime });
   scheduler = new RetrievalScheduler(model);
   engine = new RetrievalEngine(new RetrievalCache(workerData.cacheDirectory), scheduler.background, createHash('sha256').update(modelFingerprint()).digest('hex'), fixedManifest.similarityThreshold);
-  parentPort.postMessage({ id:'ready', ok:true, data:{ coldLoadMs:performance.now()-started, qualified:Object.values(fixedManifest.qualification).every(Boolean) } });
+  parentPort.postMessage({ id:'ready', ok:true, data:{ coldLoadMs:performance.now()-started, qualified:isRetrievalModelQualified() } });
 })();
 load.catch(error=>parentPort.postMessage({id:'ready',ok:false,message:error.stack}));
 parentPort.on('message',async ({id,command,payload})=>{
@@ -80,7 +82,7 @@ const sampler = setInterval(() => { peakRss = Math.max(peakRss, process.memoryUs
 const percentile = values => { const sorted = [...values].sort((a, b) => a - b); return { minimum: sorted[0], median: sorted[Math.ceil(sorted.length * .5) - 1], p95: sorted[Math.ceil(sorted.length * .95) - 1], maximum: sorted.at(-1) }; };
 try {
   const ready = await retrievalClient.wait('ready');
-  assert.equal(ready.qualified, false, '研究不得打开生产资格开关');
+  await assertResearchModelUnchanged(manifestPath, before.sha256);
   const work = await databaseClient.request('createWork', { title: '隔离性能试验作品' });
   let revision = work.revision;
   const indexStarted = retrievalClient.wait('index-started');
@@ -111,7 +113,9 @@ try {
   const reopened = await databaseClient.request('openWork', { id: work.id });
   assert.equal(reopened.revision, revision);
   assert.ok(JSON.stringify(reopened.chapters[0].document).includes(`真实数据库保存第${saves.length}次。`));
+  const manifestSha256After = await assertResearchModelUnchanged(manifestPath, before.sha256);
   const report = { timestamp: new Date().toISOString(), status: 'measured', fixtureHash, knowledgeCount: entries.length, queryCount: queries.length,
+    productQualified: ready.qualified, manifestSha256Before: before.sha256, manifestSha256After,
     textLengthCodepoints: percentile(entries.map(entry => [...entry.body].length)), hardware: { cpu: cpus()[0].model, logicalCores: cpus().length, totalMemory: totalmem(), versions: process.versions },
     runtime: modelFiles.runtime, qualificationFlags: modelFiles.qualification, coldLoadMs: ready.coldLoadMs, indexMs,
     hybridMs: percentile(hybrid), keywordMs: percentile(keyword), concurrentSaveMs: percentile(saves), concurrentSaveCount: saves.length, persistedSaveRevision: reopened.revision,
