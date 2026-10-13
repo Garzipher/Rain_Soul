@@ -20,6 +20,18 @@ const minimatch = require('minimatch').minimatch as (path: string, pattern: stri
 const fixture = () => { const root = mkdtempSync(join(tmpdir(), 'rainsoul-pack-policy-')); roots.push(root); mkdirSync(join(root, 'dist')); return root; };
 afterEach(() => { failures.rename = false; for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 // 实际builder首次require会冷加载发布依赖树，覆盖率与低内存磁盘换页时超过默认5秒。
+it('实际builder合并默认与授权配置后，许可声明只复制一次并保留门禁', async () => {
+  const root = fixture();
+  const metadata = JSON.parse(readFileSync('package.json', 'utf8'));
+  writeFileSync(join(root, 'package.json'), JSON.stringify(metadata));
+  const packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model'] });
+  const { getConfig } = require('app-builder-lib/out/util/config/config') as typeof import('app-builder-lib/out/util/config/config');
+  const effective = await getConfig(root, null, packing.config);
+  const notices = (effective.extraResources as { from: string; to: string }[]).filter(resource => resource.to === 'THIRD_PARTY_NOTICES.txt');
+  expect(notices).toEqual([{ from: join(root, 'dist', 'desktop', 'THIRD_PARTY_NOTICES.txt'), to: 'THIRD_PARTY_NOTICES.txt' }]);
+  expect(effective.beforePack).toBe(packing.config.beforePack);
+  expect(effective.afterPack).toBe(packing.config.afterPack);
+}, 60000);
 it('安装器显式关闭更新配置推断，实际builder不生成更新服务配置', async () => {
   const packing = await createModelPackConfiguration({ projectDirectory: fixture(), args: ['--without-bundled-model', '--installer'] });
   expect(packing.config).toHaveProperty('publish', null);

@@ -100,12 +100,6 @@
       "dist/renderer/**/*",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "dist/desktop/THIRD_PARTY_NOTICES.txt",
-        "to": "THIRD_PARTY_NOTICES.txt"
-      }
-    ],
     "asar": true,
     "asarUnpack": [
       "dist/desktop/retrieval-wasm/*",
