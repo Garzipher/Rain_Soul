@@ -96,9 +96,8 @@
       "output": "release/current"
     },
     "files": [
-      "dist/**/*",
-      "!dist/retrieval-model",
-      "!dist/retrieval-model/**/*",
+      "dist/desktop/**/*",
+      "dist/renderer/**/*",
       "package.json"
     ],
     "extraResources": [

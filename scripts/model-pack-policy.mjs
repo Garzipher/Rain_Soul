@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { lstat } from 'node:fs/promises';
+import { lstat, mkdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { assertSafeLocalPath, bundledManifest } from './prepare-bundled-retrieval-model.mjs';
 import { checkBundledModelPackage } from './check-bundled-model-package.mjs';
+import { auditDesktopPackage, checkDesktopBuild } from './desktop-package-audit.mjs';
 
 function contains(parent, child) { const path = relative(parent, child); return path === '' || (!path.startsWith('..') && !isAbsolute(path)); }
 async function exists(path) { return !!await lstat(path).catch(error => { if (error.code === 'ENOENT') return null; throw error; }); }
@@ -16,6 +17,7 @@ export async function createModelPackConfiguration({ projectDirectory, args = []
   if (contains(output, input) || contains(input, output)) throw new Error('打包输出不能覆盖构建输入。');
   if (research && (contains(output, formal) || contains(formal, output) || await exists(output))) throw new Error('无模型研究包必须使用新的独立目录，不得覆盖正式包或已有产物。');
   if (!research) await checkBundledModelPackage(input);
+  const buildMembers = await checkDesktopBuild(input);
   const extraResources = [{ from: join(input, 'desktop', 'THIRD_PARTY_NOTICES.txt'), to: 'THIRD_PARTY_NOTICES.txt' }];
   if (!research) extraResources.push({ from: join(input, 'retrieval-model', bundledManifest.revision), to: `retrieval-model/${bundledManifest.revision}` });
   return {
@@ -23,10 +25,14 @@ export async function createModelPackConfiguration({ projectDirectory, args = []
     message: research ? `研究包：本构建未捆绑模型，语义检索保持资格门禁；输出 ${output}` : `正式包：复制经仓库可信锚核验的模型；输出 ${output}`,
     config: {
       directories: { output },
-      beforePack: async () => { if (!research) await checkBundledModelPackage(input); },
-      files: ['dist/**/*', '!dist/retrieval-model', '!dist/retrieval-model/**/*', 'package.json'],
+      beforePack: async () => {
+        if (!research) await checkBundledModelPackage(input);
+        if ((await checkDesktopBuild(input)).membersSha256 !== buildMembers.membersSha256) throw new Error('打包输入在配置后发生变化。');
+      },
+      files: ['dist/desktop/**/*', 'dist/renderer/**/*', 'package.json'],
       extraResources,
       afterPack: async context => {
+        if ((await checkDesktopBuild(input)).membersSha256 !== buildMembers.membersSha256) throw new Error('打包输入在构建期间发生变化。');
         const resources = join(context.appOutDir, 'resources');
         if (research) {
           const model = join(resources, 'retrieval-model'); assertSafeLocalPath(model);
@@ -36,6 +42,10 @@ export async function createModelPackConfiguration({ projectDirectory, args = []
           await checkBundledModelPackage(input);
           await checkBundledModelPackage(resources);
         }
+        const audit = await auditDesktopPackage(resources, buildMembers, { vendorDefaultAsar: join(root, 'node_modules', 'electron', 'dist', 'resources', 'default_app.asar'), allowModel: !research });
+        const acceptance = join(output, 'acceptance'); assertSafeLocalPath(acceptance); await mkdir(acceptance, { recursive: true });
+        const report = join(acceptance, 'desktop-package-audit.json'); assertSafeLocalPath(report);
+        await writeFile(report, JSON.stringify({ ...audit, mode: research ? 'research-without-model' : 'formal-bundled' }, null, 2), { flag: 'wx' });
       },
     },
   };

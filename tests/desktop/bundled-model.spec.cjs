@@ -24,14 +24,21 @@ test('实际无模型研究包离线回退、只读资源边界及停用偏好�
   expect(existsSync(path.join(resources, 'retrieval-model'))).toBe(false);
   const members = listPackage(asar).map(member => member.replaceAll('\\', '/'));
   expect(members.some(member => member.includes('/dist/retrieval-model/'))).toBe(false);
+  const { checkDesktopBuild, auditDesktopPackage } = await import('../../scripts/desktop-package-audit.mjs');
+  const packageAudit = await auditDesktopPackage(resources, await checkDesktopBuild(path.resolve('dist')), { vendorDefaultAsar: path.resolve('node_modules/electron/dist/resources/default_app.asar') });
+  const savedAudit = JSON.parse(readFileSync(path.resolve(resources, '../../acceptance/desktop-package-audit.json'), 'utf8'));
+  expect(savedAudit.mode).toBe('research-without-model'); expect(savedAudit.asarSha256).toBe(packageAudit.asarSha256);
+  expect(savedAudit.membersSha256).toBe(packageAudit.membersSha256); expect(savedAudit.buildMembersSha256).toBe(packageAudit.buildMembersSha256);
+  expect(savedAudit.files).toEqual(packageAudit.files); expect(savedAudit.resourceFiles).toEqual(packageAudit.resourceFiles);
   const manifest = JSON.parse(readFileSync(path.resolve('assets/retrieval-model-manifest.json'), 'utf8'));
   expect(Object.values(manifest.qualification)).toEqual([false, false, false, false, false]);
   const directory = await temporaryDirectory(); let application;
   const report = {
     schemaVersion: 1, kind: 'research-without-model', timestamp: new Date().toISOString(),
-    executable, executableSha256: await sha256(executable), asarSha256: await sha256(asar),
+    executable, executableSha256: await sha256(executable), asarSha256: packageAudit.asarSha256,
+    packageAudit: { memberCount: packageAudit.memberCount, membersSha256: packageAudit.membersSha256, buildMembersSha256: packageAudit.buildMembersSha256, unpackedFiles: packageAudit.unpackedFiles, resourceFiles: packageAudit.resourceFiles },
     expectedRevision: manifest.revision, qualificationFlags: manifest.qualification,
-    evidence: { packaged: false, rendererOffline: false, modelAbsentFromResourcesAndAsar: true, keywordFallback: false, disabledPreferencePersisted: false, writingPersisted: false },
+    evidence: { packaged: false, rendererOffline: false, actualPackageMembersVerified: true, modelAbsentFromResourcesAndAsar: true, keywordFallback: false, disabledPreferencePersisted: false, writingPersisted: false },
     pending: ['固定官方来源与转换证明', '系统网络观测零出站', '真实模型冷加载与内存', '千条索引与200查询P95', '独立人工质量复核', '干净Windows安装升级卸载'],
   };
   try {

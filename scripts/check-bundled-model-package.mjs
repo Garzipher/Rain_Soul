@@ -4,7 +4,7 @@ import process, { argv, stderr } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { assertSafeLocalPath, bundledManifest, validateModelWeightsDirectory, validateProvenanceDirectory } from './prepare-bundled-retrieval-model.mjs';
 
-/** 只核验模型资源子树；完整ASAR/EXE成员审计仍由已有打包门禁负责。 */
+/** 只核验模型资源子树；构建成员、实际ASAR及解包旁树由desktop-package-audit独立核验。 */
 export async function checkBundledModelPackage(resourcesDirectory, manifest = bundledManifest, trustedAnchor) {
   const root = join(resolve(resourcesDirectory), 'retrieval-model'); assertSafeLocalPath(root);
   if (!(await lstat(root)).isDirectory()) throw new Error('模型资源目录缺失。');

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { afterEach, expect, it } from 'vitest';
+import { createPackage } from '@electron/asar';
 import { createModelPackConfiguration } from '../../scripts/model-pack-policy.mjs';
 
 const roots: string[] = [];
@@ -38,9 +39,26 @@ it('显式无模型模式生成新的独立研究目录，并不复制旧dist模
   expect(first.config.directories.output).toContain(join('release', 'research-without-model'));
   expect(first.config.extraResources).toEqual([{ from: join(root, 'dist', 'desktop', 'THIRD_PARTY_NOTICES.txt'), to: 'THIRD_PARTY_NOTICES.txt' }]);
   const appOutDir = join(root, 'package'); mkdirSync(join(appOutDir, 'resources'), { recursive: true });
+  const stage = join(root, 'stage'); mkdirSync(join(stage, 'dist'), { recursive: true }); writeFileSync(join(stage, 'package.json'), '{}');
+  await createPackage(stage, join(appOutDir, 'resources', 'app.asar'));
   await expect(first.config.afterPack({ appOutDir })).resolves.toBeUndefined();
+  const report = JSON.parse(readFileSync(join(first.config.directories.output, 'acceptance', 'desktop-package-audit.json'), 'utf8'));
+  expect(report.asarSha256).toMatch(/^[a-f0-9]{64}$/); expect(report.memberCount).toBe(1);
   mkdirSync(join(appOutDir, 'resources', 'retrieval-model'));
   await expect(first.config.afterPack({ appOutDir })).rejects.toThrow(/未捆绑|残留/);
+});
+it('研究包创建和beforePack均拒绝构建树的意外作者数据库，不能依靠glob忽略', async () => {
+  const root = fixture(), packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model'] });
+  mkdirSync(join(root, 'dist', 'Projects')); writeFileSync(join(root, 'dist', 'Projects', 'project.sqlite'), '作者数据');
+  await expect(packing.config.beforePack()).rejects.toThrow(/构建|成员/);
+  await expect(createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model'] })).rejects.toThrow(/构建|成员/);
+});
+it('afterPack再次核对输入，构建期间出现未知日志即使未入ASAR也阻断', async () => {
+  const root = fixture(), packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model'] });
+  const appOutDir = join(root, 'package'), stage = join(root, 'stage'); mkdirSync(join(appOutDir, 'resources'), { recursive: true });
+  mkdirSync(stage); writeFileSync(join(stage, 'package.json'), '{}'); await createPackage(stage, join(appOutDir, 'resources', 'app.asar'));
+  writeFileSync(join(root, 'dist', 'research.log'), '意外研究日志');
+  await expect(packing.config.afterPack({ appOutDir })).rejects.toThrow(/构建|成员/);
 });
 it.each(['release/current', 'release', 'dist', 'dist/retrieval-model'])('研究输出%s不能覆盖正式包或构建输入', async output => {
   const root = fixture();
@@ -69,5 +87,7 @@ it('builder文件规则保留程序/WASM但排除模型树，研究包与默认�
     expect(accepted('dist/desktop/retrieval-wasm/ort-wasm.wasm')).toBe(true);
     expect(accepted('dist/retrieval-model/revision/weights/onnx/model_quantized.onnx')).toBe(false);
     expect(accepted('dist/retrieval-model/revision.pending')).toBe(false);
+    expect(accepted('dist/Projects/project.sqlite')).toBe(false);
+    expect(accepted('dist/research.log')).toBe(false);
   }
 });
