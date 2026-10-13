@@ -10,6 +10,17 @@ const require = createRequire(import.meta.url);
 const minimatch = require('minimatch').minimatch as (path: string, pattern: string) => boolean;
 const fixture = () => { const root = mkdtempSync(join(tmpdir(), 'rainsoul-pack-policy-')); roots.push(root); mkdirSync(join(root, 'dist')); return root; };
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+it('默认builder配置实际挂接拒绝旁路门禁，显式研究配置替换该门禁', async () => {
+  const packageConfig = JSON.parse(readFileSync('package.json', 'utf8')).build;
+  expect(typeof packageConfig.beforePack).toBe('string');
+  const { resolveFunction } = require('app-builder-lib/out/util/resolve') as { resolveFunction(type: string | undefined, hook: string | (() => Promise<void>), name: string, root: string): Promise<() => Promise<void>> };
+  const beforePack = await resolveFunction(undefined, packageConfig.beforePack, 'beforePack', process.cwd());
+  await expect(beforePack()).rejects.toThrow(/pack-desktop|直接/);
+  const research = await createModelPackConfiguration({ projectDirectory: fixture(), args: ['--without-bundled-model'] });
+  expect(typeof research.config.beforePack).toBe('function');
+  const authorized = await resolveFunction(undefined, research.config.beforePack, 'beforePack', process.cwd());
+  await expect(authorized()).resolves.toBeUndefined();
+});
 it('默认正式包缺模型时在调用builder前失败，不能静默生成无模型产物', async () => {
   await expect(createModelPackConfiguration({ projectDirectory: fixture(), args: [] })).rejects.toThrow();
 });

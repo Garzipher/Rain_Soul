@@ -23,6 +23,7 @@ export async function createModelPackConfiguration({ projectDirectory, args = []
     message: research ? `研究包：本构建未捆绑模型，语义检索保持资格门禁；输出 ${output}` : `正式包：复制经仓库可信锚核验的模型；输出 ${output}`,
     config: {
       directories: { output },
+      beforePack: async () => { if (!research) await checkBundledModelPackage(input); },
       files: ['dist/**/*', '!dist/retrieval-model', '!dist/retrieval-model/**/*', 'package.json'],
       extraResources,
       afterPack: async context => {

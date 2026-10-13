@@ -89,6 +89,7 @@
     "zod": "4.6.5"
   },
   "build": {
+    "beforePack": "./scripts/reject-direct-pack.cjs",
     "appId": "com.rainsoul.desktop",
     "productName": "RainSoul",
     "directories": {
