@@ -24,7 +24,7 @@ RainSoul 是面向 Windows 的本地写作工作台，采用 Electron、React/Ty
 
 ## 项目开发学习
 
-客户端首次离线启动默认在唯一“作品集”中提供普通作品“项目全流程开发学习”，按分卷、章节记录从需求与原型到架构、实现、测试、评审和交付的学习过程。完整教学源在 [learning/项目全流程开发学习](learning/项目全流程开发学习/)，当前九卷四十一章、二十四张离线图片，包含前置知识、跟做步骤、真实代码、排错、练习答案和系统截图，明确区分已实现功能与后续计划；包含会话授权/回执恢复、本地拆书/出处冻结、AI辅助拆书及第九卷网页安全、草稿恢复、来源坐标和本机检索三章。
+客户端首次离线启动默认在唯一“作品集”中提供普通作品“项目全流程开发学习”，按分卷、章节记录从需求与原型到架构、实现、测试、评审和交付的学习过程。完整教学源在 [learning/项目全流程开发学习](learning/项目全流程开发学习/)，当前九卷四十三章、二十六张离线图片，包含前置知识、跟做步骤、真实代码、排错、练习答案和系统截图，明确区分已实现功能与后续计划；包含会话授权/回执恢复、本地拆书/出处冻结、AI辅助拆书及第九卷网页安全、草稿恢复、来源坐标和本机检索、受限渲染及内置资源五章。
 
 学习章节默认以图文阅读展示 Markdown 标题、代码高亮、表格、本章目录和包内截图；可切换只读“Markdown 源文”核对语法。原“正文／作者笔记”入口已移除，旧数据保留，不混入阅读页。教材逐章先解释技术概念、工作原理和短例，再剖析本项目源码、接口及数据流，最后提供跟做步骤、排错和拓展练习。源文维护在仓库进行；普通小说和作者新增的无教材对应章节仍使用固定样式编辑器。
 
@@ -59,7 +59,7 @@ npm start
 
 正常运行默认使用 `%LOCALAPPDATA%\RainSoul`，其中 `catalog.sqlite` 保存作品目录，每部作品位于 `Projects\<作品 ID>\project.sqlite`，`author-profile.json` 保存作者名称和规范头像。个人资料不随作品快照恢复。实际路径可在设置页面查看；升级或重装前请保留整个数据目录。
 
-当前源码作品库为 schema v7：v5增加独立会话与消息，v6增加冻结来源、知识来源关联和学习注释，v7补齐来源章节/段落坐标。旧库前向迁移前生成包含已提交 WAL 数据的一致备份，失败回滚并拒绝启动，不自动降级或清理备份。归档按白名单接受v4/v5/v6/v7并转换导入新作品；快照payload1/2独立于数据库版本，先核对原hash再兼容读取，恢复正文快照保留当前会话。凭据、模型及向量缓存不进归档。迁移、归档schema校验与快照关系有自动化覆盖，安装器原位升级仍待真实系统验收。
+当前源码作品库为 schema v8：v5增加独立会话与消息，v6增加冻结来源、知识来源关联和学习注释，v7补齐来源章节/段落坐标，v8保存捕获方式、时间及受限渲染DOM摘要。旧库前向迁移前生成包含已提交 WAL 数据的一致备份，失败回滚并拒绝启动，不自动降级或清理备份。归档按白名单接受v4～v8并转换导入新作品；新快照payload3保留捕获证据，旧payload1/2先核对原hash再内存兼容读取，不重写历史字节，恢复正文快照保留当前会话。凭据、模型及向量缓存不进归档。迁移、归档schema校验与快照关系有自动化覆盖，安装器原位升级仍待真实系统验收。
 
 正文保存在本机，AI 仅在作者核对服务、完整发送范围及计费提示并逐次确认后联网。API Key 使用本机安全存储，不进入作品、归档、日志或错误提示。正常关闭会等待保存，保存失败或输入法仍在组词时阻止关闭；强制结束进程、系统断电或系统强制终止不等于正常关闭保护，未落盘草稿仍可能丢失。
 
@@ -67,7 +67,7 @@ npm start
 
 ```powershell
 npm run verify
-npm run pack
+npm run pack:research
 ```
 
 `npm run verify` 依次执行 TypeScript 检查、ESLint、覆盖率测试、真实 Electron 集成测试和原有 Demo 浏览器测试。`npm test` 的覆盖率与桌面测试均自动前置构建，不需要先手动生成 `dist`。
@@ -86,14 +86,16 @@ npm run pack
 
 实际环境为Windows 10 Pro build19045、i5-4460四核/四逻辑核、8GB、1280×840视口；临时作品位于C盘，已通过卷/磁盘映射确认GLOWAY 256GB SATA SSD。测试窗显示但不抢焦点；这是生产构建开发入口的成绩，安装包和其他系统仍按发布门禁另验。专用重跑命令为 `npx playwright test --config playwright.desktop.config.cjs search-performance.spec.cjs --workers=1`，报告在对应 `test-results-desktop` 用例目录中的 `search-performance.json`。完整过程见教材第八卷第14章。
 
-`npm run pack` 生成 Windows x64 目录包，默认输出位于 `release\current\win-unpacked`；`npm run pack:installer` 生成 `release\current\RainSoul Setup 1.3.0.exe`。可以指定独立输出目录，避免覆盖正在运行的程序：
+`npm run pack` 与 `npm run pack:installer` 是正式捆绑入口，默认输出到 `release\current`，当前因模型可信来源锚缺失而拒绝继续。`npm run pack:research` 显式生成未捆绑模型的 Windows x64 目录包，输出到新的 `release\research-without-model\<UUID>`；保留关键词回退，不覆盖正式包。打包前后审计构建成员、实际ASAR和解包旁树，记录文件摘要。显式研究安装器也须与正式目录分开：
 
 ```powershell
-$env:RAINSOUL_PACK_DIRECTORY = 'release/source-intelligence-20261010'
-npm run pack:installer
+$env:RAINSOUL_PACK_DIRECTORY = 'release/research-without-model/example-new-build'
+npm run build
+node scripts/pack-desktop.mjs --without-bundled-model --installer
+Remove-Item Env:RAINSOUL_PACK_DIRECTORY
 ```
 
-当前源码版本为 1.3.0，本批实际目录包入口为 `release\source-intelligence-20261010\win-unpacked\RainSoul.exe`，安装器为 `release\source-intelligence-20261010\RainSoul Setup 1.3.0.exe`；`release/current`是默认构建目录，不能据其名称认定版本最新。复制目录包时需要保留整个 `win-unpacked` 目录；分享安装器只需发送安装器文件。退出旧版后再启动新版，避免单实例锁聚焦旧窗口。目录包启动验证不代表 NSIS 安装、升级和卸载流程已经验收。
+当前源码版本为 1.3.0，新产物和文件摘要以 [实际包记录](tasks/bundled-model-acceptance.md) 为准。`release\source-intelligence-20261010` 是历史构建，不能证明本轮新增代码；`release/current`是默认正式目录，也不能据名称认定版本最新。复制目录包时需要保留整个 `win-unpacked` 目录；分享安装器只需发送安装器文件。退出旧版后再启动新版，避免单实例锁聚焦旧窗口。目录包启动验证不代表 NSIS 安装、升级和卸载流程已经验收。
 
 打包入口针对 Windows 刚重命名程序文件时的 `UNKNOWN/open` 临时访问失败，最多尝试 5 次，间隔 1500ms；每次执行原工具的完整性写入，其他错误直接返回。适配仅验证过锁定的 electron-builder/app-builder-lib 26.15.3，升级这两个工具后需重新验证。
 
@@ -109,7 +111,7 @@ Demo 是视觉和交互参考，包含示例数据及后置功能工作区；作
 
 本轮补齐AI知识更新：默认新建，更新需显式选择条目、对比并逐条审核；稳定ID、引用、保护快照、历史、索引与回执保持一致。跨章提取保留完整授权材料来源；审计材料从普通出处、搜索及云参考中分离，旧索引可幂等修复。云端截断、过滤、拒绝、工具调用和未知结束响应不生成可应用候选；写作特点草稿锁住章节覆盖。
 
-当时教材为八卷38章、20张离线图片；当前九卷41章24图见上文课程清单。补原理、项目链路、跟做、回滚实验和拓展练习。此前真实窗口AI测试只预览并取消，使用隔离目录和虚构配置，未向云服务发送请求。已交付1.0.3的测试、覆盖率、搜索P95及安装包核验结果见 [验收记录](tasks/p0-ai-knowledge-completion.md)；当前P1首批实现和交付门禁结果见 [开发任务](tasks/p0-release-p1-delivery.md)，不将旧包证据算作新源码验收。
+当时教材为八卷38章、20张离线图片；当前九卷43章26图见上文课程清单。补原理、项目链路、跟做、回滚实验和拓展练习。此前真实窗口AI测试只预览并取消，使用隔离目录和虚构配置，未向云服务发送请求。已交付1.0.3的测试、覆盖率、搜索P95及安装包核验结果见 [验收记录](tasks/p0-ai-knowledge-completion.md)；当前P1首批实现和交付门禁结果见 [开发任务](tasks/p0-release-p1-delivery.md)，不将旧包证据算作新源码验收。
 
 本批1.3.0开发验证包使用独立目录 `release/source-intelligence-20261010`；默认打包目录仍为 `release/current`。1119项单元组件、26项开发入口桌面及74项Demo通过，实际EXE的CPU运行库和包完整性通过；包桌面完整结果见[本批执行记录](tasks/url-local-retrieval-ledger.md)。本机Microsoft Word 2007已实际打开导出样稿并验证中文、引用、伏笔及标题字号，生成PDF后检查版面。干净Windows10/11安装升级卸载、真实云模型与费用及其他Word版本仍需对应环境验收；本机测试不替代最终发布门禁。
 
