@@ -19,13 +19,14 @@ const require = createRequire(import.meta.url);
 const minimatch = require('minimatch').minimatch as (path: string, pattern: string) => boolean;
 const fixture = () => { const root = mkdtempSync(join(tmpdir(), 'rainsoul-pack-policy-')); roots.push(root); mkdirSync(join(root, 'dist')); return root; };
 afterEach(() => { failures.rename = false; for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+// 实际builder首次require会冷加载发布依赖树，覆盖率与低内存磁盘换页时超过默认5秒。
 it('安装器显式关闭更新配置推断，实际builder不生成更新服务配置', async () => {
   const packing = await createModelPackConfiguration({ projectDirectory: fixture(), args: ['--without-bundled-model', '--installer'] });
   expect(packing.config).toHaveProperty('publish', null);
   const { getAppUpdatePublishConfiguration } = require('app-builder-lib/out/publish/PublishManager');
   const packager = { config: packing.config, platformSpecificBuildOptions: {}, info: { config: packing.config } };
   expect(await getAppUpdatePublishConfiguration(packager, null, 'x64', false)).toBeNull();
-});
+}, 60000);
 it('普通用户安装不打包提权助手，实际builder不取得或复制助手资源', async () => {
   const root = fixture(), packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model', '--installer'] });
   expect(packing.config).toHaveProperty('nsis', { perMachine: false, packElevateHelper: false, allowElevation: false });
@@ -138,11 +139,13 @@ it('研究输出已有内容或junction时拒绝，不改作者已有文件', as
 it.each([{ args: ['--trusted-anchor', '{}'] }, { args: ['--manifest', '{}'] }, { args: ['--research'] }, { args: ['--unknown'] }])('CLI策略不接受外部锚或未知参数 $args', async ({ args }) => {
   await expect(createModelPackConfiguration({ projectDirectory: fixture(), args })).rejects.toThrow(/参数/);
 });
-it('正式包来源材料不能自证放行，即使外部提供看似可信协议也保持失败', async () => {
+it('正式包拒绝结构合法但与仓库固定锚不符的外部来源协议', async () => {
   const root = fixture(), revision = '75c43b069aac4d136ba6bc1122f995fedcfd2781', notices = join(root, 'dist', 'retrieval-model', revision, 'notices');
   mkdirSync(notices, { recursive: true }); mkdirSync(join(root, 'dist', 'retrieval-model', revision, 'weights'));
-  writeFileSync(join(notices, 'provenance.json'), '{}');
-  await expect(createModelPackConfiguration({ projectDirectory: root, args: [] })).rejects.toThrow(/可信锚|来源/);
+  const external = JSON.parse(readFileSync('assets/retrieval-model-provenance.json', 'utf8'));
+  external.repository = 'external/bge-small-zh-v1.5';
+  writeFileSync(join(notices, 'provenance.json'), JSON.stringify(external));
+  await expect(createModelPackConfiguration({ projectDirectory: root, args: [] })).rejects.toThrow('来源证据与仓库可信锚不一致');
 });
 it('builder文件规则保留程序/WASM但排除模型树，研究包与默认配置均不把权重混入ASAR', async () => {
   const root = fixture(), packing = await createModelPackConfiguration({ projectDirectory: root, args: ['--without-bundled-model'] });

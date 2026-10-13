@@ -24,7 +24,7 @@ try {
   const page = await application.firstWindow(); await page.context().setOffline(true);
   const measured = await application.evaluate(async ({ app }, payload) => {
     // 在真正EXE的主进程创建隔离推理Worker，使用ASAR中的原始运行库，而非研究构建。
-    const { createRequire } = await import('node:module');
+    const { createRequire } = process.getBuiltinModule('node:module');
     const runtimeRequire = createRequire(payload.identity.runtimePath);
     const { Worker } = runtimeRequire('node:worker_threads');
     const source = `
@@ -68,7 +68,7 @@ try {
       })().catch(error=>parentPort.postMessage({ok:false,error:error.message}));
     `;
     const worker = new Worker(source, { eval: true, workerData: payload });
-    const timer = await import('node:timers');
+    const timer = process.getBuiltinModule('node:timers');
     try {
       const result = await new Promise((accept, reject) => {
         const timeout = timer.setTimeout(() => reject(new Error('实际包推理超过5分钟')), 300000);
