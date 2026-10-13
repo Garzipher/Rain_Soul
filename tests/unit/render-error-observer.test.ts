@@ -69,3 +69,12 @@ it('即使页面自行捕获请求错误，宿主网络失败仍拒绝fetch/XHR�
   f.guard.fail.mockClear(); f.message('Network.loadingFailed', { type: 'Image' }); expect(f.guard.fail).not.toHaveBeenCalled();
   await observer.close();
 });
+it('宿主已决定销毁任务时撤下观察监听，不向死循环页面发命令或同步detach', async () => {
+  const f = fixture(), observer = await installRenderErrorObserver(f.contents, f.guard);
+  f.debuggerApi.isAttached = () => true;
+  f.debuggerApi.sendCommand.mockClear();
+  f.debuggerApi.sendCommand.mockImplementation(() => new Promise(() => {}));
+  await observer.close('terminate');
+  expect(f.debuggerApi.sendCommand).not.toHaveBeenCalled();expect(f.debuggerApi.detach).not.toHaveBeenCalled();
+  f.guard.fail.mockClear();f.debuggerApi.emit('detach', {}, 'closed');expect(f.guard.fail).not.toHaveBeenCalled();
+});

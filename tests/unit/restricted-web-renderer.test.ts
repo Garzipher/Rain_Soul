@@ -70,3 +70,39 @@ it('销毁后允许进程指标异步移除，正常成功不会误判永久清�
   const result=f.renderer.render('https://article.example.com/page',new AbortController().signal).catch(e=>e);
   await vi.advanceTimersByTimeAsync(1001);expect((await result).domBytes?.toString()).toContain('动态正文');
 });
+it('等待观察器异步关闭后才销毁窗口，避免真实CDP命令被关闭目标打断',async()=>{
+  const f=fixture();
+  f.observer.close.mockImplementation(async()=>{
+    await new Promise(resolve=>setTimeout(resolve,10));
+    if(f.window.isDestroyed())throw new Error('target closed while handling command');
+  });
+  const result=await f.renderer.render('https://article.example.com/page',new AbortController().signal);
+  expect(result.domBytes.toString()).toContain('动态正文');expect(f.window.destroy).toHaveBeenCalledOnce();
+});
+it('取消后使用终止关闭模式再结束已核对的任务进程',async()=>{
+  const f=fixture(),controller=new AbortController();
+  f.window.loadURL=vi.fn(async()=>{controller.abort();});
+  await expect(f.renderer.render('https://article.example.com/page',controller.signal)).rejects.toThrow(/取消/);
+  expect(f.observer.close).toHaveBeenCalledWith('terminate');
+  expect(f.observer.close.mock.invocationCallOrder[0]).toBeLessThan(f.contents.forcefullyCrashRenderer.mock.invocationCallOrder[0]);
+});
+it('正常关闭观察器也受一秒期限约束，超时销毁并永久阻断重试',async()=>{
+  vi.useFakeTimers();const f=fixture();f.observer.close.mockImplementation(()=>new Promise(()=>{}));
+  const result=f.renderer.render('https://article.example.com/page',new AbortController().signal).catch(error=>error);
+  await vi.advanceTimersByTimeAsync(1001);expect((await result).message).toMatch(/清理/);
+  expect(f.window.destroy).toHaveBeenCalledOnce();
+  await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/清理/);
+});
+it('正常结果关闭观察器后终止已核对的独立renderer，避免窗口销毁后进程留存',async()=>{
+  const f=fixture();
+  const result=await f.renderer.render('https://article.example.com/page',new AbortController().signal);
+  expect(result.domBytes.toString()).toContain('动态正文');expect(f.contents.forcefullyCrashRenderer).toHaveBeenCalledOnce();
+  expect(f.observer.close.mock.invocationCallOrder[0]).toBeLessThan(f.contents.forcefullyCrashRenderer.mock.invocationCallOrder[0]);
+  expect(f.contents.forcefullyCrashRenderer.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(f.window.destroy).mock.invocationCallOrder[0]);
+});
+it('清理前身份或共享关系变化时绝不结束作者进程，拒绝结果并阻断重试',async()=>{
+  const f=fixture();f.observer.close.mockImplementation(async()=>{f.dependencies.allContents=()=>[{id:7,pid:222},{id:1,pid:222}];});
+  await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/清理/);
+  expect(f.contents.forcefullyCrashRenderer).not.toHaveBeenCalled();
+  await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/清理/);
+});

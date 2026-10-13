@@ -77,12 +77,12 @@ export class RestrictedWebRenderer {
       };
       if(context){
         context.window.webContents.removeListener('render-process-gone',crash);
-        if(controller.signal.aborted&&!context.window.isDestroyed()){
-          try{const current=this.identity(context);if(identity&&identity.pid===current.pid&&identity.creationTime===current.creationTime)context.window.webContents.forcefullyCrashRenderer();}catch{cleanupFailure=true;}
+        const currentObserver=observer;if(currentObserver)await cleanup(()=>currentObserver.close(controller.signal.aborted?'terminate':undefined));
+        if(identity&&!context.window.isDestroyed()){
+          // 最后一次核对后结束任务renderer，窗口销毁本身不能证明进程已退出。
+          try{const current=this.identity(context);if(identity.pid===current.pid&&identity.creationTime===current.creationTime)context.window.webContents.forcefullyCrashRenderer();else cleanupFailure=true;}catch{cleanupFailure=true;}
         }
-        const closingObserver=observer?.close();
         try{context.window.destroy();}catch{cleanupFailure=true;}
-        if(closingObserver)await cleanup(()=>closingObserver);
       }
       controller.abort();const currentBroker=broker;if(currentBroker)await cleanup(()=>currentBroker.close());
       if(installation&&!guard)await cleanup(async()=>{await installation!.catch(()=>undefined);});

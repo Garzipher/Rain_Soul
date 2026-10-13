@@ -3,7 +3,7 @@ import type { WebContents } from 'electron';
 import type { RenderFailure } from './render-network-guard';
 
 type Guard = { fail(type: RenderFailure): void; markObserverReady(): void };
-export interface RenderErrorObserver { close(): Promise<void> }
+export interface RenderErrorObserver { close(mode?: 'terminate'): Promise<void> }
 /** 首次导航前调用；在隔离世界的文档创建脚本中注册监听，页面没有应用API。 */
 export async function installRenderErrorObserver(contents: WebContents, guard: Guard): Promise<RenderErrorObserver> {
   const debuggerApi = contents.debugger;
@@ -49,9 +49,11 @@ export async function installRenderErrorObserver(contents: WebContents, guard: G
       else failure();
     }
   };
-  const close = () => {
+  const close = (mode?: 'terminate') => {
     closing ??= (async () => {
       closed = true; debuggerApi.removeListener('message', message); debuggerApi.removeListener('detach', failure);
+      // 取消后宿主紧接着销毁独立任务窗口；CDP命令和同步detach都可能被死循环阻塞。
+      if (mode === 'terminate') return;
       try {
         if (scriptId) await debuggerApi.sendCommand('Page.removeScriptToEvaluateOnNewDocument', { identifier: scriptId });
         await debuggerApi.sendCommand('Runtime.removeBinding', { name: binding });
