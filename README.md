@@ -97,7 +97,7 @@ Remove-Item Env:RAINSOUL_PACK_DIRECTORY
 
 当前源码版本为 1.3.0，新产物和文件摘要以 [实际包记录](tasks/bundled-model-acceptance.md) 为准。`release\source-intelligence-20261010` 是历史构建，不能证明本轮新增代码；`release/current`是默认正式目录，也不能据名称认定版本最新。复制目录包时需要保留整个 `win-unpacked` 目录；分享安装器只需发送安装器文件。退出旧版后再启动新版，避免单实例锁聚焦旧窗口。目录包启动验证不代表 NSIS 安装、升级和卸载流程已经验收。
 
-打包入口针对 Windows 刚重命名程序文件时的 `UNKNOWN/open` 临时访问失败，最多尝试 5 次，间隔 1500ms；每次执行原工具的完整性写入，其他错误直接返回。适配仅验证过锁定的 electron-builder/app-builder-lib 26.15.3，升级这两个工具后需重新验证。
+打包入口针对 Windows 刚重命名程序文件时的 `UNKNOWN/open`、`EBUSY/open` 临时访问失败，最多尝试 5 次，间隔 1500ms；每次执行原工具的完整性写入，其他错误直接返回。安装器显式关闭更新服务推断与普通用户提权助手，整个构建完成后再次审计最终资源。适配仅验证过锁定的 electron-builder/app-builder-lib 26.15.3，升级这两个工具后需重新验证。
 
 ## Demo 与后续开发
 
