@@ -1,8 +1,10 @@
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import { env, argv, stdout } from 'node:process';
 import { retryWindowsFileOperation } from './windows-file-retry.mjs';
 import { fileURLToPath, URL } from 'node:url';
 import { createModelPackConfiguration } from './model-pack-policy.mjs';
+import { auditedDesktopBuild } from './audited-desktop-build.mjs';
 
 const packing = await createModelPackConfiguration({ projectDirectory: fileURLToPath(new URL('../', import.meta.url)), args: argv.slice(2), outputDirectory: env.RAINSOUL_PACK_DIRECTORY });
 stdout.write(packing.message + '\n');
@@ -21,6 +23,6 @@ electronWin.addWinAsarIntegrity = (...args) => retryWindowsFileOperation(() => a
 const { build, Platform, Arch } = require('electron-builder');
 // 可指定新产物目录，避免覆盖作者正在运行的旧版程序。
 const target = argv.includes('--installer') ? 'nsis' : 'dir';
-await build({ targets: Platform.WINDOWS.createTarget(target, Arch.x64), config: {
+await auditedDesktopBuild(() => build({ targets: Platform.WINDOWS.createTarget(target, Arch.x64), config: {
   electronDist: 'node_modules/electron/dist', ...packing.config,
-}, publish: 'never' });
+}, publish: 'never' }), () => packing.config.afterPack({ appOutDir: join(packing.config.directories.output, 'win-unpacked') }));
