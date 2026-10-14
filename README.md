@@ -4,6 +4,22 @@ RainSoul 是面向 Windows 的本地写作工作台，采用 Electron、React/Ty
 
 开发基线为[立项方案 V2.0](docs/Rain_Soul_项目立项方案_V2.0.md)、[PRD](docs/Rain_Soul_PRD.md)及[技术方案](docs/Rain_Soul_技术方案.md)，界面沿用[工作台 Demo](docs/demos/rainsoul-writing-style.html)。本指南介绍开发运行方式，不另行定义需求。
 
+## 启动入口与目录
+
+本机当前版本统一从 `E:\soulrain\release\current\win-unpacked\RainSoul.exe` 启动；安装器也放在 `release/current/`，只启动或安装这里的版本。运行目录包须保留整个 `win-unpacked`，不能单独取走EXE。启动前退出旧实例，避免单实例锁聚焦旧程序。
+
+| 目录 | 内容 | 是否提交Git |
+| --- | --- | --- |
+| `src/` | 产品源码 | 是 |
+| `tests/`、`scripts/` | 自动化测试源码、构建和验收工具 | 是；安装包不含测试源码 |
+| `docs/`、`learning/`、`tasks/` | 产品文档、教材、结论与证据索引 | 是 |
+| `.artifacts/` | 本机生成的日志、截图、报告、覆盖率和历史证据 | 否 |
+| `release/current/` | 当前可用目录包与安装器 | 否 |
+| `release/archive/` | 历史安装包与升级验收基线 | 否；日常不从这里启动 |
+| `node_modules/`、`dist/` | 可重新生成的依赖、编译输出 | 否 |
+
+新测试默认输出到 `.artifacts/tests/desktop`、`.artifacts/tests/demo`，HTML报告在 `.artifacts/reports/demo`，覆盖率在 `.artifacts/coverage`。历史根目录的 `test-results*`、`.p0-*.log` 等已保留原名归档到 `.artifacts/archive/root-20261014/`，搬迁清单在 `.artifacts/manifests/`。旧报告里的原路径按此映射查找；历史 `release/<名称>` 已移至 `release/archive/<名称>`。测试源代码是防止回归所需的项目资产，不能因为叫“脚本”就忽略。
+
 ## 当前开发范围
 
 当前代码已接入真实本地存储：创建/打开作品、可选分卷、卷章排序和移卷、章节标题与固定样式正文编辑、实时字数、撤销重做、自动保存、失败后显式重试，以及正常切换和关闭前的保存保护。启动第二个实例会聚焦已有窗口。
@@ -86,7 +102,7 @@ npm run pack:research
 
 2026-10-09已在真实可见Electron窗口完成搜索性能验收：固定种子100章/100万统计字/1000条知识，20查询各10次共200样本，nearest-rank第190个P95为113.90ms（门槛≤1秒），中位75.90ms、最大147.80ms；20次预热和220次准备查询另计。计时从实际输入事件到正确结果DOM完成并跨两帧，包含IPC、SQLite与渲染，逐项独立核对正文/知识结果和标签AND。
 
-实际环境为Windows 10 Pro build19045、i5-4460四核/四逻辑核、8GB、1280×840视口；临时作品位于C盘，已通过卷/磁盘映射确认GLOWAY 256GB SATA SSD。测试窗显示但不抢焦点；这是生产构建开发入口的成绩，安装包和其他系统仍按发布门禁另验。专用重跑命令为 `npx playwright test --config playwright.desktop.config.cjs search-performance.spec.cjs --workers=1`，报告在对应 `test-results-desktop` 用例目录中的 `search-performance.json`。完整过程见教材第八卷第14章。
+实际环境为Windows 10 Pro build19045、i5-4460四核/四逻辑核、8GB、1280×840视口；临时作品位于C盘，已通过卷/磁盘映射确认GLOWAY 256GB SATA SSD。该历史轮次测试窗显示但不抢焦点；这是生产构建开发入口的成绩，安装包和其他系统仍按发布门禁另验。专用重跑命令为 `npx playwright test --config playwright.desktop.config.cjs search-performance.spec.cjs --workers=1`，新报告在 `.artifacts/tests/desktop` 对应用例目录的 `search-performance.json`。完整过程见教材第八卷第14章。
 
 2026-10-14源码完整回归沿用200样本与双帧终点，P95=201.40ms、中位76.40ms、最大268.70ms。为避免Windows遮挡/最小化导致显示帧被节流，当前测试在每次输入前恢复并检查原生窗口，测量期间隐藏或最小化立即判环境无效；该轮无无效样本，没有丢弃慢样本或放宽门槛。测试专用开关不改变产品显示策略；实际包搜索性能与其他系统需分别验证，详见本轮交付记录。
 
@@ -99,9 +115,9 @@ node scripts/pack-desktop.mjs --without-bundled-model --installer
 Remove-Item Env:RAINSOUL_PACK_DIRECTORY
 ```
 
-当前源码版本为1.3.1，本轮产物与验证见[灰字参考交付](tasks/ghost-reference-delivery-2026-10-14.md)，此前BGE实际包证据见[模型记录](tasks/bundled-model-acceptance.md)。`release\source-intelligence-20261010` 是历史构建，不能证明本轮新增代码；`release/current`是默认正式目录，也不能据名称认定版本最新。复制目录包时需要保留整个 `win-unpacked` 目录；分享安装器只需发送安装器文件。退出旧版后再启动新版，避免单实例锁聚焦旧窗口。目录包启动验证不代表NSIS安装、升级和卸载流程已经验收。
+当前源码版本为1.3.2，知识库入口修正及目录收敛见[本轮记录](tasks/release-layout-2026-10-14.md)。此前1.3.1的灰字与模型验证见[交付记录](tasks/ghost-reference-delivery-2026-10-14.md)及[模型记录](tasks/bundled-model-acceptance.md)。本轮起 `release/current` 作为唯一当前入口，历史构建归入 `release/archive`；仍须核对版本、hash及验收记录。目录包启动验证不代表NSIS安装、升级和卸载流程已经验收。
 
-本轮安装器为[RainSoul Setup 1.3.1.exe](<release/ghost-reference-20261014/RainSoul Setup 1.3.1.exe>)（149369739字节，未签名），含离线BGE模型。实际目录包已通过模型底层资格和灰字、教材、语义检索三项UI验收；干净Windows安装矩阵及正式受限渲染资格仍待验。
+当前安装器为[RainSoul Setup 1.3.2.exe](<release/current/RainSoul Setup 1.3.2.exe>)（149372121字节，未签名），含离线BGE模型。实际目录包已通过知识库入口/跨作品复制、灰字、教材和语义检索四项UI专项及模型底层验收；本轮源码搜索200样本P95=217.80ms。完整验证首轮两项失败已分别复验通过，失败日志仍保留，不称首轮`verify`命令通过。原1.3.1归档至`release/archive/ghost-reference-20261014`；干净Windows安装矩阵及正式受限渲染资格仍待验。
 
 历史研究安装器 `release/research-without-model/35492ba6-3fc7-4034-a7e3-c2230f157386/RainSoul Setup 1.3.0.exe` 未捆绑模型、未签名。当时资源审计、指定EXE的32桌面场景、74项Demo及窄窗键盘检查通过，关键词P95=174.60ms。此后的正式含BGE包和真实云实测已有独立证据；历史研究包不代表当前能力或本轮交付，正式渲染和干净Windows矩阵仍待验。
 
@@ -119,7 +135,7 @@ Demo 是视觉和交互参考，包含示例数据及后置功能工作区；作
 
 本轮补齐AI知识更新：默认新建，更新需显式选择条目、对比并逐条审核；稳定ID、引用、保护快照、历史、索引与回执保持一致。跨章提取保留完整授权材料来源；审计材料从普通出处、搜索及云参考中分离，旧索引可幂等修复。云端截断、过滤、拒绝、工具调用和未知结束响应不生成可应用候选；写作特点草稿锁住章节覆盖。
 
-当时教材为八卷38章、20张离线图片；当前九卷43章26图见上文课程清单。补原理、项目链路、跟做、回滚实验和拓展练习。此前真实窗口AI测试只预览并取消，使用隔离目录和虚构配置，未向云服务发送请求。已交付1.0.3的测试、覆盖率、搜索P95及安装包核验结果见 [验收记录](tasks/p0-ai-knowledge-completion.md)；当前P1首批实现和交付门禁结果见 [开发任务](tasks/p0-release-p1-delivery.md)，不将旧包证据算作新源码验收。
+当时教材为八卷38章、20张离线图片；当前九卷45章28图见上文课程清单。补原理、项目链路、跟做、回滚实验和拓展练习。此前真实窗口AI测试只预览并取消，使用隔离目录和虚构配置，未向云服务发送请求。已交付1.0.3的测试、覆盖率、搜索P95及安装包核验结果见 [验收记录](tasks/p0-ai-knowledge-completion.md)；当前P1首批实现和交付门禁结果见 [开发任务](tasks/p0-release-p1-delivery.md)，不将旧包证据算作新源码验收。
 
 本批1.3.0开发验证包使用独立目录 `release/source-intelligence-20261010`；默认打包目录仍为 `release/current`。1119项单元组件、26项开发入口桌面及74项Demo通过，实际EXE的CPU运行库和包完整性通过；包桌面完整结果见[本批执行记录](tasks/url-local-retrieval-ledger.md)。本机Microsoft Word 2007已实际打开导出样稿并验证中文、引用、伏笔及标题字号，生成PDF后检查版面。干净Windows10/11安装升级卸载、真实云模型与费用及其他Word版本仍需对应环境验收；本机测试不替代最终发布门禁。
 
@@ -129,4 +145,4 @@ Demo 是视觉和交互参考，包含示例数据及后置功能工作区；作
 
 ### 隐藏文件与验收日志
 
-`.gitignore` 是 Git 忽略配置，`.git/` 保存版本历史，`.trae/` 保存项目技能和规章，均属有效开发资料。`.p0-*.log`、`.writing-*.log` 是测试、构建和故障诊断输出，程序运行不依赖；成功和失败记录都可能存在，不能仅凭文件名认定通过。2026-10-09 的75份历史日志已移到 `test-results-logs/2026-10-09/`，任务记录中的路径同步更新。日志目录不进入Git，也不进入安装器；后续验收证据继续放专用 `test-results-*` 目录。
+`.gitignore` 是 Git 忽略配置，`.git/` 保存版本历史，`.trae/` 保存项目技能和规章，均属有效开发资料。`.p0-*.log`、`.writing-*.log` 是测试、构建和故障诊断输出，程序运行不依赖；成功和失败记录都可能存在，不能仅凭文件名认定通过。2026-10-09 的75份历史日志现位于 `.artifacts/archive/root-20261014/test-results-logs/2026-10-09/`。日志目录不进入Git，也不进入安装器；后续日志放 `.artifacts/logs/`，验收证据放 `.artifacts/tests/`。
