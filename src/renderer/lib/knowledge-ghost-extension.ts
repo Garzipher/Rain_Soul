@@ -59,7 +59,7 @@ export function createKnowledgeGhost(context: () => KnowledgeGhostContext) {
             span.setAttribute('role', 'note'); span.setAttribute('aria-label', `知识原句参考，出处：${source}；Tab接受，Esc取消`);
             span.title = `出处：${source} · Tab 接受 / Esc 取消`;
             // 装饰不可选中，不提供可聚焦控件，不移动作者光标。
-            span.style.color = '#7a8695'; span.style.pointerEvents = 'none'; span.style.userSelect = 'none';
+            span.style.color = '#667085'; span.style.pointerEvents = 'none'; span.style.userSelect = 'none';
             return span;
           }, { side: 1, key: `${ghost.candidate.knowledgeId}:${ghost.candidate.revision}:${ghost.position}`, ignoreSelection: true })]);
         },
