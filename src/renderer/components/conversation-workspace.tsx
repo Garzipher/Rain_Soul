@@ -1,18 +1,19 @@
+import { SelectField } from './select-field';
 import { useEffect, useRef, useState } from 'react';
 import type { DesktopApi, WorkDetail, WorkSummary } from '../../shared/contracts';
 import type { ConversationDetail, ConversationRequest, ConversationSummary } from '../../shared/conversations';
 import type { AiPreparedRequest } from '../../shared/ai';
 import './conversation-workspace.css';
 import { ConversationDialog } from './conversation-dialog';
-import { isDefiniteRejection } from '../../shared/operation-errors';
+import { errorCode, isDefiniteRejection } from '../../shared/operation-errors';
 import { ConversationReplyRecovery } from './conversation-reply-recovery';
 
 export type ConversationApi = Pick<DesktopApi, 'listConversations' | 'readConversation' | 'manageConversation' | 'prepareConversationAi' | 'executeConversationAi' | 'cancelConversationAi' | 'retryConversationReply' | 'readPendingConversationReply' | 'discardConversationReply'>;
-interface Props { work: WorkDetail | null; works: WorkSummary[]; api: ConversationApi; externalBusy?: boolean; onSelectWork: (id: string) => void; onDirtyChange: (dirty: boolean) => void }
+interface Props { work: WorkDetail | null; works: WorkSummary[]; api: ConversationApi; externalBusy?: boolean; onSelectWork: (id: string) => void; onOpenSettings?: () => void; onDirtyChange: (dirty: boolean) => void }
 const messageOf = (reason: unknown) => reason instanceof Error ? reason.message : '会话操作失败，请重试。';
 
 /** 会话只保存讨论与草稿，不具有改写作品的权限。 */
-export function ConversationWorkspace({ work, works, api, externalBusy = false, onSelectWork, onDirtyChange }: Props) {
+export function ConversationWorkspace({ work, works, api, externalBusy = false, onSelectWork, onOpenSettings, onDirtyChange }: Props) {
   const [list, setList] = useState<ConversationSummary[]>([]);
   const [current, setCurrent] = useState<ConversationDetail | null>(null);
   const [text, setText] = useState('');
@@ -125,8 +126,8 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
       const updated = await api.executeConversationAi({ confirmationToken: prepared.confirmationToken, requestHash: prepared.requestHash, confirmed: true });
       if (mounted.current) { accept(updated); setText(updated.draft); }
     } catch (reason) {
-      // IPC 丢回执无法推断云端或数据库结果，先按原请求在本机核对。
-      if (mounted.current) setPendingReply(prepared.requestHash);
+      // 明确的失败回执不应锁死导航和关闭；真正未知的回执仍在本机核对。
+      if (mounted.current && errorCode(reason) !== 'CONVERSATION_SEND_FAILED') setPendingReply(prepared.requestHash);
       throw reason;
     } finally { if (mounted.current) { setPreview(null); previewRef.current = null; } }
   }); }
@@ -161,9 +162,9 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
   }
   return <section className="conversation-workspace" aria-label="作品需求会话">
     <aside className="conversation-list" aria-label="作品与会话">
-      <label className="conversation-work-select">作品<select aria-label="会话所属作品" value={work?.id ?? ''} disabled={busy || changed || !!pending || !!preview || !!pendingReply || renaming} onChange={event => onSelectWork(event.target.value)}>
+      <label className="conversation-work-select">作品<SelectField aria-label="会话所属作品" value={work?.id ?? ''} disabled={busy || changed || !!pending || !!preview || !!pendingReply || renaming} onChange={event => onSelectWork(event.target.value)}>
         {!work && <option value="">选择作品</option>}{works.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
-      </select></label>
+      </SelectField></label>
       {work && <><div className="conversation-project"><strong>{work.title}</strong><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply || renaming || rejected} onClick={create}>新建会话</button></div>
         {list.map(item => <div key={item.id} className={`conversation-row ${current?.id === item.id ? 'active' : ''}`}>
           <button aria-label={`打开会话：${item.title}`} disabled={busy || !!pending || !!preview || !!pendingReply || renaming} onClick={() => open(item.id)}>{item.title}</button>
@@ -171,10 +172,10 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
         </div>)}{!list.length && <p>尚无会话</p>}</>}
     </aside>
     <div className="conversation-main">
-      {error && <div role="alert" className="page-error">{error}{refreshNeeded && work && <button disabled={busy} onClick={() => void run(() => refreshRemaining(work.id))}>重新读取会话列表</button>}{pending && <button className="secondary" onClick={() => void write(pending).catch(() => {})}>{pending.action.type === 'saveDraft' ? '重试保存草稿' : '重试会话操作'}</button>}{rejected && current && <button className="secondary" onClick={() => void reload()}>重新读取会话并保留草稿</button>}</div>}
+      {error && <div role="alert" className="page-error"><span>{error}</span><div className="conversation-error-actions">{refreshNeeded && work && <button className="secondary" disabled={busy} onClick={() => void run(() => refreshRemaining(work.id))}>重新读取会话列表</button>}{pending && <button className="secondary" onClick={() => void write(pending).catch(() => {})}>{pending.action.type === 'saveDraft' ? '重试保存草稿' : '重试会话操作'}</button>}{rejected && current && <button className="secondary" onClick={() => void reload()}>重新读取会话并保留草稿</button>}{!pending && !pendingReply && !rejected && !busy && !changed && onOpenSettings && <button className="secondary" onClick={onOpenSettings}>打开模型设置</button>}</div></div>}
       {!current ? <div className="conversation-empty">{work ? '新建或选择一个会话' : '先选择一部作品'}</div> : <>
         <div className="conversation-heading"><h2>{current.title}</h2><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply} onClick={() => { setName(current.title); setRenaming(true); }}>重命名会话</button></div>
-        {renaming && <form onSubmit={event => { event.preventDefault(); rename(); }}><input aria-label="会话名称" value={name} maxLength={120} onChange={event => setName(event.target.value)} /><button disabled={busy || !name.trim()}>保存名称</button><button type="button" disabled={busy} onClick={() => setRenaming(false)}>取消改名</button></form>}
+        {renaming && <form className="conversation-rename" onSubmit={event => { event.preventDefault(); rename(); }}><input aria-label="会话名称" value={name} maxLength={120} onChange={event => setName(event.target.value)} /><button className="primary" disabled={busy || !name.trim()}>保存名称</button><button className="secondary" type="button" disabled={busy} onClick={() => setRenaming(false)}>取消改名</button></form>}
         <div className="conversation-messages" role="log" aria-label="会话消息">{current.hasMore && <button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply} onClick={older}>加载更早消息</button>}{current.messages.map(item => <article key={item.id} className={`conversation-message ${item.role}`}><span>{item.role === 'user' ? '你' : 'AI 建议'}</span><p>{item.content}</p></article>)}</div>
         {current.messageCount > 100 && <p className="conversation-range">云端预览仅发送最近100条历史；更早消息可在本机阅读。</p>}
         <div className="conversation-composer"><textarea aria-label="会话输入" placeholder="输入消息" value={text} maxLength={200000} disabled={busy || !!pending || !!preview || !!pendingReply} onChange={event => { textRef.current = event.target.value; onDirtyChange(true); setText(event.target.value); }} /><div><span role="status">{pending ? '草稿保存失败' : changed ? '正在保存草稿…' : '草稿已存本机'}</span><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply || renaming || rejected || !text.trim()} onClick={record}>仅记录</button><button className="primary" disabled={busy || !!pending || !!preview || !!pendingReply || renaming || rejected || !text.trim()} onClick={prepare}>预览发送</button></div></div>

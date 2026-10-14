@@ -4,7 +4,7 @@ import type { AiSettings } from './ai-settings';
 import type { ConversationAiService } from './conversation-ai-service';
 import type { ConversationDetail, ConversationTurnRequest } from '../shared/conversations';
 import { conversationAiPrepareRequestSchema, type ConversationAiPrepareRequest, type PendingConversationReply } from '../shared/conversation-ai';
-import { operationError } from '../shared/operation-errors';
+import { errorCode, operationError } from '../shared/operation-errors';
 
 const replyRequestSchema = z.object({ requestHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 const schemas = {
@@ -26,7 +26,14 @@ export class ConversationAiCommands {
   constructor(private readonly store: { execute: (command: string, payload: unknown) => Promise<unknown> }, private readonly settings: { get: () => AiSettings }, private readonly service: ConversationAiService) {}
   accepts(command: string): boolean { return Object.hasOwn(schemas, command); }
   execute(command: string, payload: unknown): Promise<unknown> {
-    const operation = this.run(command, payload); this.running.add(operation);
+    const operation = this.run(command, payload).catch(reason => {
+      // 主进程已经给出明确失败回执，只有完整回答待保存或仍在执行才需要锁住恢复。
+      // IPC 本身丢失回执时不会到达这里，前端仍按未知结果核对，不自动重发。
+      if (command === 'executeConversationAi' && !['CONVERSATION_REPLY_PENDING', 'CONVERSATION_IN_PROGRESS'].includes(errorCode(reason) ?? '')) {
+        throw operationError(reason instanceof Error ? reason.message : '会话发送失败，请检查设置后手动重试。', 'CONVERSATION_SEND_FAILED');
+      }
+      throw reason;
+    }); this.running.add(operation);
     void operation.then(() => this.running.delete(operation), () => this.running.delete(operation)); return operation;
   }
   private async read(request: ConversationAiPrepareRequest): Promise<ConversationDetail> {
