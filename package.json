@@ -4,6 +4,7 @@
   "description": "本地优先的中文写作工作台",
   "main": "dist/desktop/main.cjs",
   "scripts": {
+    "postinstall": "install-electron",
     "test": "npm run test:coverage && npm run test:desktop && npm run test:demo",
     "test:headed": "playwright test --project=chrome",
     "test:report": "playwright show-report .artifacts/reports/demo",
