@@ -1,3 +1,4 @@
+import { SelectField } from './select-field';
 import { useRef, useState } from 'react';
 import { readableKnowledgeSource } from '../../shared/knowledge-source';
 import type { Category, KnowledgeEntry, KnowledgeTag } from '../../shared/assets';
@@ -67,7 +68,7 @@ export function KnowledgeCopyDialog({ preview, busy, pending = false, onRetry, o
     <div className="knowledge-copy-preview">
       <p className="knowledge-copy-content">{preview.entry.body}</p><p>出处：{readableKnowledgeSource(preview.entry.source) || '未注明出处'}</p>
       <p>来源分类：{preview.sourceCategory}</p><p>来源标签：{preview.sourceTags.join('、') || '无'}</p>
-      <label>目标主分类<select aria-label="目标主分类" value={categoryId} disabled={disabled} onChange={event => setCategoryId(event.target.value)}>{preview.categories.map(item => <option key={item.id} value={item.id}>{categoryPath(item.id, preview.categories)}</option>)}</select></label>
+      <label>目标主分类<SelectField aria-label="目标主分类" value={categoryId} disabled={disabled} onChange={event => setCategoryId(event.target.value)}>{preview.categories.map(item => <option key={item.id} value={item.id}>{categoryPath(item.id, preview.categories)}</option>)}</SelectField></label>
       <fieldset disabled={disabled}><legend>目标作品已有标签</legend>{preview.tags.length ? preview.tags.map(tag => <label key={tag.id}><input type="checkbox" checked={tagIds.includes(tag.id)} onChange={() => setTagIds(previous => previous.includes(tag.id) ? previous.filter(id => id !== tag.id) : [...previous, tag.id])} />{tag.name}</label>) : <p>当前作品尚无标签。</p>}</fieldset>
       {!!preview.unmatchedTags.length && <p>未匹配标签：{preview.unmatchedTags.join('、')}。本次不添加；如需这些标签，请先在设置维护后重新复制。</p>}
       {error && <p role="alert">{error}</p>}

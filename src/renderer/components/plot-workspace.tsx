@@ -1,3 +1,4 @@
+import { SelectField } from './select-field';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssetAction, AssetState, OutlineKind, OutlineNode } from '../../shared/assets';
 import type { WorkDetail } from '../../shared/contracts';
@@ -101,7 +102,7 @@ function PlotDetails(props: AssetWorkspaceProps & { node: OutlineNode }) {
       {action.error && <p role="alert" className="asset-error">{action.error}</p>}
       <label>节点名称<input value={title} disabled={action.locked} onChange={(event) => { setTitle(event.target.value); setDirty(true); }} required /></label>
       <label>剧情摘要<textarea value={summary} disabled={action.locked} onChange={(event) => { setSummary(event.target.value); setDirty(true); }} /></label>
-      <label>关联正文章节<select value={chapterId} disabled={action.locked} onChange={(event) => { setChapterId(event.target.value); setDirty(true); }}><option value="">未关联</option>{props.work.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}</select></label>
+      <label>关联正文章节<SelectField value={chapterId} disabled={action.locked} onChange={(event) => { setChapterId(event.target.value); setDirty(true); }}><option value="">未关联</option>{props.work.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.title}</option>)}</SelectField></label>
       <div className="asset-buttons"><button className="primary" disabled={action.locked || !title.trim()}>保存剧情</button><button type="button" className="secondary" disabled={action.locked} onClick={() => { setTitle(node.title); setSummary(node.summary); setChapterId(node.chapterId ?? ''); setDirty(false); action.setError(''); }}>放弃更改</button><button type="button" className="secondary" disabled={action.locked || !node.chapterId} onClick={() => node.chapterId && props.onLocate(node.chapterId)}>定位正文</button></div>
     </form>
     <div className="asset-buttons"><button className="secondary" disabled={action.locked || dirty} onClick={() => void action.execute({ type: 'moveOutline', id: node.id, direction: 'up' })}>节点上移</button><button className="secondary" disabled={action.locked || dirty} onClick={() => void action.execute({ type: 'moveOutline', id: node.id, direction: 'down' })}>节点下移</button><button className="secondary" disabled={action.locked || dirty} onClick={() => setConfirmDelete(true)}>删除剧情</button></div>

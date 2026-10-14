@@ -1,3 +1,4 @@
+import { SelectField } from './select-field';
 import { useEffect, useRef, useState } from 'react';
 import Document from '@tiptap/extension-document';
 import HardBreak from '@tiptap/extension-hard-break';
@@ -124,8 +125,8 @@ export function ChapterEditor({ document, assets, locked, ghostPaused = false, o
     insertBookmarkAtSelection(editor, kind, targetId);
   }
   return <>
-    {assets && <div className="bookmark-toolbar"><select aria-label="书签类型" value={kind} disabled={locked} onChange={event => { setKind(event.target.value as BookmarkNode['attrs']['kind']); setTarget(''); }}><option value="knowledge">知识引用</option><option value="foreshadow">伏笔标记</option></select>
-      <select aria-label="书签目标" value={targetId} disabled={locked || !options?.length} onChange={event => setTarget(event.target.value)}>{!options?.length && <option value="">暂无可关联条目</option>}{options?.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+    {assets && <div className="bookmark-toolbar"><SelectField aria-label="书签类型" value={kind} disabled={locked} onChange={event => { setKind(event.target.value as BookmarkNode['attrs']['kind']); setTarget(''); }}><option value="knowledge">知识引用</option><option value="foreshadow">伏笔标记</option></SelectField>
+      <SelectField aria-label="书签目标" value={targetId} disabled={locked || !options?.length} onChange={event => setTarget(event.target.value)}>{!options?.length && <option value="">暂无可关联条目</option>}{options?.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
       <button className="secondary" disabled={locked || !targetId} onMouseDown={event => event.preventDefault()} onClick={insertBookmark}>插入书签</button></div>}
     <EditorContent editor={editor} />
     {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}

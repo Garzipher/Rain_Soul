@@ -1,3 +1,4 @@
+import { SelectField } from './select-field';
 import { useEffect, useRef, useState } from 'react';
 import type { AssetAction, AssetState, Category, KnowledgeTag } from '../../shared/assets';
 import { StructureDialog } from './structure-dialog';
@@ -96,7 +97,7 @@ export function KnowledgeDictionary({ assets, busy, onAction, onDirtyChange }: K
       </div>)}</div>
       {draft && <form onSubmit={event => void saveCategory(event)}><h3>{draft.id ? '编辑分类' : '新增分类'}</h3>
         <label>分类名称<input aria-label="分类名称" value={draft.name} disabled={disabled} onChange={event => setDraft({ ...draft, name: event.target.value })} required /></label>
-        <label>上级分类<select aria-label="上级分类" value={draft.parentId ?? ''} disabled={disabled} onChange={event => setDraft({ ...draft, parentId: event.target.value || null })}><option value="">顶级分类</option>{categories.filter(item => item.id !== draft.id && !descendants(draft.id ?? '').has(item.id)).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label>上级分类<SelectField aria-label="上级分类" value={draft.parentId ?? ''} disabled={disabled} onChange={event => setDraft({ ...draft, parentId: event.target.value || null })}><option value="">顶级分类</option>{categories.filter(item => item.id !== draft.id && !descendants(draft.id ?? '').has(item.id)).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectField></label>
         <div><button type="button" disabled={disabled} onClick={() => setDraft(null)}>取消</button><button type="submit" disabled={disabled || !draft.name.trim()}>{busyAction ? '正在保存…' : '保存分类'}</button></div>
       </form>}
       {!draft && <button type="button" disabled={dictionaryLocked} onClick={() => openCategory()}>新增分类</button>}
@@ -111,7 +112,7 @@ export function KnowledgeDictionary({ assets, busy, onAction, onDirtyChange }: K
     {deleteCategory && <StructureDialog role="alertdialog" busy={disabled} submitDisabled={!!categoryChildren.length || (categoryEntries.length > 0 && !destinationId)} onClose={() => setDeleteCategory(null)} state={{
       heading: `删除分类：${deleteCategory.name}`, description: categoryEntries.length ? `此分类下有 ${categoryEntries.length} 条知识，确认后先迁移知识，再删除分类。` : '删除后无法恢复分类。',
       submitLabel: categoryEntries.length ? '确认迁移并删除分类' : '确认删除分类', onSubmit: () => operate({ type: 'deleteCategory', id: deleteCategory.id, destinationId: categoryEntries.length ? destinationId : null }),
-    }}>{categoryChildren.length ? <p role="alert">该分类有子分类，请先处理子分类。</p> : categoryEntries.length > 0 && <label>迁移到分类<select aria-label="迁移到分类" value={destinationId} disabled={disabled} onChange={event => setDestinationId(event.target.value)}><option value="">选择目标分类</option>{deleteTargets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}</StructureDialog>}
+    }}>{categoryChildren.length ? <p role="alert">该分类有子分类，请先处理子分类。</p> : categoryEntries.length > 0 && <label>迁移到分类<SelectField aria-label="迁移到分类" value={destinationId} disabled={disabled} onChange={event => setDestinationId(event.target.value)}><option value="">选择目标分类</option>{deleteTargets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectField></label>}</StructureDialog>}
     {deleteTag && <StructureDialog role="alertdialog" busy={disabled} onClose={() => setDeleteTag(null)} state={{
       heading: `删除标签：${deleteTag.name}`, description: usedTag ? '此标签会从知识条目解除关联，知识内容和其他标签会保留。' : '删除该标签。', submitLabel: '确认删除标签',
       onSubmit: async () => { const success = await operate({ type: 'deleteTag', id: deleteTag.id }); if (success) setNotice(usedTag ? '标签已删除，相关知识内容已保留。' : '标签已删除。'); return success; },

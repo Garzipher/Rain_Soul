@@ -1,3 +1,4 @@
+import { SelectField } from './select-field';
 import { useEffect, useRef, useState } from 'react';
 import type { ManuscriptDraft } from '../../shared/manuscript';
 import { canMoveManuscriptChapter, normalizeManuscriptOrder } from '../lib/manuscript-order';
@@ -52,7 +53,7 @@ export function ManuscriptDialog({ draft, busy, error, onConfirm, onClose }: { d
   }
   return <dialog ref={dialog} className="create-dialog manuscript-dialog" aria-labelledby="manuscript-heading" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onKeyDown={event => {
     if (event.key !== 'Tab') return;
-    const elements = Array.from(dialog.current?.querySelectorAll<HTMLElement>('input:not(:disabled),select:not(:disabled),button:not(:disabled),summary') ?? []);
+    const elements = Array.from(dialog.current?.querySelectorAll<HTMLElement>('input:not(:disabled),select:not(:disabled),button:not(:disabled),summary') ?? []).filter(item => item.tabIndex >= 0 && !item.closest('[hidden], [inert], [aria-hidden="true"]'));
     const first = elements[0], last = elements[elements.length - 1];
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -68,7 +69,7 @@ export function ManuscriptDialog({ draft, busy, error, onConfirm, onClose }: { d
         <label>分卷（可选）<input aria-label={`导入章节 ${index + 1} 分卷`} value={chapter.volumeTitle ?? ''} maxLength={200} disabled={busy} onChange={event => changeChapter(index, 'volumeTitle', event.target.value)} onBlur={normalizeOrder} /></label>
         <div className="import-structure-actions"><button className="secondary" type="button" aria-label={`上移第 ${index + 1} 章`} disabled={busy || !canMoveManuscriptChapter(edited.chapters, index, -1)} onClick={() => restructure(index, 'up')}>上移</button><button className="secondary" type="button" aria-label={`下移第 ${index + 1} 章`} disabled={busy || !canMoveManuscriptChapter(edited.chapters, index, 1)} onClick={() => restructure(index, 'down')}>下移</button><button className="secondary" type="button" aria-label={`第 ${index + 1} 章合并下一章`} disabled={busy || index === edited.chapters.length - 1} onClick={() => restructure(index, 'merge')}>合并下一章</button></div>
         {index < edited.chapters.length - 1 && <p className="import-structure-hint">合并会保留本章标题和分卷，下一章正文完整接在本章后。</p>}
-        <div className="import-split"><label>拆章位置<select aria-label={`第 ${index + 1} 章拆章位置`} value={splitPoints[index] ?? 1} disabled={busy || chapter.paragraphs.length < 2} onChange={event => { if (!busy) setSplitPoints(previous => ({ ...previous, [index]: Number(event.target.value) })); }}>{chapter.paragraphs.length < 2 ? <option value="1">不足两段，无法拆分</option> : chapter.paragraphs.slice(0, -1).map((_text, i) => <option value={i + 1} key={i}>第 {i + 1} 段之后 · 下一段：{chapter.paragraphs[i + 1].slice(0, 35) || '空段落'}</option>)}</select></label><button className="secondary" type="button" aria-label={`拆分第 ${index + 1} 章`} disabled={busy || chapter.paragraphs.length < 2} onClick={() => restructure(index, 'split')}>拆为两章</button></div>
+        <div className="import-split"><label>拆章位置<SelectField aria-label={`第 ${index + 1} 章拆章位置`} value={splitPoints[index] ?? 1} disabled={busy || chapter.paragraphs.length < 2} onChange={event => { if (!busy) setSplitPoints(previous => ({ ...previous, [index]: Number(event.target.value) })); }}>{chapter.paragraphs.length < 2 ? <option value="1">不足两段，无法拆分</option> : chapter.paragraphs.slice(0, -1).map((_text, i) => <option value={i + 1} key={i}>第 {i + 1} 段之后 · 下一段：{chapter.paragraphs[i + 1].slice(0, 35) || '空段落'}</option>)}</SelectField></label><button className="secondary" type="button" aria-label={`拆分第 ${index + 1} 章`} disabled={busy || chapter.paragraphs.length < 2} onClick={() => restructure(index, 'split')}>拆为两章</button></div>
         <details><summary>正文预览 · {chapter.paragraphs.length} 段</summary>{chapter.paragraphs.map((text, i) => <p key={i}>{text || '　'}</p>)}</details>
       </section>)}</div>
       <div className="dialog-actions"><button className="secondary" type="button" disabled={busy} onClick={onClose}>取消</button><button className="primary" disabled={busy || !valid}>{busy ? '正在导入…' : '创建新作品'}</button></div>

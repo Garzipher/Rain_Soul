@@ -17,7 +17,7 @@ export function WorkspaceToolDialog({ title, open, busy, onClose, children }: { 
     if ((event.target as Element).closest('dialog') !== dialog.current) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!busy) onClose(); }
     if (event.key !== 'Tab') return;
-    const items = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary') ?? []);
+    const items = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary') ?? []).filter(item => item.tabIndex >= 0 && !item.closest('[hidden], [inert], [aria-hidden="true"]'));
     if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); items.at(-1)?.focus(); }
     if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0]?.focus(); }
   }}>

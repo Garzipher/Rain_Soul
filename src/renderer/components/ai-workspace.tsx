@@ -1,3 +1,4 @@
+import { SelectField } from './select-field';
 import { useEffect, useRef, useState } from 'react';
 import type { AiCandidate, AiExecuteRequest, AiOperation, AiPreparedRequest } from '../../shared/ai';
 import type { WorkDetail } from '../../shared/contracts';
@@ -116,10 +117,10 @@ export function AiWorkspace(props: AiWorkspaceProps) {
     ? props.work.chapters.flatMap(item => item.document.content).filter(item => candidate.paragraphIds.includes(item.attrs.id)).flatMap(item => item.content ?? []).filter(item => item.type === 'bookmark').length : 0;
   return <section className="ai-workspace" aria-label="AI 写作助手"><div className="ai-request-form">
     <h2>AI 写作助手</h2><p className="ai-muted">每次操作先确认发送范围，候选由作者决定是否采用。</p>
-    <label>AI 操作<select aria-label="AI 操作" value={operation} disabled={disabled} onChange={event => setOperation(event.target.value as AiOperation)}>{operations.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+    <label>AI 操作<SelectField aria-label="AI 操作" value={operation} disabled={disabled} onChange={event => setOperation(event.target.value as AiOperation)}>{operations.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</SelectField></label>
     {props.selectionRequest && <p className="ai-muted">已选定 {props.selectionRequest.paragraphIds.length} 个段落。单句润色只替换选中原文；段落润色和纠错处理选区涉及的完整段落，续写追加在目标段落之后。</p>}
     {operation === 'sentencePolish' && <label>目标单句<input aria-label="目标单句" value={sentenceText} disabled={disabled} onChange={event => { setSentenceText(event.target.value); setSentenceFrom(undefined); }} placeholder="从一个已选段落中复制需要润色的单句" /></label>}
-    <label>上下文范围<select aria-label="上下文范围" value={scope} disabled={disabled} onChange={event => setScope(event.target.value as typeof scope)}><option value="chapter">当前章节</option><option value="previous">前章衔接</option><option value="volume" disabled={!chapter?.volumeId}>全卷</option><option value="custom">自定义范围</option></select></label>
+    <label>上下文范围<SelectField aria-label="上下文范围" value={scope} disabled={disabled} onChange={event => setScope(event.target.value as typeof scope)}><option value="chapter">当前章节</option><option value="previous">前章衔接</option><option value="volume" disabled={!chapter?.volumeId}>全卷</option><option value="custom">自定义范围</option></SelectField></label>
     {scope === 'previous' && chapterIndex === 0 && <p className="ai-muted">当前是首章，没有前章，仅发送当前章节。</p>}
     {scope === 'custom' && <fieldset disabled={disabled}><legend>自定义章节</legend>{props.work.chapters.map(item => <label key={item.id}><input type="checkbox" checked={chapterIds.includes(item.id)} onChange={event => setChapterIds(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} />{item.title}</label>)}</fieldset>}
     <details><summary>指定目标段落（默认当前章全部段落）</summary><fieldset disabled={disabled}>{chapter?.document.content.map((paragraph, index) => <label key={paragraph.attrs.id}><input type="checkbox" checked={targetIds.includes(paragraph.attrs.id)} onChange={event => setTargetIds(previous => event.target.checked ? [...previous, paragraph.attrs.id] : previous.filter(id => id !== paragraph.attrs.id))} />第 {index + 1} 段 · {paragraphText(paragraph).slice(0, 50) || '空段落'}</label>)}</fieldset></details>
