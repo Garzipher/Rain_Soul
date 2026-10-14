@@ -1,10 +1,12 @@
 const { test, expect } = require('@playwright/test');
+const { access } = require('node:fs/promises');
 
 test('真实Electron动态正文、CSP提前拒绝与死循环取消清理', async () => {
   test.setTimeout(200000);
   const { qualifyRestrictedRender } = await import('../../scripts/qualify-restricted-render.mjs');
   const file = test.info().outputPath('restricted-render-runtime-report.json');
   const report = await qualifyRestrictedRender(file);
+  await expect(access(report.temporaryDirectory)).rejects.toMatchObject({ code: 'ENOENT' });
   await test.info().attach('受限渲染实际运行时证据', { path: file, contentType: 'application/json' });
   expect(report.productionCapability.enabled).toBe(false);
   expect(report.qualification).toEqual({ runtimeFixtures: 'passed', controlledTargets: 'passed', systemNetworkAudit: 'pending', realPackage: 'pending', networkIsolation: 'pending' });

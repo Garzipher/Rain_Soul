@@ -43,6 +43,7 @@ const fixtures = [
 ];
 try {
   for (const fixture of fixtures) {
+    process.stderr.write(`开始夹具：${fixture.name}\n`);
     const controller = new AbortController(), requests: string[] = [], stages: string[] = [], before = { tcpConnections, uploadBytes, udpPackets };
     const start = Date.now(); let cancelTimer: ReturnType<typeof setTimeout> | undefined, taskPid = 0;
     const renderer = new RestrictedWebRenderer({
@@ -88,6 +89,7 @@ try {
     const clean = stages.includes('observer-closed') && stages.includes('guard-closed') && !stages.some(stage => stage.includes('close-error')) && webContents.getAllWebContents().length === 0;
     const success = fixture.expected === 'success' ? !error && html.includes(fixture.contains!) : !!error && !error.includes('清理') && (fixture.cancelAfterMs ? error.includes('取消') : stages.some(stage => stage.startsWith('guard-failed:'))) && stages.includes('observer-ready') && stages.filter(stage => stage === 'loading').length >= 2;
     results.push({ name: fixture.name, expected: fixture.expected, status: success && clean && !network.tcpConnections && !network.uploadBytes && !network.udpPackets ? 'passed' : 'failed', error, elapsedMs: Date.now() - start, requests, stages, renderedDomHash, network, remainingContents: webContents.getAllWebContents().length, remainingTaskProcess: app.getAppMetrics().some(item => item.pid === taskPid) });
+    process.stderr.write(`完成夹具：${JSON.stringify(results.at(-1))}\n`);
   }
   await writeFile(output, JSON.stringify({ schemaVersion: 1, capturedAt: new Date().toISOString(), electronVersion: process.versions.electron, platform: process.platform, productionCapability: getWebRenderCapability(), results,
     fixtureHash: createHash('sha256').update(JSON.stringify(fixtures)).digest('hex'),
