@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import type { BrowserWindow, Session, WebContents } from 'electron';
 import { afterEach, expect, it, vi } from 'vitest';
 import { RestrictedWebRenderer } from '../../src/main/restricted-web-renderer';
+import { parseArticleDocument } from '../../src/main/web-article-core';
 
 afterEach(()=>vi.useRealTimers());
 function fixture(){
@@ -13,7 +14,8 @@ function fixture(){
   const guard={warnings:['图片已限制'],attachWebContents:vi.fn(),assertHealthy:vi.fn(),fail:vi.fn(),markObserverReady:vi.fn(),waitForQuiet:vi.fn(async()=>undefined),close:vi.fn(async()=>undefined)};
   const observer={close:vi.fn(async()=>undefined)};
   const dependencies={createBroker:()=>broker,createContext:()=>({window,session:{} as Session}),installGuard:vi.fn(async()=>guard),installObserver:vi.fn(async()=>observer),
-    allContents:()=>[{id:7,pid:222},{id:1,pid:111}],processes:()=>running?[{pid:222,creationTime:123}]:[]};
+    allContents:()=>[{id:7,pid:222},{id:1,pid:111}],processes:()=>running?[{pid:222,creationTime:123}]:[],
+    parse:vi.fn(async(bytes:Buffer)=>parseArticleDocument(bytes,'text/html',20000))};
   const renderer=new RestrictedWebRenderer(dependencies);
   return {renderer,dependencies,window,contents,broker,guard,observer};
 }
@@ -29,7 +31,14 @@ it('捕获前建立观察与独立进程核对，等待安静；保留原HTML和
   expect(result.rawBytes.toString()).toBe('原始HTML');expect(result.domBytes.toString()).toContain('动态正文');
   expect(result.renderedDomHash).toMatch(/^[a-f0-9]{64}$/);expect(result.warnings).toEqual(['图片已限制']);
   expect(f.dependencies.installObserver.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(f.window.loadURL).mock.invocationCallOrder[0]);
-  expect(f.guard.waitForQuiet).toHaveBeenCalledOnce();expect(f.window.destroy).toHaveBeenCalledOnce();expect(f.broker.close).toHaveBeenCalled();expect(f.guard.close).toHaveBeenCalled();
+  expect(f.guard.waitForQuiet).toHaveBeenCalled();expect(f.window.destroy).toHaveBeenCalledOnce();expect(f.broker.close).toHaveBeenCalled();expect(f.guard.close).toHaveBeenCalled();
+});
+it('渲染后延迟一秒半出现的正文必须就绪并稳定后才捕获',async()=>{
+  vi.useFakeTimers();vi.setSystemTime(10000);const f=fixture();
+  f.contents.executeJavaScriptInIsolatedWorld.mockImplementation(async()=>Date.now()<11500?'<html><body><article></article></body></html>':'<html><body><article>雨夜故人归来。</article></body></html>');
+  let complete=false;const result=f.renderer.render('https://article.example.com/page',new AbortController().signal).then(value=>{complete=true;return value;});
+  await vi.advanceTimersByTimeAsync(2000);expect(complete).toBe(false);expect(f.window.destroy).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(250);expect((await result).domBytes.toString()).toContain('故人归来');expect(f.window.destroy).toHaveBeenCalledOnce();
 });
 it('与作者界面共享进程时拒绝导航且绝不强制结束作者进程',async()=>{
   const f=fixture();f.dependencies.allContents=()=>[{id:7,pid:222},{id:1,pid:222}];
@@ -96,7 +105,7 @@ it('取消后使用终止关闭模式再结束已核对的任务进程',async()=
 it('正常关闭观察器也受一秒期限约束，超时销毁并永久阻断重试',async()=>{
   vi.useFakeTimers();const f=fixture();f.observer.close.mockImplementation(()=>new Promise(()=>{}));
   const result=f.renderer.render('https://article.example.com/page',new AbortController().signal).catch(error=>error);
-  await vi.advanceTimersByTimeAsync(1001);expect((await result).message).toMatch(/清理/);
+  await vi.advanceTimersByTimeAsync(1751);expect((await result).message).toMatch(/清理/);
   expect(f.window.destroy).toHaveBeenCalledOnce();
   await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).rejects.toThrow(/清理/);
 });
@@ -121,7 +130,8 @@ it('初始化挂起时取消仍核对并结束独立任务进程，退出证实�
   expect((await result).message).toMatch(/取消/);expect(f.contents.forcefullyCrashRenderer).toHaveBeenCalledOnce();
   expect(f.dependencies.installGuard).not.toHaveBeenCalled();
   const next=fixture();f.dependencies.createContext=next.dependencies.createContext;f.dependencies.processes=next.dependencies.processes;
-  await expect(f.renderer.render('https://article.example.com/page',new AbortController().signal)).resolves.toHaveProperty('domBytes');
+  const retry=f.renderer.render('https://article.example.com/page',new AbortController().signal);
+  await vi.advanceTimersByTimeAsync(750);await expect(retry).resolves.toHaveProperty('domBytes');
 });
 it.each(['未知','共享'])('初始化取消时%s身份不得强杀，无法核验退出则阻断重试',async kind=>{
   vi.useFakeTimers();const f=fixture(),controller=new AbortController();

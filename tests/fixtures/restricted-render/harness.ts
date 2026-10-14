@@ -11,6 +11,7 @@ import { RenderResourceBroker } from '../../../src/main/render-resource-broker';
 import { installRenderNetworkGuard } from '../../../src/main/render-network-guard';
 import { installRenderErrorObserver } from '../../../src/main/render-error-observer';
 import { getWebRenderCapability } from '../../../src/main/restricted-render-policy';
+import { parseArticleDocument } from '../../../src/main/web-article-core';
 
 /** 仅由测试构建打包，生产入口不引用、不读取任何环境旁路。 */
 const output = process.argv[2];
@@ -32,6 +33,8 @@ const header = '<!doctype html><html><head><meta charset="utf-8"></head><body><a
 const trailer = '</body></html>';
 const fixtures = [
   { name: 'inline', expected: 'success' as const, html: `${header}<script>document.getElementById('article').textContent='动态文章：内联脚本完成。'</script>${trailer}`, contains: '动态文章：内联脚本完成。' },
+  { name: 'delayed-article', expected: 'success' as const, html: `${header}<script>setTimeout(()=>{document.getElementById('article').textContent='延迟一秒半后渲染的正文。'},1500)</script>${trailer}`, contains: '延迟一秒半后渲染的正文。' },
+  { name: 'staged-article', expected: 'success' as const, html: `${header}<script>document.getElementById('article').textContent='第一段正文。';setTimeout(()=>{document.getElementById('article').textContent+='延迟补齐的第二段正文。'},1000)</script>${trailer}`, contains: '延迟补齐的第二段正文。' },
   { name: 'same-origin-script-fetch-xhr', expected: 'success' as const, html: `${header}<script src="/article.js"></script>${trailer}`, contains: '动态正文来自fetch与XHR', script: "Promise.all([fetch('/fetch').then(r=>r.text()),new Promise(resolve=>{const x=new XMLHttpRequest();x.open('GET','/xhr');x.onload=()=>resolve(x.responseText);x.send();})]).then(parts=>{document.getElementById('article').textContent=parts.join('');});" },
   { name: 'csp-cross-origin-script', expected: 'rejected' as const, html: `${header}<script src="https://cdn.example.com/article.js"></script>${trailer}` },
   { name: 'csp-connect-caught', expected: 'rejected' as const, html: `${header}<script>fetch('https://cdn.example.com/data').catch(()=>{});document.getElementById('article').textContent='不完整文章';</script>${trailer}` },
@@ -73,6 +76,8 @@ try {
       },
       allContents: () => webContents.getAllWebContents().map(contents => ({ id: contents.id, pid: contents.getOSProcessId() })),
       processes: () => app.getAppMetrics().map(({ pid, creationTime }) => ({ pid, creationTime })),
+      // 临时测试bundle只替代解析Worker部署，仍使用生产纯正文解析器。
+      parse: async bytes => parseArticleDocument(bytes, 'text/html', 20000),
     });
     let error: string | undefined, html = '', renderedDomHash: string | undefined;
     try {

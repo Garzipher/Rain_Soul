@@ -1,11 +1,13 @@
 import { EventEmitter } from 'node:events';
 import { expect, it, vi } from 'vitest';
+import { parseArticleDocument } from '../../src/main/web-article-core';
 
 const host=vi.hoisted(()=>({fromPartition:vi.fn(),createWindow:vi.fn(),allContents:vi.fn(),metrics:vi.fn(),broker:vi.fn(),guard:vi.fn(),observer:vi.fn()}));
 vi.mock('electron',()=>({session:{fromPartition:host.fromPartition},BrowserWindow:class{constructor(options:unknown){return host.createWindow(options);}},webContents:{getAllWebContents:host.allContents},app:{getAppMetrics:host.metrics}}));
 vi.mock('../../src/main/render-resource-broker',()=>({RenderResourceBroker:class{constructor(options:unknown){return host.broker(options);}}}));
 vi.mock('../../src/main/render-network-guard',()=>({installRenderNetworkGuard:host.guard}));
 vi.mock('../../src/main/render-error-observer',()=>({installRenderErrorObserver:host.observer}));
+vi.mock('../../src/main/web-article',()=>({parseWebArticle:vi.fn(async(bytes:Buffer)=>parseArticleDocument(bytes,'text/html',20000))}));
 import { renderPublicArticle } from '../../src/main/restricted-web-renderer';
 
 it('生产适配器始终创建随机非持久session及无应用桥的独立sandbox窗口',async()=>{

@@ -10,6 +10,7 @@ export const renderLimits = Object.freeze({
   maxTotalCompressedBytes: 12 * 1024 * 1024, maxTotalDecodedBytes: 24 * 1024 * 1024,
   maxDomNodes: 20000, maxDomBytes: 5 * 1024 * 1024,
   maxBodyCharacters: 200000, maxParagraphs: 2000, quietPeriodMs: 500, maxQuietWaitMs: 5000,
+  contentStableMs: 750, contentPollMs: 250,
 });
 const buildFields = { packageSha256: z.string().regex(/^[a-f0-9]{64}$/), electronVersion: z.string().min(1).max(100),
   platform: z.enum(['win32', 'darwin', 'linux']) };

@@ -9,7 +9,7 @@ test('真实Electron动态正文、CSP提前拒绝与死循环取消清理', asy
   expect(report.productionCapability.enabled).toBe(false);
   expect(report.qualification).toEqual({ runtimeFixtures: 'passed', controlledTargets: 'passed', systemNetworkAudit: 'pending', realPackage: 'pending', networkIsolation: 'pending' });
   expect(report.executableSha256).toMatch(/^[a-f0-9]{64}$/);
-  expect(report.results).toHaveLength(6);
+  expect(report.results).toHaveLength(8);
   for (const result of report.results) {
     expect(result.status, result.name + ': ' + (result.error ?? '')).toBe('passed');
     expect(result.remainingContents).toBe(0);
@@ -20,6 +20,11 @@ test('真实Electron动态正文、CSP提前拒绝与死循环取消清理', asy
   const dynamic = report.results.find(result => result.name === 'same-origin-script-fetch-xhr');
   expect(dynamic.requests.map(url => new URL(url).pathname)).toEqual(['/', '/article.js', '/fetch', '/xhr']);
   expect(dynamic.renderedDomHash).toMatch(/^[a-f0-9]{64}$/);
+  for (const name of ['delayed-article', 'staged-article']) {
+    const result = report.results.find(item => item.name === name);
+    expect(result.error, name + ': ' + (result.error ?? '')).toBeUndefined();
+    expect(result.renderedDomHash).toMatch(/^[a-f0-9]{64}$/);
+  }
   for (const name of ['csp-cross-origin-script', 'csp-connect-caught']) {
     const result = report.results.find(result => result.name === name);
     expect(result.requests).toEqual(['https://capture.example.com/']);

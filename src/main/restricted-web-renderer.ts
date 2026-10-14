@@ -5,6 +5,8 @@ import { installRenderNetworkGuard, type RenderNetworkGuard } from './render-net
 import { installRenderErrorObserver, type RenderErrorObserver } from './render-error-observer';
 import { captureBoundedDom } from './render-dom-capture';
 import { renderLimits } from './restricted-render-policy';
+import { parseWebArticle } from './web-article';
+import { waitForRenderableContent } from './render-content-ready';
 
 type Broker=Pick<RenderResourceBroker,'initialize'|'fetch'|'assertHealthy'|'close'>;
 interface Context {window:BrowserWindow;session:Session;initialize?:()=>Promise<void>}
@@ -14,6 +16,7 @@ interface Dependencies {
   createContext():Context;
   installGuard(session:Session,broker:Broker,signal:AbortSignal,initial:RenderResource & {finalUrl:string}):Promise<RenderNetworkGuard>;
   installObserver:typeof installRenderErrorObserver;
+  parse?:typeof parseWebArticle;
   allContents():{id:number;pid:number}[];processes():ProcessIdentity[];
 }
 export interface RenderedArticle {rawBytes:Buffer;finalUrl:string;capturedAt:string;domBytes:Buffer;renderedDomHash:string;warnings:string[];deadline:number}
@@ -60,11 +63,13 @@ export class RestrictedWebRenderer {
       void observation.catch(()=>{if(cleaning)this.blocked=true;});
       observer=await wait(observation);
       await wait(context.window.loadURL(initial.finalUrl));identity=this.identity(context);
-      await wait(guard.waitForQuiet(deadline,controller.signal));guard.assertHealthy();broker.assertHealthy();
       const source=`(${captureBoundedDom.toString()})(document,${JSON.stringify({maxDomNodes:renderLimits.maxDomNodes,maxDomBytes:renderLimits.maxDomBytes})})`;
-      const html:unknown=await wait(context.window.webContents.executeJavaScriptInIsolatedWorld(999,[{code:source}]));
-      if(typeof html!=='string' || html.length>renderLimits.maxDomBytes)throw new Error('网页DOM捕获结果无效。');
-      const domBytes=Buffer.from(html,'utf8');if(domBytes.length>renderLimits.maxDomBytes)throw new Error('网页DOM容量超限。');
+      const domBytes=await waitForRenderableContent({deadline,signal:controller.signal,
+        capture:async()=>{const html:unknown=await wait(context!.window.webContents.executeJavaScriptInIsolatedWorld(999,[{code:source}]));
+          if(typeof html!=='string' || html.length>renderLimits.maxDomBytes)throw new Error('网页DOM捕获结果无效。');
+          const bytes=Buffer.from(html,'utf8');if(bytes.length>renderLimits.maxDomBytes)throw new Error('网页DOM容量超限。');return bytes;},
+        parse:this.dependencies.parse??parseWebArticle,checkHealthy:()=>{guard!.assertHealthy();broker!.assertHealthy();},
+        waitForQuiet:(end,signal)=>guard!.waitForQuiet(end,signal)});
       identity=this.identity(context);guard.assertHealthy();broker.assertHealthy();controller.signal.throwIfAborted();
       result={rawBytes:initial.bytes,finalUrl:initial.finalUrl,capturedAt:new Date().toISOString(),domBytes,
         renderedDomHash:createHash('sha256').update(domBytes).digest('hex'),warnings:[...guard.warnings],deadline};
@@ -123,6 +128,7 @@ export async function renderPublicArticle(url:string,signal:AbortSignal):Promise
       installGuard:installRenderNetworkGuard,installObserver:installRenderErrorObserver,
       allContents:()=>electron.webContents.getAllWebContents().map(contents=>({id:contents.id,pid:contents.getOSProcessId()})),
       processes:()=>electron.app.getAppMetrics().map(({pid,creationTime})=>({pid,creationTime})),
+      parse:parseWebArticle,
     });
   }
   return production.render(url,signal);
