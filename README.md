@@ -2,7 +2,7 @@
 
 RainSoul 是面向 Windows 的本地写作工作台。把正文、剧情大纲、伏笔和写作素材放在同一部作品中，离线完成写作、保存、搜索和导出；需要 AI 时再配置自己的云服务。
 
-采用 Electron、React/TypeScript、Tiptap 和 SQLite。当前版本 **1.3.2**，支持 **Windows 10/11 64 位**。
+采用 Electron、React/TypeScript、Tiptap 和 SQLite。当前版本 **1.3.3**，支持 **Windows 10/11 64 位**。
 
 ## 选择使用方式
 
@@ -15,7 +15,9 @@ RainSoul 是面向 Windows 的本地写作工作台。把正文、剧情大纲�
 
 在 [GitHub Releases](https://github.com/Garzipher/Rain_Soul/releases) 查找安装器；只有发布者上传后才会出现，源码仓库不包含 EXE。
 
-本机当前安装器位于 `release/current/RainSoul Setup 1.3.2.exe`；也可直接运行 `release/current/win-unpacked/RainSoul.exe`。使用目录包时须保留整个 `win-unpacked`，不能只复制 EXE。先退出旧实例，再打开新版；旧程序不会随着源码更新自动升级。
+本机当前安装器位于 `release/current/RainSoul Setup 1.3.3.exe`；也可直接运行 `release/current/win-unpacked/RainSoul.exe`。使用目录包时须保留整个 `win-unpacked`，不能只复制 EXE。先退出旧实例，再打开新版；旧程序不会随着源码更新自动升级。
+
+1.3.3 整理了全局控件、知识库与会话布局，并调整云端失败后的恢复状态。本轮按作者要求未运行测试，仅做静态检查和构建，界面与交互交由作者验证；不沿用旧版本的测试结果声称本版已验收。
 
 当前安装器未签名，Windows 可能提示未知发布者。首次安装后的写作不需要网络；云端 AI 需要用户自己的服务配置。
 
@@ -159,6 +161,7 @@ npm run pack:research
 - [立项方案 V2.0](docs/Rain_Soul_项目立项方案_V2.0.md)
 - [PRD](docs/Rain_Soul_PRD.md) · [技术方案](docs/Rain_Soul_技术方案.md)
 - [工作台 Demo](docs/demos/rainsoul-writing-style.html)
+- [1.3.3 界面整改与验证说明](tasks/ui-redesign-2026-10-14.md)
 - [1.3.2 验收与目录整理](tasks/release-layout-2026-10-14.md)
 - [GitHub 发布准备检查](tasks/github-readiness-2026-10-14.md)
 
