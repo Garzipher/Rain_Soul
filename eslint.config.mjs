@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 import hooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'release/**', 'coverage/**', 'node_modules/**', '.trae/**', 'docs/**', 'agent-skills-main/**', 'everything-claude-code/**'] },
+  { ignores: ['.artifacts/**', 'dist/**', 'release/**', 'coverage/**', 'node_modules/**', '.trae/**', 'docs/**', 'agent-skills-main/**', 'everything-claude-code/**'] },
   js.configs.recommended, ...tseslint.configs.recommended,
   { files: ['src/renderer/**/*.tsx'], plugins: { 'react-hooks': hooks }, rules: { 'react-hooks/rules-of-hooks': 'error' } },
   { files: ['tests/desktop/**/*.cjs', 'tests/fixtures/**/*.cjs'], languageOptions: { sourceType: 'commonjs', globals: {

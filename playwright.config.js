@@ -10,7 +10,8 @@ module.exports = defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  outputDir: './.artifacts/tests/demo',
+  reporter: [['html', { outputFolder: '.artifacts/reports/demo', open: 'never' }]],
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',

@@ -1,12 +1,12 @@
 {
   "name": "soulrain",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "本地优先的中文写作工作台",
   "main": "dist/desktop/main.cjs",
   "scripts": {
     "test": "npm run test:coverage && npm run test:desktop && npm run test:demo",
     "test:headed": "playwright test --project=chrome",
-    "test:report": "playwright show-report",
+    "test:report": "playwright show-report .artifacts/reports/demo",
     "test:demo": "playwright test --project=chrome-headless",
     "pretest:unit": "node scripts/build-desktop.mjs",
     "test:unit": "vitest run --pool=threads --maxWorkers=1",
