@@ -14,6 +14,7 @@ import type { RetrievalQuery, RetrievalReply } from '../../shared/retrieval';
 import { diffText } from '../../shared/text-diff';
 export interface AiReviewState { candidate: AiCandidate | null; original: string; items: ExtractionReviewItem[] }
 export interface AiWorkspaceProps {
+  onActivityChange?: (active: boolean) => void;
   initialReview?: AiReviewState;
   onReviewChange?: (review: AiReviewState) => void;
   selectedReferenceIds?: string[];
@@ -42,6 +43,7 @@ export function AiWorkspace(props: AiWorkspaceProps) {
   const reviewChange = useRef(props.onReviewChange); reviewChange.current = props.onReviewChange;
   useEffect(() => { reviewChange.current?.({ candidate, original, items }); }, [candidate, original, items]);
   const [pending, setPending] = useState(false), [sending, setSending] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  useEffect(() => { props.onActivityChange?.(pending || sending || !!prepared || !!candidate); }, [pending, sending, prepared, candidate, props.onActivityChange]);
   const lock = useRef(false), token = useRef<string | null>(null), alive = useRef(true);
   const chapter = props.work.chapters.find(item => item.id === props.chapterId), disabled = props.busy || pending;
   const chapterIndex = props.work.chapters.findIndex(item => item.id === props.chapterId);

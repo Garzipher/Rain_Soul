@@ -58,6 +58,7 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
   const [tab, setTab] = useState<WorkTab>('body');
   const [tool, setTool] = useState<'ai' | 'snapshots' | null>(null);
   const [aiOpened, setAiOpened] = useState(false);
+  const [aiActive, setAiActive] = useState(!!props.ai.initialReview?.candidate);
   const [entryToken, setEntryToken] = useState(0);
   const [selectionRequest, setSelectionRequest] = useState<WritingAiRequest>();
   const restoringSelection = useRef(!!props.savedSelection);
@@ -122,7 +123,7 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
     </div>
     {props.status.phase === 'failed' && <div className="save-error" role="alert"><span>{props.status.error}。草稿仍保留在当前窗口，请重试保存后再离开。</span><button className="secondary" onClick={props.onRetry} disabled={props.busy}>重试保存</button></div>}
     <WorkspaceToolDialog title="AI工具" open={tool === 'ai'} busy={props.busy} onClose={() => showTool(null)}>
-      {aiOpened && <Suspense fallback={<p role="status">正在打开 AI 工具…</p>}><ConsistencyPanel work={props.work} onLocate={locateFromTool} /><AiWorkspace {...props.ai} entryToken={entryToken} selectionRequest={selectionRequest} work={props.work} chapterId={props.draft?.id ?? null} busy={props.busy} onLocate={locateFromTool} /></Suspense>}
+      {aiOpened && <Suspense fallback={<p role="status">正在打开 AI 工具…</p>}><ConsistencyPanel work={props.work} onLocate={locateFromTool} /><AiWorkspace {...props.ai} onActivityChange={setAiActive} entryToken={entryToken} selectionRequest={selectionRequest} work={props.work} chapterId={props.draft?.id ?? null} busy={props.busy} onLocate={locateFromTool} /></Suspense>}
     </WorkspaceToolDialog>
     <WorkspaceToolDialog title="版本历史" open={tool === 'snapshots'} busy={props.busy} onClose={() => showTool(null)}>
       {tool === 'snapshots' && <Suspense fallback={<p role="status">正在打开版本历史…</p>}><SnapshotPanel {...props.snapshots} busy={props.busy} revision={props.work.revision} /></Suspense>}
@@ -135,7 +136,7 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
         {props.draft ? <LearningChapter key={props.work.id} textbook={props.textbook} workId={props.work.id} chapterId={props.draft.id} busy={props.busy} changeMode={props.changeTab}><div className="manuscript">
           <div className="manuscript-meta"><span>正文</span><span aria-live="polite">本章 {countDocumentWords(props.draft.document)} 字</span></div>
           <input className="chapter-title" aria-label="章节标题" value={props.draft.title} onChange={(event) => props.onTitleChange(event.target.value)} onCompositionStart={() => props.onCompositionChange(true)} onCompositionEnd={() => props.onCompositionChange(false)} disabled={props.busy} autoComplete="off" />
-          <ChapterEditor assets={props.work.assets} location={props.location?.chapterId === props.draft.id ? props.location : null} key={props.draft.id} document={props.draft.document} locked={props.busy} onChange={props.onDocumentChange} onError={props.onError} onCompositionChange={props.onCompositionChange} onLocateAsset={locateAsset} onAiRequest={openSelection} />
+          <ChapterEditor assets={props.work.assets} location={props.location?.chapterId === props.draft.id ? props.location : null} key={props.draft.id} document={props.draft.document} locked={props.busy} ghostPaused={tool === 'ai' || aiActive} onChange={props.onDocumentChange} onError={props.onError} onCompositionChange={props.onCompositionChange} onLocateAsset={locateAsset} onAiRequest={openSelection} />
         </div></LearningChapter> : <div className="empty-state"><h2>尚无章节</h2><button className="primary" onClick={() => props.onAddChapter()} disabled={props.busy}>添加章节</button></div>}
       </section>
     </div>}

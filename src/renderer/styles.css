@@ -95,6 +95,8 @@ button svg { width: 18px; height: 18px; flex: none; }
 .writing-body { min-height: 320px; padding: 4px 0; border: 0; outline: 0; font: 12pt/1.5 "Microsoft YaHei", sans-serif; color: #242424; overflow-wrap: anywhere; white-space: pre-wrap; }
 .writing-body:focus, .writing-body:focus-visible { outline: 0; }
 .writing-body p { margin: 0 0 .8em; }
+.knowledge-ghost { color: #8a96a3; opacity: .8; font-style: normal; pointer-events: none; user-select: none; }
+.knowledge-ghost-source { font-size: 10px; margin-left: .5em; }
 .page-error, .save-error { display: flex; align-items: center; gap: 18px; padding: 14px 24px; background: #fff5f3; color: #a34037; border-bottom: 1px solid #f0d3cf; line-height: 1.6; }
 .page-error button, .save-error button { margin-left: auto; flex: none; }
 .placeholder { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 50px 24px; text-align: center; }

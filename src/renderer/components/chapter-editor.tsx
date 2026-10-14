@@ -5,6 +5,7 @@ import Paragraph from '@tiptap/extension-paragraph';
 import Text from '@tiptap/extension-text';
 import { UndoRedo } from '@tiptap/extensions';
 import { EditorContent, useEditor } from '@tiptap/react';
+import type { Editor } from '@tiptap/core';
 import type { BookmarkNode, WritingDocument } from '../../shared/contracts';
 import type { AssetState } from '../../shared/assets';
 import { validateDocument } from '../../shared/document';
@@ -12,21 +13,26 @@ import { stableParagraphIds } from '../lib/paragraph-ids';
 import { BookmarkDetails, bookmarkInfo, inlineBookmark, insertBookmarkAtSelection } from './inline-bookmark';
 import { ContextMenu, type MenuState } from './context-menu';
 import { captureWritingSelection, type WritingAiRequest } from '../lib/writing-ai-selection';
+import { createKnowledgeGhost, refreshKnowledgeGhost } from '../lib/knowledge-ghost-extension';
 
-export interface ChapterEditorProps { document: WritingDocument; assets?: AssetState; locked: boolean; onChange: (document: WritingDocument) => void; onError: (error: string) => void; onCompositionChange: (value: boolean) => void; location?: { paragraphId: string; token: number } | null; onLocateAsset?: (kind: BookmarkNode['attrs']['kind'], id: string) => void; onAiRequest?: (request: WritingAiRequest) => void }
+export interface ChapterEditorProps { document: WritingDocument; assets?: AssetState; locked: boolean; ghostPaused?: boolean; onChange: (document: WritingDocument) => void; onError: (error: string) => void; onCompositionChange: (value: boolean) => void; location?: { paragraphId: string; token: number } | null; onLocateAsset?: (kind: BookmarkNode['attrs']['kind'], id: string) => void; onAiRequest?: (request: WritingAiRequest) => void }
 
 /** 固定样式正文保存段落、文本、换行与书签关联；不导入外部 HTML 样式。 */
-export function ChapterEditor({ document, assets, locked, onChange, onError, onCompositionChange, location, onLocateAsset, onAiRequest }: ChapterEditorProps) {
+export function ChapterEditor({ document, assets, locked, ghostPaused = false, onChange, onError, onCompositionChange, location, onLocateAsset, onAiRequest }: ChapterEditorProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const aiEntry = useRef({ locked, onAiRequest });
   useEffect(() => { aiEntry.current = { locked, onAiRequest }; }, [locked, onAiRequest]);
+  const knowledgeEntries = useRef(assets?.knowledge ?? []);
+  const ghostState = useRef({ locked, paused: ghostPaused });
+  useEffect(() => { knowledgeEntries.current = assets?.knowledge ?? []; ghostState.current = { locked, paused: ghostPaused }; if (editorRef.current) refreshKnowledgeGhost(editorRef.current); }, [assets, locked, ghostPaused]);
+  const editorRef = useRef<Editor | null>(null);
   const [kind, setKind] = useState<BookmarkNode['attrs']['kind']>('knowledge');
   const [target, setTarget] = useState('');
   const [detail, setDetail] = useState<BookmarkNode['attrs'] | null>(null);
   const options = kind === 'knowledge' ? assets?.knowledge.filter(item => !item.deletedAt).map(item => ({ id: item.id, label: item.body.slice(0, 30) })) : assets?.foreshadows.filter(item => !item.deletedAt).map(item => ({ id: item.id, label: item.name }));
   const targetId = options?.some(item => item.id === target) ? target : options?.[0]?.id ?? '';
   const editor = useEditor({
-    extensions: [Document, Paragraph, Text, HardBreak, inlineBookmark, stableParagraphIds, UndoRedo],
+    extensions: [Document, Paragraph, Text, HardBreak, inlineBookmark, stableParagraphIds, UndoRedo, createKnowledgeGhost(() => ({ entries: knowledgeEntries.current, paused: ghostState.current.locked || ghostState.current.paused }))],
     content: document,
     editable: !locked,
     editorProps: {
@@ -86,6 +92,7 @@ export function ChapterEditor({ document, assets, locked, onChange, onError, onC
       catch (error) { onError(error instanceof Error ? error.message : '正文结构无法保存，请保留内容并联系开发者'); }
     },
   });
+  useEffect(() => { editorRef.current = editor; return () => { if (editorRef.current === editor) editorRef.current = null; }; }, [editor]);
   useEffect(() => {
     if (!editor) return;
     const refresh = () => {

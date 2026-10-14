@@ -11,6 +11,18 @@ import { emptyDocument } from '../../src/shared/document';
 import type { WorkDetail } from '../../src/shared/contracts';
 import type { AiCandidate, AiPreparedRequest } from '../../src/shared/ai';
 afterEach(cleanup);
+it('AI生成和候选审核向写作区报告暂停状态，放弃候选后解除', async () => {
+  const { props, view } = setup();
+  const onActivityChange = vi.fn();
+  view.rerender(<AiWorkspace {...props} onActivityChange={onActivityChange} />);
+  fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
+  await waitFor(() => expect(onActivityChange).toHaveBeenLastCalledWith(true));
+  fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
+  await screen.findByText('润色候选', { selector: 'pre[aria-label="候选全文"]' });
+  expect(onActivityChange).toHaveBeenLastCalledWith(true);
+  fireEvent.click(screen.getByRole('button', { name: '放弃此候选' }));
+  await waitFor(() => expect(onActivityChange).toHaveBeenLastCalledWith(false));
+});
 it('候选差异可阅读，返回工具时恢复原文与候选，过期版本禁止写入', async () => {
   const { props, view } = setup();
   const onReviewChange = vi.fn();
