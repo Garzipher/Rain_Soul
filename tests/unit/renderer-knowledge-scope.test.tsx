@@ -6,6 +6,24 @@ import App from '../../src/renderer/App';
 import { createStructureAdapter } from './renderer-structure-adapter';
 const adapters: ReturnType<typeof createStructureAdapter>[] = [];
 afterEach(() => { cleanup(); adapters.splice(0).forEach(adapter => adapter.dispose()); });
+it('首次进入知识库先选择作品，不把未选作品误报为功能未交付', async () => {
+  const adapter = createStructureAdapter(); adapters.push(adapter);
+  const work = await adapter.api.createWork('知识入口验收');
+  await adapter.api.manageAssets({ workId: work.id, expectedRevision: work.revision, operationId: crypto.randomUUID(), action: { type: 'createKnowledge', body: '雨夜的灯光映在窗上。', source: '原创参考', categoryId: work.assets!.categories[0].id, tagIds: [] } });
+  render(<App api={adapter.api} />);
+  await screen.findByRole('button', { name: '打开作品：知识入口验收' });
+  fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  const empty = await screen.findByRole('region', { name: '选择知识库作品' });
+  expect(screen.queryByText(/本功能尚未交付/)).not.toBeInTheDocument();
+  expect(empty).toHaveTextContent('知识按作品保存');
+  fireEvent.click(within(empty).getByRole('button', { name: '前往作品集选择作品' }));
+  fireEvent.click(await screen.findByRole('button', { name: '打开作品：知识入口验收' }));
+  await screen.findByLabelText('章节标题');
+  await waitFor(() => expect(screen.getByRole('button', { name: '知识库' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  expect(await screen.findByRole('article', { name: '知识：雨夜的灯光映在窗上。' })).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: '选择知识库作品' })).not.toBeInTheDocument();
+});
 it('删除已选知识释放参考额度，AI 只预览有效条目且不跨作品沿用', async () => {
   const adapter = createStructureAdapter(); adapters.push(adapter);
   let work = await adapter.api.createWork('参考额度验收');

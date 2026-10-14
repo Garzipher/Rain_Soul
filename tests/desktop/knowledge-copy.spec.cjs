@@ -34,6 +34,11 @@ test('离线跨作品复制预览映射目标字典，取消不写入，分类�
     page = await offlineWindow(application);
     const pageErrors = [];
     page.on('pageerror', error => pageErrors.push(error.message));
+    await sidebar(page, '知识库');
+    const empty = page.getByRole('region', { name: '选择知识库作品', exact: true });
+    await expect(empty).toContainText('知识按作品保存');
+    await expect(page.getByText(/本功能尚未交付/)).toHaveCount(0);
+    await activate(empty.getByRole('button', { name: '前往作品集选择作品', exact: true }));
     await activate(page.getByRole('button', { name: '打开作品：复制目标作品', exact: true }));
     await sidebar(page, '知识库');
     const scope = page.getByRole('combobox', { name: '作品范围', exact: true });
