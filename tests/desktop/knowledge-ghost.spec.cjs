@@ -35,6 +35,18 @@ test('真实窗口灰字不落盘，Tab接受可撤销，AI打开时暂停', asy
     await activate(page.getByRole('button', { name: 'AI 工具', exact: true }));
     await expect(ghost).toHaveCount(0);
     await activate(page.getByRole('button', { name: '关闭AI工具', exact: true }));
-    await editor.press('Home'); await editor.press('ArrowRight'); await editor.press('End'); await expect(ghost).toHaveCount(1);
+    await expect(page.getByRole('dialog', { name: 'AI工具', exact: true })).not.toBeVisible();
+    await expect(editor).toHaveAttribute('contenteditable', 'true');
+    await editor.focus(); await expect(editor).toBeFocused();
+    // 关闭工具需等待保存及焦点恢复，再用真实按键解除 Esc 对当前位置的抑制。
+    const caretOffset = () => editor.evaluate(element => {
+      const instance = element.editor, selection = element.ownerDocument.getSelection();
+      if (!instance || element.ownerDocument.activeElement !== element || !selection?.isCollapsed || !selection.anchorNode || !element.contains(selection.anchorNode)) return null;
+      const domPosition = instance.view.posAtDOM(selection.anchorNode, selection.anchorOffset), current = instance.state.selection;
+      return current.empty && domPosition === current.from ? current.$from.parentOffset : null;
+    });
+    await editor.press('ArrowLeft'); await expect.poll(caretOffset).toBe(1);
+    await editor.press('ArrowRight'); await expect.poll(caretOffset).toBe(2);
+    await expect(ghost).toHaveCount(1);
   } finally { await cleanup(application, directory); }
 });
