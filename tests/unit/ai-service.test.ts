@@ -61,6 +61,14 @@ describe('云端 AI 冻结、授权和候选保护', () => {
     const prepared = service.prepare(input);
     expect(await service.execute({ ...prepared, confirmed: true })).toMatchObject({ operation, baselineRevision: 7 });
   });
+  it('续写提示明确使用剧情与写作资料生成新内容，不拼贴知识原句', () => {
+    const { service } = setup();
+    const input = request(); input.operation = 'continue';
+    input.context.text += '\n\n作者作品资料与知识参考：\n大纲：旧站台的秘密\n伏笔：钥匙（已埋设）\n写作特点：第一人称、舒缓\n知识参考：雨丝拂过青瓦。';
+    const prepared = service.prepare(input);
+    expect(prepared.previewText).toContain('结合已授权上下文、剧情大纲、伏笔状态、人物关系、节奏与写作特点');
+    expect(prepared.previewText).toContain('知识内容只能参考描写手法，不得直接拼贴或复述原句');
+  });
 });
 describe('地址与故障保护', () => {
   it.each(['length', 'content_filter', 'tool_calls', 'function_call', 'unknown', null, '', 42])('结束原因为 %s 时不把非空响应当作完整候选且不能重用授权', async finishReason => {

@@ -10,7 +10,7 @@ export interface AiServiceDependencies {
 interface FrozenRequest { prepared: AiPreparedRequest; request: AiPrepareRequest; url: string; hostname: string; body: string }
 const operationPrompts: Record<AiOperation, string> = {
   sentencePolish: '润色指定单句，保留原意，返回待作者确认的候选。', paragraphPolish: '润色指定段落，保留原意和事实，返回待作者确认的候选。',
-  continue: '依据上下文给出续写候选，保持人称与衔接，不声称已经修改正文。', correct: '检查错字和病句，保留原意，返回纠错候选。',
+  continue: '依据上下文给出续写候选，结合已授权上下文、剧情大纲、伏笔状态、人物关系、节奏与写作特点，先保持剧情因果和人物动机，再生成与原文衔接自然的新内容；知识内容只能参考描写手法，不得直接拼贴或复述原句；不声称已经修改正文。', correct: '检查错字和病句，保留原意，返回纠错候选。',
   consistency: '检查角色、时间、地点、伏笔、大纲和写作特点一致性。只给建议，引用上下文证据并标明不确定性。',
   plotFeel: '评估剧情衔接、合理性及大纲偏离。只给建议，引用上下文证据并标明不确定性，不自动改稿。',
   extractKnowledge: '从正文提取摘要、角色、事件和伏笔候选，逐项给出原文依据；必须由作者审核后入库。',
