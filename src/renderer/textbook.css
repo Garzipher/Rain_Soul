@@ -1,7 +1,7 @@
-.learning-toolbar { display: flex; gap: 6px; padding: 16px 28px; border-bottom: 1px solid var(--line); background: #fff; position: sticky; top: 0; z-index: 1; }
-.learning-toolbar button { padding: 8px 14px; border: 0; border-radius: 7px; background: transparent; color: #546878; font-size: 13px; }
-.learning-toolbar button[aria-pressed="true"] { background: #eaf5fd; color: #206294; font-weight: 600; }
-.textbook-layout { max-width: 1250px; margin: auto; display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 36px; padding: 36px clamp(24px, 4vw, 64px) 100px; }
+.learning-toolbar { display: flex; gap: 6px; padding: 12px 28px; border-bottom: 1px solid var(--line); background: #fff; position: sticky; top: 0; z-index: 1; }
+.learning-toolbar button { min-height: var(--control-height); padding: 6px 12px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); font-size: 13px; }
+.learning-toolbar button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-dark); font-weight: 600; }
+.textbook-layout { max-width: 1220px; margin: auto; display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 40px; padding: 36px clamp(24px, 4vw, 56px) 100px; background: var(--surface); }
 .textbook { grid-column: 1; grid-row: 1; min-width: 0; color: #28323b; font: 15px/1.95 "Microsoft YaHei", sans-serif; overflow-wrap: anywhere; }
 .textbook h1 { font-size: 26px; line-height: 1.5; margin: 0 0 28px; letter-spacing: .02em; }
 .textbook h2 { font-size: 19px; margin: 40px 0 16px; padding-bottom: 10px; border-bottom: 1px solid #e9eef2; scroll-margin-top: 85px; }
@@ -10,8 +10,8 @@
 .textbook-paragraph { margin: 14px 0; }
 .textbook ul, .textbook ol { padding-left: 24px; }
 .textbook li { margin: 6px 0; }
-.textbook blockquote { margin: 20px 0; padding: 2px 20px; border-left: 3px solid #83bce3; background: #f5faff; color: #496779; }
-.textbook pre { max-width: 100%; overflow-x: auto; background: #f6f8fa; padding: 18px 20px; border-radius: 9px; line-height: 1.65; font-size: 13px; }
+.textbook blockquote { margin: 20px 0; padding: 2px 20px; border-left: 3px solid #8cbbdb; background: #f5f8fb; color: var(--text-secondary); }
+.textbook pre { max-width: 100%; overflow-x: auto; background: #f5f6f8; border: 1px solid var(--line); padding: 18px 20px; border-radius: var(--radius-control); line-height: 1.65; font-size: 13px; }
 .textbook code { font-family: Consolas, "Cascadia Code", monospace; }
 .textbook :not(pre) > code { background: #f1f5f8; border-radius: 4px; padding: 2px 5px; font-size: .9em; }
 .textbook pre code.hljs { padding: 0; background: transparent; }
@@ -22,10 +22,10 @@
 .textbook table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .textbook th, .textbook td { padding: 10px 12px; border: 1px solid #dfe7ed; text-align: left; }
 .textbook th { background: #f5f9fc; font-weight: 600; }
-.textbook-toc { grid-column: 2; grid-row: 1; align-self: start; position: sticky; top: 92px; display: grid; gap: 5px; padding-left: 16px; border-left: 1px solid #e5edf3; max-height: calc(100vh - 230px); overflow-y: auto; }
-.textbook-toc button { border: 0; background: transparent; padding: 7px 4px; text-align: left; font-size: 12px; line-height: 1.6; color: #526c7d; }
-.textbook-toc button:hover { color: #205f91; background: #f1f8fe; }
-.textbook-source { display: block; width: calc(100% - 56px); min-height: calc(100vh - 260px); margin: 28px; padding: 22px; resize: vertical; border: 1px solid #e0e8ef; border-radius: 8px; color: #334657; background: #fafcfe; font: 13px/1.8 Consolas, monospace; }
+.textbook-toc { grid-column: 2; grid-row: 1; align-self: start; position: sticky; top: 84px; display: grid; gap: 4px; padding-left: 16px; border-left: 1px solid var(--line); max-height: calc(100vh - 210px); overflow-y: auto; }
+.textbook-toc button { min-height: 30px; border: 0; background: transparent; padding: 6px 8px; text-align: left; font-size: 12px; line-height: 1.6; color: var(--text-secondary); }
+.textbook-toc button:hover { color: var(--accent-dark); background: var(--accent-soft); }
+.textbook-source { display: block; width: calc(100% - 56px); min-height: calc(100vh - 260px); margin: 28px; padding: 22px; resize: vertical; border: 1px solid var(--line); border-radius: var(--radius-control); color: #334657; background: var(--surface); font: 13px/1.8 Consolas, monospace; }
 .learning-note-hint { padding: 8px 28px; margin: 0; font-size: 12px; color: #687e8e; background: #f8fbfd; }
 @media (max-width: 1150px) {
   .textbook-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }

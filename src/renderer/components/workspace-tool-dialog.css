@@ -1,6 +1,6 @@
-.workspace-tool-dialog { width: min(1040px, calc(100vw - 40px)); max-width: 100%; max-height: calc(100vh - 40px); padding: 0; border: 1px solid #e1e9ef; border-radius: 16px; color: #263c4b; background: #fff; box-shadow: 0 24px 90px #1c3f562e; }
-.workspace-tool-dialog::backdrop { background: #203d533d; backdrop-filter: blur(3px); }
-.workspace-tool-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 22px; background: #fff; border-bottom: 1px solid #e9eff4; }
+.workspace-tool-dialog { width: min(1040px, calc(100vw - 48px)); max-width: 100%; max-height: calc(100vh - 48px); padding: 0; border: 1px solid #cfd7e0; border-radius: 14px; color: var(--text); background: #fff; box-shadow: var(--shadow-dialog); }
+.workspace-tool-dialog::backdrop { background: rgb(23 35 48 / 30%); backdrop-filter: blur(2px); }
+.workspace-tool-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--line); }
 .workspace-tool-header span { font-weight: 600; }
 .workspace-tool-dialog .snapshot-panel { padding: 24px; }
 .workspace-tool-dialog .consistency-panel { margin: 20px 28px; }

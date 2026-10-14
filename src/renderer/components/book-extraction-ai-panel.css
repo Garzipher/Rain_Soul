@@ -1,12 +1,12 @@
-.book-extraction-ai { min-width: 0; margin: 24px 0; padding: 20px; border: 1px solid #d8e2ec; border-radius: 13px; background: #f7fbff; }
-.book-extraction-ai h2 { margin: 0; font-size: 18px; }
+.book-extraction-ai { min-width: 0; margin: 24px 0; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: #f7f9fc; }
+.book-extraction-ai h2 { margin: 0; font-size: 16px; font-weight: 650; color: var(--text); }
 .book-extraction-ai-selection { max-height: 320px; overflow: auto; }
 .book-extraction-ai-selection label { display: flex; align-items: start; gap: 8px; padding: 8px; border-bottom: 1px solid #e0e8ef; }
 .book-extraction-ai-selection input { flex-shrink: 0; margin-top: 6px; }
 .book-extraction-ai-original { display: block; max-height: 5.4em; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #536170; }
 .book-extraction-ai-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
 .book-extraction-ai-actions span { font-size: 13px; }
-.book-extraction-ai-results article { min-width: 0; margin-top: 18px; padding: 16px; border: 1px solid #d8e2ec; border-radius: 9px; background: white; }
+.book-extraction-ai-results article { min-width: 0; margin-top: 18px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-control); background: white; box-shadow: var(--shadow-panel); }
 .book-extraction-ai-results h3 { margin-top: 0; font-size: 15px; }
 .book-extraction-ai-results dt { font-weight: 600; margin-top: 12px; }
 .book-extraction-ai-results dd { margin: 6px 0 0; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
