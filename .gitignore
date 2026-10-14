@@ -24,6 +24,7 @@ __pycache__/
 *.pyc
 
 # Playwright
+.playwright-mcp/
 test-results/
 test-results-desktop/
 test-results-desktop-pack/
@@ -31,6 +32,8 @@ playwright-report/
 playwright/.cache/
 
 # 桌面构建与覆盖率产物
+/.artifacts/
+/.p0-*/
 dist/
 release/
 coverage/
