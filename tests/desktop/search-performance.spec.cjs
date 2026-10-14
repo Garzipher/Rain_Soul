@@ -5,6 +5,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { seedSearchProject, expectedResults, queries } = require('../fixtures/search-performance.cjs');
+const { restoreSearchWindow, readSearchWindow, isSearchDisplayValid, assertSearchDisplayValid } = require('../fixtures/search-display-state.cjs');
 const { activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup, createWork } = require('./structure-helper.cjs');
 
 // 总预算包含种库、400次准备/正式输入和200次真实渲染；单次P95门槛仍为1秒。
@@ -32,7 +33,7 @@ async function measureInput(page, text, expected, mode) {
     const input = document.querySelector('input[aria-label="模糊搜索知识与正文"]');
     const workspace = document.querySelector('.knowledge-workspace');
     window.__searchMeasurement = new Promise((resolve, reject) => {
-      let start, sawSearching = false, sawMutation = false, finishing = false, finished = false, timer;
+      let start, visibilityAtInput, focusedAtInput, sawSearching = false, sawMutation = false, finishing = false, finished = false, timer;
       const rendered = () => ({
         knowledge: [...workspace.querySelectorAll('.knowledge-entry')].map(card => ({ body: card.querySelector('.knowledge-snippet').textContent,
           source: card.querySelector('.knowledge-source span:last-of-type').textContent })).sort((left, right) => left.source.localeCompare(right.source)),
@@ -48,18 +49,23 @@ async function measureInput(page, text, expected, mode) {
         if (!isComplete() || finishing) return;
         finishing = true;
         const domDurationMs = performance.now() - start;
-        requestAnimationFrame(() => requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const firstFrameDurationMs = performance.now() - start - domDurationMs;
+          requestAnimationFrame(() => {
           finishing = false;
           if (!isComplete() || finished) return;
           finished = true; observer.disconnect(); clearTimeout(timer);
           const durationMs = performance.now() - start;
           resolve({ durationMs, domDurationMs, frameDurationMs: durationMs - domDurationMs,
+            firstFrameDurationMs, secondFrameDurationMs: durationMs - domDurationMs - firstFrameDurationMs,
+            documentState: { visibilityAtInput, focusedAtInput, visibilityAtFinish: document.visibilityState, focusedAtFinish: document.hasFocus() },
             renderedKnowledge: expected.knowledge.length, renderedParagraphs: expected.paragraphs.length });
-        }));
+          });
+        });
       });
       observer.observe(workspace, { subtree: true, childList: true, characterData: true });
       input.addEventListener('input', () => {
-        start = performance.now(); sawSearching ||= searching();
+        start = performance.now(); visibilityAtInput = document.visibilityState; focusedAtInput = document.hasFocus(); sawSearching ||= searching();
         timer = setTimeout(() => { observer.disconnect(); finished = true;
           reject(new Error(`真实搜索未完成：${JSON.stringify({ sawSearching, searching: searching(), actualKnowledge: rendered().knowledge.length,
             actualParagraphs: rendered().paragraphs.length, expectedKnowledge: expected.knowledge.length, expectedParagraphs: expected.paragraphs.length })}`));
@@ -76,21 +82,27 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
   let application;
   const environment = await machineEnvironment(), samples = [], warmups = [];
   try {
-    application = await launch(directory);
+    const displayArgs = ['-r', path.resolve('tests/fixtures/search-display-bootstrap.cjs')];
+    environment.displayArgs = displayArgs;
+    application = await launch(directory, displayArgs);
     let page = await offlineWindow(application);
     await createWork(page, title);
     const location = await page.evaluate(async title => ({ work: (await window.rainSoul.listWorks()).find(work => work.title === title),
       runtime: await window.rainSoul.getRuntimeInfo() }), title);
     await closeNormally(application); application = undefined;
     const fixture = seedSearchProject(path.join(location.runtime.dataDirectory, location.work.id, 'project.sqlite'), location.work.id);
-    application = await launch(directory); page = await offlineWindow(application);
+    application = await launch(directory, displayArgs); page = await offlineWindow(application);
     // 测量前将隔离窗口置于前台，避免 Windows 遮挡检测对显示帧节流。
-    environment.windowState = await application.evaluate(({ BrowserWindow }) => {
+    environment.windowState = await application.evaluate(({ app, BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       window.webContents.setBackgroundThrottling(false);
+      // 隔离测量窗置顶，避免长轮次中被其他桌面窗口遮挡后双帧降至1Hz。
+      window.setAlwaysOnTop(true);
       window.show(); window.focus();
-      return { visible: window.isVisible(), focused: window.isFocused(), backgroundThrottling: window.webContents.getBackgroundThrottling() };
+      return { visible: window.isVisible(), focused: window.isFocused(), backgroundThrottling: window.webContents.getBackgroundThrottling(),
+        actualDisabledFeatures: app.commandLine.getSwitchValue('disable-features').split(',') };
     });
+    expect(environment.windowState.actualDisabledFeatures).toContain('CalculateNativeWinOcclusion');
     await page.bringToFront();
     await page.setViewportSize({ width: 1280, height: 840 });
     environment.viewport = page.viewportSize();
@@ -105,7 +117,18 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
     await expect(page.getByRole('article', { name: /^知识：/ })).toHaveCount(1000);
     const expected = queries.map(query => expectedResults(fixture, query));
     let reset = 0;
+    const displayState = () => application.evaluate(readSearchWindow);
+    async function foregroundForInput(stage) {
+      let state = await application.evaluate(restoreSearchWindow);
+      await page.bringToFront();
+      // DOM 的 visibilityState 在 Electron 最小化时可能仍为 visible，必须等原生窗口。
+      await expect.poll(async () => { state = await displayState(); return isSearchDisplayValid(state); },
+        { timeout: 5000, message: `环境无效：${stage}搜索窗口未恢复可见状态` }).toBe(true);
+      assertSearchDisplayValid(state, stage);
+      return state;
+    }
     async function sample(index) {
+      await page.bringToFront();
       const query = queries[index];
       await page.getByRole('combobox', { name: '搜索范围', exact: true }).selectOption(query.mode);
       const group = page.getByRole('group', { name: '标签筛选', exact: true });
@@ -115,8 +138,22 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
       }
       // 唯一出处稳定命中一条，确保正式查询的空结果也必须发生真实DOM变化，不能沿用旧空结果。
       reset++;
-      await measureInput(page, '性能夹具参考0000', expectedResults(fixture, { ...query, text: '性能夹具参考0000' }), query.mode);
-      return { queryIndex: index, text: query.text, mode: query.mode, tags: query.tags, ...await measureInput(page, query.text, expected[index], query.mode) };
+      const resetWindowAtInput = await foregroundForInput('准备查询输入前');
+      const resetMeasured = await measureInput(page, '性能夹具参考0000', expectedResults(fixture, { ...query, text: '性能夹具参考0000' }), query.mode);
+      const resetWindowAtFinish = await displayState();
+      if (!isSearchDisplayValid(resetWindowAtFinish)) {
+        console.log(`搜索准备样本环境无效 ${JSON.stringify({ resetWindowAtInput, resetWindowAtFinish, ...resetMeasured })}`);
+      }
+      assertSearchDisplayValid(resetWindowAtFinish, '准备查询测量结束');
+      const windowAtInput = await foregroundForInput('正式查询输入前');
+      const measured = await measureInput(page, query.text, expected[index], query.mode);
+      const windowAtFinish = await displayState();
+      const result = { queryIndex: index, text: query.text, mode: query.mode, tags: query.tags, windowAtInput, windowAtFinish, ...measured };
+      // 每条留下 DOM 与两次显示帧证据；中断轮次也可定位，不等整轮成功才输出。
+      console.log(`搜索显示样本 ${JSON.stringify(result)}`);
+      // 结束状态无效即终止该轮；禁止丢弃慢样本后补抽来凑足 200 条。
+      assertSearchDisplayValid(windowAtFinish, '正式查询测量结束');
+      return result;
     }
     for (let index = 0; index < queries.length; index++) warmups.push(await sample(index));
     console.log(`预热20查询完成；耗时范围 ${Math.min(...warmups.map(item => item.durationMs)).toFixed(2)}–${Math.max(...warmups.map(item => item.durationMs)).toFixed(2)}ms。`);

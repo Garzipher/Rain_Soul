@@ -23,7 +23,7 @@ function dataDirectory(directory) {
   return process.env.RAINSOUL_TEST_EXECUTABLE ? path.join(directory, 'RainSoul') : directory;
 }
 
-async function launch(directory) {
+async function launch(directory, extraArgs = []) {
   const env = { ...process.env, RAINSOUL_TEST_DIRECTORY: directory };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.NODE_OPTIONS;
@@ -33,9 +33,10 @@ async function launch(directory) {
     // 目录包与开发入口共用验收；作品与 Electron 档案均隔离在本次临时目录。
     env.LOCALAPPDATA = directory;
     env.APPDATA = directory;
-    application = await _electron.launch({ executablePath, args: [`--user-data-dir=${path.join(directory, 'ElectronProfile')}`], env });
+    application = await _electron.launch({ executablePath, args: [`--user-data-dir=${path.join(directory, 'ElectronProfile')}`, ...extraArgs], env });
   } else {
-    application = await _electron.launch({ args: [path.resolve('dist/desktop/main.cjs')], env });
+    // Playwright 在最前注入自己的 loader；测试 -r 必须随后预加载，并排在主入口之前。
+    application = await _electron.launch({ args: [...extraArgs, path.resolve('dist/desktop/main.cjs')], env });
   }
   processes.set(application, application.process());
   return application;
