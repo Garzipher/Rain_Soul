@@ -47,3 +47,14 @@ coverage/
 /.coverage-dom-attributes/
 /.coverage-package-audit-fixes/
 /.coverage-bundled-package-cli/
+
+# 本机服务凭据与环境配置，防止复制到项目后误提交
+**/ai-settings.json
+**/.ai-settings-*.tmp
+**/credentials.json
+**/credentials.*.json
+.env
+.env.*
+!.env.example
+*.key
+*.pem
