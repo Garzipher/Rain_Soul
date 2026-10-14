@@ -150,7 +150,7 @@ npm run pack:research
 | `tasks/` | 开发决策、验收结论与证据索引 |
 | `.trae/` | AI 开发规章与技能；普通用户运行不依赖 AI 开发工具 |
 
-`node_modules/`、`dist/`、`release/`、`.artifacts/`、本机模型研究资料及凭据被 Git 忽略，不随 clone 下载。报告、截图和日志集中到 `.artifacts/`；旧安装包在本机 `release/archive/`。测试源码与测试结果分别保存，不把测试源码当作垃圾删除。
+`node_modules/`、`dist/`、`release/`、`.artifacts/`、本机模型研究资料及凭据被 Git 忽略，不随 clone 下载。报告、截图和日志集中到 `.artifacts/`；旧安装包已物理删除，其验收证据保留于本机 `.artifacts/archive/release-evidence-20261014/`。当前有效安装包在 `release/current/`。测试源码与测试结果分别保存，不把测试源码当作垃圾删除。
 
 ## 状态与文档
 

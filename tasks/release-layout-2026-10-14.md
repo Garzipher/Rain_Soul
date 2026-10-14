@@ -1,5 +1,9 @@
 # 知识库入口与交付目录整理
 
+## 后续清理说明
+
+作者随后明确要求物理删除旧EXE：本文提到的 `release/archive/` 历史包已删除，验收证据迁至 `.artifacts/archive/release-evidence-20261014/` 并保持相对目录；当前 `release/current/` 1.3.2入口保留。清理与主线统一见 [GitHub准备台账](github-readiness-2026-10-14.md)。以下为当时验收和目录整理的历史记录。
+
 日期：2026-10-14。目标版本1.3.2，分支`codex/cloud-local-semantic`。
 
 ## 作者反馈与根因

@@ -2,7 +2,7 @@
 
 ## 结论
 
-当前发布文件树已整理，净源码安装、生产构建、静态检查、离线启动及可执行测试通过。保留原开发历史，另提供 `codex/github-ready` 分支用于发布；未实际推送 GitHub。
+当前发布文件树已整理，净源码安装、生产构建、静态检查、离线启动及可执行测试通过。按作者后续要求，完整最新代码已统一到本机 `main`，旧分支历史中的大EXE也已清理；未实际推送GitHub。初次准备使用 `codex/github-ready`，该过渡分支无需再作为日常开发或推送入口。
 
 这不等于全部产品发布门禁通过。正式动态网页渲染、干净 Windows 安装/升级/卸载矩阵和部分真实云操作仍按原验收台账待验。
 
@@ -11,7 +11,7 @@
 - 根目录两套外部参考仓库移至 `.artifacts/archive/reference-repositories-20261014/`，原资料保留；208 个曾被跟踪的参考文件停止跟踪。
 - `src`、`tests`、`scripts`、`assets`、`docs`、`learning`、`tasks` 与项目开发规章保留。测试是必要源码，不整体忽略。
 - `node_modules`、`dist`、`release`、`.artifacts`、本机模型研究资料和本机凭据由 `.gitignore` 排除。当前文件树不包含安装程序、作者数据库或生成报告。
-- 工作区仍有本机依赖、当前安装包、研究模型和归档证据，它们不随源码发布。不能将“发布树已整理”理解为“硬盘上已删除所有辅助资料”。
+- 工作区仍有本机依赖、当前安装包、研究模型和归档证据，它们不随源码发布。后续已物理删除 `release/archive`：2855个旧文件、27个EXE，8227369992字节；68份验收证据校验后移至 `.artifacts/archive/release-evidence-20261014/`，当前1.3.2两个入口SHA-256保持一致。删除清单见 `.artifacts/manifests/old-release-deletion-20261014.json`。
 - 使用说明见根目录 README；新增 ISC LICENSE 与现有 package.json 许可声明一致。第三方运行库与模型仍遵守各自许可。
 
 ## 净源码复现
@@ -45,24 +45,36 @@
 
 原分支历史含 `release/win-unpacked/RainSoul.exe`，246302720字节。只删除当前文件不能消除GitHub的100MB限制。
 
-在 `.artifacts/github-readiness/publish-repo` 完整隔离克隆中，仅对开发分支运行 git-filter-repo 的 `--strip-blobs-bigger-than 100M`；原仓库历史不改写。过滤后文件树哈希相同，远端主线 `e49b2b73d034d1894c74e88a72c4273a8eb1878e` 仍为祖先，发布分支可达对象没有超过100MiB的blob。保留原分支，导入 `codex/github-ready`。不要 push --all 或 --mirror，以免重新携带旧历史。
+初次在完整隔离克隆中运行 git-filter-repo 的 `--strip-blobs-bigger-than 100M`，过滤前后文件树一致，远端主线 `e49b2b73d034d1894c74e88a72c4273a8eb1878e` 仍为祖先。后续作者明确要求删除旧EXE并统一main：先比对最新源码树与旧开发分支一致，再将main与开发引用指向等价的清理历史；另一旧功能分支也核对过滤前后源码树一致。完成引用清理后，用Git清除旧回退记录并回收旧对象，主仓库与隔离副本均清理，不再保留旧EXE的Git对象。
+
+本机main包含最新源码、测试、教材、README与许可；不采用把含大EXE的旧main合并回新主线的方式。main跟踪origin/main，保留功能提交；过滤涉及的旧提交哈希发生变化，但不丢弃当前源码。仅推送main即可，无需force或推送全部分支。
 
 用户决定发布后可执行：
 
 ```powershell
-git push origin codex/github-ready
+git push origin main
 ```
 
-再通过PR将该分支合入GitHub main；合入后README中的普通clone命令取得新版。合入前可明确下载该分支：
+若远端主线没有新增不兼容提交，上述推送可前向更新；如GitHub有保护规则，应按保护规则提交PR，不能强推。推送成功后README中的普通clone命令取得新版：
 
 ```powershell
-git clone --branch codex/github-ready https://github.com/Garzipher/Rain_Soul.git
+git clone https://github.com/Garzipher/Rain_Soul.git
 cd Rain_Soul
 npm ci
 npm start
 ```
 
-本轮曾成功获取远端主线，末次GitHub访问发生DNS解析失败；没有执行实际推送，远端认证、保护规则和当时网络仍需推送时确认。
+初次曾成功获取远端主线，后续一次获取发生连接重置；再次执行 `git push --dry-run origin main` 退出0，预检显示 `e49b2b7..62dabb7 main -> main`，未实际更新远端。本机main统一不等于GitHub上的main已经更新，正式推送仍须遵守届时的远端状态与保护规则。
+
+## 后续main清理验证
+
+本轮主线业务代码、测试与构建配置相对完整最新基线没有变化，仅修订本文、README及历史目录台账。主仓库和隔离副本都已通过旧EXE对象不存在检查；全对象检查无超过100MiB的blob，Git fsck通过，旧main的等价清理历史仍为新main祖先。凭据模式扫描、被跟踪的生成物与README相对链接检查无命中或损坏。
+
+主线上重新执行typecheck、lint、单元、桌面与Demo。首次单元全集169文件中168通过，1564项通过、1项失败；失败点是资产回执重试后切换正文的异步等待，错误快照仍显示资产编辑保护。随后单独重跑失败项通过，再以覆盖率采集模式复验整个相关文件5项全部通过，业务和测试代码均未改变，不将首次失败隐去。单文件覆盖率采集关闭总体百分比阈值仅用于定位，不替代全项目80%覆盖率门禁；上节93.09%等覆盖率是此前同一业务源码的净安装全集证据。
+
+主线桌面测试32项通过、2项缺显式安装包入口跳过；200个真实搜索样本P95=233.30ms，门槛仍为1000ms。Demo测试74项通过，失败项复验、桌面、Demo三阶段退出码均为0。本轮验证使用独立临时作品，作者作品未用于测试。
+
+主线新证据位于 `.artifacts/github-readiness/`：main-final-audit.json、main-gc.log、duplicate-gc.log、main-verify-20261014.log、renderer-assets-retry.log、renderer-assets-coverage-retry.log、main-desktop.log、main-demo.log、main-followup-exit.json和main-push-dry-run.log。删除清单记录68份验收证据的SHA-256与当前有效EXE校验值。
 
 ## 源码与安装器边界
 
