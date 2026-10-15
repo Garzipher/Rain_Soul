@@ -2,7 +2,7 @@
 
 RainSoul 是面向 Windows 的本地写作工作台。把正文、剧情大纲、伏笔和写作素材放在同一部作品中，离线完成写作、保存、搜索和导出；需要 AI 时再配置自己的云服务。
 
-采用 Electron、React/TypeScript、Tiptap 和 SQLite。当前版本 **1.3.3**，支持 **Windows 10/11 64 位**。
+采用 Electron、React/TypeScript、Tiptap 和 SQLite。当前版本 **1.3.4**，支持 **Windows 10/11 64 位**。
 
 ## 选择使用方式
 
@@ -15,9 +15,9 @@ RainSoul 是面向 Windows 的本地写作工作台。把正文、剧情大纲�
 
 在 [GitHub Releases](https://github.com/Garzipher/Rain_Soul/releases) 查找安装器；只有发布者上传后才会出现，源码仓库不包含 EXE。
 
-本机当前安装器位于 `release/current/RainSoul Setup 1.3.3.exe`；也可直接运行 `release/current/win-unpacked/RainSoul.exe`。使用目录包时须保留整个 `win-unpacked`，不能只复制 EXE。先退出旧实例，再打开新版；旧程序不会随着源码更新自动升级。
+本机当前安装器位于 `release/current/RainSoul Setup 1.3.4.exe`；也可直接运行 `release/current/win-unpacked/RainSoul.exe`。使用目录包时须保留整个 `win-unpacked`，不能只复制 EXE。先退出旧实例，再打开新版；旧程序不会随着源码更新自动升级。
 
-1.3.3 整理了全局控件、知识库与会话布局，并调整云端失败后的恢复状态。本轮按作者要求未运行测试，仅做静态检查和构建，界面与交互交由作者验证；不沿用旧版本的测试结果声称本版已验收。
+1.3.4 将会话改为直接发送、可停止生成，分离云请求与本地编辑锁，修复错误码跨进程丢失和灰字触发限制，并精简多层边框、增加章节折叠动效。本轮按作者要求未运行测试，仅做静态检查和构建，界面与交互交由作者验证；不沿用旧版本的测试结果声称本版已验收。
 
 当前安装器未签名，Windows 可能提示未知发布者。首次安装后的写作不需要网络；云端 AI 需要用户自己的服务配置。
 
@@ -79,7 +79,9 @@ npm start
 
 在正文选区右键或右上角“AI 工具”调用润色、续写、纠错、一致性检查等操作。每次先核对服务、发送范围及费用提示，再确认；结果作为候选或建议，作者审核后才写入。原文变化会要求重新对比，确认改稿前保存保护快照。超时或额度不足时不自动重发。
 
-“需求会话”按作品组织，可新建、改名和删除会话，草稿与消息保存在本机。云回答同样逐次授权；拆书建议默认不入库。当前没有内置本机聊天大模型。
+“需求会话”按作品组织，可新建、改名和删除会话，草稿与消息保存在本机。点击“发送”即将当前草稿和最近会话历史发往已配置服务，不再弹二次确认；Enter 发送，Shift+Enter 换行，可停止生成。会话不自动附加作品正文或知识。拆书建议默认不入库。当前没有内置本机聊天大模型。
+
+正文底部可开启“知识原句提示”：在本作品知识库已有摘录时，输入原句开头至少两个汉字，停顿后提示剩余原句和出处，Tab 接受、Esc 忽略。提示不是云端生成，也不自动改稿；编辑教材的 Markdown 源文时不会触发。
 
 ## 保存与备份
 
@@ -162,6 +164,7 @@ npm run pack:research
 - [PRD](docs/Rain_Soul_PRD.md) · [技术方案](docs/Rain_Soul_技术方案.md)
 - [工作台 Demo](docs/demos/rainsoul-writing-style.html)
 - [1.3.3 界面整改与验证说明](tasks/ui-redesign-2026-10-14.md)
+- [1.3.4 会话阻塞、灰字与界面整改说明](tasks/ai-interaction-repair-2026-10-15.md)
 - [1.3.2 验收与目录整理](tasks/release-layout-2026-10-14.md)
 - [GitHub 发布准备检查](tasks/github-readiness-2026-10-14.md)
 
