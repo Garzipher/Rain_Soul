@@ -22,7 +22,8 @@ export interface KnowledgeWorkspaceProps {
 }
 interface KnowledgeDraft { id: string | null; body: string; source: string; originalSource: string; categoryId: string; tagIds: string[] }
 export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width: 760px)').matches);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [categoryId, setCategory] = useState<string | null>(null);
   const [tagIds, setTags] = useState<string[]>([]);
   const [text, setText] = useState('');
@@ -58,6 +59,12 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
   const dirty = sending || (!!form && JSON.stringify(form) !== baseline);
   useEffect(() => { dirtyCallback.current?.(dirty); }, [dirty]);
   useEffect(() => () => { dirtyCallback.current?.(false); }, []);
+  useEffect(() => {
+    const narrowWindow = window.matchMedia('(max-width: 760px)');
+    const closeCategories = () => { if (narrowWindow.matches) setCollapsed(true); };
+    narrowWindow.addEventListener('change', closeCategories);
+    return () => narrowWindow.removeEventListener('change', closeCategories);
+  }, []);
   useEffect(() => { if (form) editor.current?.focus(); }, [form?.id, !!form]);
   useEffect(() => {
     setCategory(null); setTags([]); setExpanded(new Set()); setText(''); setMode('knowledge');
@@ -153,13 +160,14 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
     <div className="knowledge-heading"><p>{entries.length} 条知识储备</p><div>{props.onReturnWriting && <button className="secondary" disabled={disabled || !!form} onClick={props.onReturnWriting}>返回写作</button>}<button className="secondary" disabled={disabled || !!form} onClick={() => props.onBookExtraction ? props.onBookExtraction() : setSplitter(true)}>拆书工具</button><button className="primary" disabled={disabled || !canEdit || !!form || !categories.length} onClick={() => openForm()}>新增知识</button></div></div>
     {splitter ? <div className="knowledge-deferred" role="status"><h2>后续开发：本功能尚未交付</h2><p>素材拆文会将参考作品中的描写与写法整理入知识库，保留出处供学习与创作参考。当前阶段：知识库与手工条目。</p><button className="secondary" onClick={() => setSplitter(false)}>返回知识库</button></div> : <div className={`knowledge-layout ${collapsed ? 'is-collapsed' : ''}`}>
       {!collapsed && <nav className="knowledge-categories" aria-label="知识分类"><div><strong>分类</strong><button className="secondary" aria-expanded="true" onClick={() => setCollapsed(true)}>收起分类</button></div>
-        <button aria-pressed={categoryId === null} onClick={() => setCategory(null)}>全部知识</button>
-        {categories.map(category => <button key={category.id} disabled={globalScope} aria-pressed={categoryId === category.id} onClick={() => setCategory(category.id)}><span>{category.parentId && '↳ '}{category.name}</span></button>)}
+        <button aria-pressed={categoryId === null} onClick={() => { setCategory(null); if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true); }}>全部知识</button>
+        {categories.map(category => <button key={category.id} disabled={globalScope} aria-pressed={categoryId === category.id} onClick={() => { setCategory(category.id); if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true); }}><span>{category.parentId && '↳ '}{category.name}</span></button>)}
       </nav>}
       <div className="knowledge-content"><div className="knowledge-toolbar"><div className="knowledge-search">
         {collapsed && <button className="secondary" aria-expanded="false" onClick={() => setCollapsed(false)}>展开分类</button>}
         <input type="search" aria-label="模糊搜索知识与正文" placeholder="搜索内容、出处、标签" value={text} onChange={event => setText(event.target.value)} />
-        {text && <button className="secondary" aria-label="清空搜索" onClick={() => setText('')}>清空</button>}</div><div className="knowledge-filter-controls">
+        {text && <button className="secondary" aria-label="清空搜索" onClick={() => setText('')}>清空</button>}
+        <button className="secondary knowledge-filter-toggle" aria-expanded={filtersExpanded} aria-controls="knowledge-filter-controls" onClick={() => setFiltersExpanded(value => !value)}>筛选范围</button></div><div id="knowledge-filter-controls" className={`knowledge-filter-controls ${filtersExpanded ? 'is-open' : ''}`}>
         <label>搜索范围<SelectField aria-label="搜索范围" value={mode} onChange={event => { setMode(event.target.value as AssetQuery['mode']); setRetrievalMode('keyword'); }}><option value="knowledge">知识内容</option>{canEdit && <option value="all">正文与知识</option>}</SelectField></label>
         {props.onRetrieve && <label>检索方式<SelectField aria-label="检索方式" value={mode === 'all' ? 'keyword' : retrievalMode} disabled={mode === 'all'} onChange={event => { if (mode === 'knowledge') setRetrievalMode(event.target.value as RetrievalQuery['mode']); }}><option value="keyword">关键词</option><option value="semantic">语义</option><option value="hybrid">混合</option></SelectField></label>}
         {props.scopeProps && <label>作品范围<SelectField aria-label="作品范围" value={props.scopeProps.scopeId} disabled={disabled || !!form} onChange={event => props.scopeProps?.onScopeChange(event.target.value)}><option value={props.work.id}>当前作品：{props.work.title}</option><option value="all">全部作品（只读）</option>{props.scopeProps.works.filter(item => item.id !== props.work.id).map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</SelectField></label>}
@@ -181,12 +189,15 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
       {reply?.message && <p role="status">{reply.message}</p>}
       <div className="knowledge-grid">{visible.map(entry => { const source = splitKnowledgeSource(entry.source); return <article key={entry.id} ref={element => { if (element) cards.current.set(entry.id, element); else cards.current.delete(entry.id); }} tabIndex={-1} className="knowledge-entry" aria-label={`知识：${entry.body.slice(0, 20)}`}>
         <button className={`knowledge-snippet ${expanded.has(entry.id) ? '' : 'is-collapsed'}`} aria-label={`${expanded.has(entry.id) ? '收起' : '展开'}知识：${entry.body.slice(0, 20)}`} aria-expanded={expanded.has(entry.id)} onClick={() => setExpanded(previous => { const next = new Set(previous); if (next.has(entry.id)) next.delete(entry.id); else next.add(entry.id); return next; })}>{entry.body}</button>
-        <div className="knowledge-entry-tags">{entry.tagIds.map(id => { const tag = tags.find(item => item.id === id); return tag && <span key={id}>{tag.name}</span>; })}</div>
-        {reply && <small>{reply.hits.find(hit => hit.entryId === (props.scopeProps?.entryOwners?.[entry.id]?.sourceEntryId ?? entry.id) && hit.workId === (props.scopeProps?.entryOwners?.[entry.id]?.workId ?? props.work.id))?.matchedBy.map(value => value === 'keyword' ? '关键词命中' : '语义相关').join(' · ')}</small>}
-        <div className="knowledge-entry-bottom"><div>{canEdit ? <><button disabled={disabled || !!form} onClick={() => openForm(entry)}>编辑知识</button><button disabled={disabled || !!form} onClick={() => setDialog({ heading: '删除知识', description: '将删除这条知识。历史内容与引用追溯仍保留，不会删除正文。', submitLabel: '确认删除', onSubmit: () => operate(() => props.onAction({ type: 'deleteKnowledge', id: entry.id })) })}>删除知识</button></> : props.scopeProps?.entryOwners?.[entry.id]?.workId === props.work.id ? <span>已在当前作品</span> : props.scopeProps?.onCopy && <button disabled={disabled} onClick={() => { void operate(() => props.scopeProps!.onCopy!(entry.id)); }}>复制到当前作品</button>}</div>
-          <div className="knowledge-source">{props.scopeProps?.entryOwners?.[entry.id] && <span>{props.scopeProps.entryOwners[entry.id].workTitle}</span>}<span>{source.readable || '未注明出处'}</span>{entry.origin && <small>来源作品：{entry.origin.workTitle}</small>}</div></div>
-        {canEdit && props.onToggleReference && <button className="secondary" aria-pressed={props.referenceIds?.includes(entry.id) ?? false} disabled={disabled || !!form || (!props.referenceIds?.includes(entry.id) && (props.referenceIds?.length ?? 0) >= 5)} onClick={() => props.onToggleReference!(entry.id)}>{props.referenceIds?.includes(entry.id) ? '移除写作参考' : '用于写作参考'}</button>}
-        <KnowledgeSourceAudit records={source.records} />
+        <div className="knowledge-entry-tags">{(expanded.has(entry.id) ? entry.tagIds : entry.tagIds.slice(0, 2)).map(id => { const tag = tags.find(item => item.id === id); return tag && <span key={id}>{tag.name}</span>; })}{!expanded.has(entry.id) && entry.tagIds.length > 2 && <span title={entry.tagIds.slice(2).map(id => tags.find(tag => tag.id === id)?.name).filter(Boolean).join('、')}>+{entry.tagIds.length - 2}</span>}</div>
+        <div className="knowledge-entry-bottom"><div className="knowledge-entry-actions">
+          {canEdit && props.onToggleReference && <button className="knowledge-reference" aria-pressed={props.referenceIds?.includes(entry.id) ?? false} disabled={disabled || !!form || (!props.referenceIds?.includes(entry.id) && (props.referenceIds?.length ?? 0) >= 5)} onClick={() => props.onToggleReference!(entry.id)}>{props.referenceIds?.includes(entry.id) ? '已选参考' : '选作参考'}</button>}
+          {canEdit ? <details className="knowledge-entry-menu" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
+            <summary aria-label={`知识操作：${entry.body.slice(0, 20)}`} title="知识操作">···</summary>
+            <div className="knowledge-entry-menu-items" role="group" aria-label="知识操作"><button disabled={disabled || !!form} onClick={event => { const menu = event.currentTarget.closest('details'); menu?.removeAttribute('open'); menu?.querySelector('summary')?.focus(); openForm(entry); }}>编辑知识</button><button disabled={disabled || !!form} onClick={event => { const menu = event.currentTarget.closest('details'); menu?.removeAttribute('open'); menu?.querySelector('summary')?.focus(); setDialog({ heading: '删除知识', description: '将删除这条知识。历史内容与引用追溯仍保留，不会删除正文。', submitLabel: '确认删除', onSubmit: () => operate(() => props.onAction({ type: 'deleteKnowledge', id: entry.id })) }); }}>删除知识</button></div>
+          </details> : props.scopeProps?.entryOwners?.[entry.id]?.workId === props.work.id ? <span>已在当前作品</span> : props.scopeProps?.onCopy && <button disabled={disabled} onClick={() => { void operate(() => props.scopeProps!.onCopy!(entry.id)); }}>复制到当前作品</button>}
+        </div><div className="knowledge-source"><span>{source.readable || '未注明出处'}</span>{expanded.has(entry.id) && <>{props.scopeProps?.entryOwners?.[entry.id] && <span>作品：{props.scopeProps.entryOwners[entry.id].workTitle}</span>}{entry.origin && <small>来源作品：{entry.origin.workTitle}</small>}</>}</div></div>
+        {expanded.has(entry.id) && <>{reply && <small className="knowledge-match">{reply.hits.find(hit => hit.entryId === (props.scopeProps?.entryOwners?.[entry.id]?.sourceEntryId ?? entry.id) && hit.workId === (props.scopeProps?.entryOwners?.[entry.id]?.workId ?? props.work.id))?.matchedBy.map(value => value === 'keyword' ? '关键词命中' : '语义相关').join(' · ')}</small>}<KnowledgeSourceAudit records={source.records} /></>}
       </article>; })}</div>
       {paragraphs.map(row => <article className="knowledge-paragraph-result" key={row.id}><small>正文 · {row.source}</small><p>{row.snippet}</p><button className="secondary" disabled={!row.chapterId || disabled} aria-label={`定位正文：${row.title}`} onClick={() => { if (row.chapterId) props.onLocate(row.chapterId, row.paragraphId ?? undefined); }}>{row.title}</button></article>)}
       {!searching && !searchError && !visible.length && !paragraphs.length && <div role="status">{!entries.length ? <><p>还没有知识储备</p>{props.onBookExtraction && <button className="secondary" disabled={disabled} onClick={props.onBookExtraction}>导入参考素材</button>}</> : !text.trim() && (categoryId || tagIds.length) ? <><p>当前分类或标签没有匹配内容</p><button className="secondary" onClick={() => { setCategory(null); setTags([]); }}>清除筛选</button></> : <><p>没有匹配的知识或正文内容</p><button className="secondary" onClick={() => document.querySelector<HTMLInputElement>('input[aria-label="模糊搜索知识与正文"]')?.focus()}>改写查询</button></>}</div>}
