@@ -22,10 +22,14 @@ export class ConversationReplyStore {
   readAll(): ConversationTurnRequest[] {
     this.assertDirectory();
     const requests: ConversationTurnRequest[] = [];
+    let totalSize = 0, inspected = 0;
     for (const name of readdirSync(this.directory)) {
+      if (requests.length >= 100 || totalSize >= 32_000_000 || inspected >= 1000) break;
       if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
+      inspected += 1;
       const file = join(this.directory, name), stat = lstatSync(file);
       if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4_000_000) continue;
+      totalSize += stat.size;
       try {
         const parsed = conversationTurnSchema.safeParse(JSON.parse(readFileSync(file, 'utf8')));
         if (parsed.success && name === `${parsed.data.requestHash}.json`) requests.push(parsed.data);

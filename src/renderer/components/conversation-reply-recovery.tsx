@@ -50,22 +50,25 @@ export function ConversationReplyRecovery({ requestHash, workId, conversationId,
     try { await action(); } catch (reason) { setError(reason instanceof Error ? reason.message : '回答恢复失败，请保留并重试。'); }
     finally { setBusy(false); }
   }
+  async function check() {
+    try {
+      const pending = await api.readPendingConversationReply(requestHash);
+      setAvailable(true); setDurable(pending.durable === true); protection.current?.(pending.durable !== true);
+    } catch (reason) {
+      if (errorCode(reason) !== 'NOT_FOUND') throw reason;
+      onResolved(await api.readConversation(workId, conversationId));
+    }
+  }
   return <div className="conversation-recovery" role="region" aria-label="待保存回答恢复">
     <strong>{checking ? '正在读取本机发送记录' : available ? '回答已收到' : '发送已结束，正在保留草稿'}</strong>
     <p>{durable ? '回答已保存在本机恢复文件中，可随时切换页面，稍后继续保存到会话。' : available ? '回答尚未保存到磁盘，请先保存或复制后放弃。' : '原始草稿仍在本机。仅核对本机记录，不会重新发送。'}</p>
     {error && <p role="alert">{error}</p>}
     <div className="conversation-recovery-actions"><button className="primary" disabled={busy || checking || !available} onClick={() => void run(async () => onResolved(await api.retryConversationReply(requestHash)))}>保存回答</button>
     <button className="secondary" disabled={busy || checking || !available} onClick={() => void run(async () => setReply(await api.readPendingConversationReply(requestHash)))}>查看回答</button>
-    <button className="secondary" disabled={busy || checking} onClick={() => void run(async () => {
-      try { const pending = await api.readPendingConversationReply(requestHash); setAvailable(true); setDurable(pending.durable === true); protection.current?.(pending.durable !== true); }
-      catch (reason) {
-        if (errorCode(reason) !== 'NOT_FOUND') throw reason;
-        onResolved(await api.readConversation(workId, conversationId));
-      }
-    })}>重新核对</button>
+    <button className="secondary" disabled={busy || checking} onClick={() => void run(check)}>重新核对</button>
     <button className="secondary" disabled={busy || checking} onClick={() => {
       if (available) setDiscarding(true);
-      else void run(async () => onResolved(await api.readConversation(workId, conversationId)));
+      else void run(check);
     }}>{available ? '放弃回答' : '保留草稿并返回'}</button></div>
     {reply && <ConversationDialog title="待保存回答对照" onCancel={() => setReply(null)}>
       <h3>待保存回答对照</h3><p>生成时版本 {reply.expectedRevision}；当前版本 {reply.currentRevision}。可选择文本复制保留。</p>
