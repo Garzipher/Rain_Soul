@@ -1,4 +1,4 @@
-export type IconName = 'books' | 'knowledge' | 'chat' | 'settings' | 'plus' | 'back' | 'chapter';
+export type IconName = 'books' | 'knowledge' | 'chat' | 'settings' | 'plus' | 'back' | 'chapter' | 'panel' | 'chevron' | 'folder';
 
 const paths: Record<IconName, string> = {
   books: 'M4 3h5v18H4z M9 3h5v18H9z M16 3l4 1-3 17-4-1z',
@@ -8,6 +8,9 @@ const paths: Record<IconName, string> = {
   plus: 'M12 5v14 M5 12h14',
   back: 'M14 5l-7 7 7 7 M7 12h13',
   chapter: 'M5 3h10l4 4v14H5z M15 3v5h4 M8 12h8 M8 16h6',
+  panel: 'M4 4h16v16H4z M10 4v16 M6.5 8h1 M6.5 12h1 M6.5 16h1',
+  chevron: 'm9 5 7 7-7 7',
+  folder: 'M3 6h7l2 3h9v11H3z M3 6V4h7l2 2',
 };
 
 export function Icon({ name }: { name: IconName }) {

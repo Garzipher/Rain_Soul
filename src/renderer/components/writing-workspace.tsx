@@ -128,7 +128,7 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
         </div>
       </details><span role="status" className={`save-status ${props.status.phase}`}>{props.closing ? '正在保存并关闭…' : statusText}</span></div></header>
     <div className="work-tabs">
-      {tab === 'body' && <button className="chapter-list-toggle" aria-expanded={!chaptersCollapsed} aria-controls="writing-chapters" onClick={() => setChaptersCollapsed(value => !value)}>{chaptersCollapsed ? '章节' : '收起章节'}</button>}
+      {tab === 'body' && <button className="chapter-list-toggle" aria-label={chaptersCollapsed ? '展开章节列表' : '收起章节列表'} title={chaptersCollapsed ? '展开章节列表' : '收起章节列表'} aria-expanded={!chaptersCollapsed} aria-controls="writing-chapters" onClick={() => setChaptersCollapsed(value => !value)}><Icon name="panel" /><span>章节</span></button>}
       <div className="work-tab-group" ref={tabsRef} role="tablist" aria-label="作品工作区">
         {tabDefinitions.map((item) => <button key={item.id} id={`tab-${item.id}`} role="tab" data-tab={item.id} aria-controls={`panel-${item.id}`} aria-selected={tab === item.id} tabIndex={tab === item.id ? 0 : -1} disabled={props.busy} onClick={() => void selectTab(item.id)} onKeyDown={(event) => handleTabKey(event, item.id)}>{item.label}</button>)}
       </div>
@@ -144,7 +144,7 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
     {tab !== 'body' ? <div className="architecture-placeholder" role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
       {props.work.assets ? (tab === 'plot' ? <PlotWorkspace key={props.assetRecovery} work={props.work} assets={props.work.assets} busy={props.busy} onAction={props.onAssetAction} onLocate={locate} onDirtyChange={props.onAssetDirtyChange} selectedId={selectedOutlineId} onSelectForeshadow={id => locateAsset('foreshadow', id)} /> : <ForeshadowWorkspace key={props.assetRecovery} work={props.work} assets={props.work.assets} busy={props.busy} onAction={props.onAssetAction} onLocate={locate} onDirtyChange={props.onAssetDirtyChange} selectedId={selectedForeshadowId} onSelectOutline={(id) => { void props.changeTab(() => { setSelectedOutlineId(id); setTab('plot'); }); }} />) : <Placeholder onReturn={props.onReturn} />}
     </div> : tab === 'body' && <div className={`workspace ${chaptersCollapsed ? 'chapters-collapsed' : ''}`} id="panel-body" role="tabpanel" aria-labelledby="tab-body">
-      <div id="writing-chapters" className="writing-chapters" hidden={chaptersCollapsed}>
+      <div id="writing-chapters" className="writing-chapters" inert={chaptersCollapsed} aria-hidden={chaptersCollapsed}>
       <ChapterTree work={props.work} draft={props.draft} busy={props.busy} onSelectChapter={props.onSelectChapter} onAddChapter={props.onAddChapter} onAddVolume={props.onAddVolume} onSelectVolume={props.onSelectVolume} onMenu={props.onMenu} />
       </div>
       <section className="editor-panel">
