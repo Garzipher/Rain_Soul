@@ -39,7 +39,9 @@ export function useAnimatedDialog(ref: RefObject<HTMLDialogElement | null>, open
       return () => { ++generation.current; };
     }
     node.inert = true; node.dataset.motion = 'exit';
-    if (reduced || !node.open) { close(); return; }
+    // 隐藏窗口不会可靠派发 CSS animationend，且后台计时器可能被节流；
+    // 退出动画不能把原生 dialog 留在 top layer 吞掉后续输入。
+    if (reduced || !node.open || document.visibilityState === 'hidden') { close(); return; }
     const finish = (event: AnimationEvent) => { if (event.target === node && event.animationName === 'rainsoul-dialog-out') close(); };
     node.addEventListener('animationend', finish);
     // 后台节流、关键帧被覆盖时仍能关闭，不仅依赖 animationend。
