@@ -108,7 +108,7 @@ it('失效伏笔证据保留原出处且禁止定位，重新关联使用明确�
   expect(within(history).getByText('原出处摘录：旧地址')).toBeVisible();
   expect(screen.getByText('雨夜来信 · 第 1 段')).toBeVisible();
   expect(within(history).getByText('当前来源版本：2')).toBeVisible();
-  expect(screen.getByRole('button', { name: '定位证据：来信' })).toHaveProperty('disabled', false);
+  expect(screen.getByRole('button', { name: '定位证据：来信' })).toBeEnabled();
 });
 
 it('证据表单未保存时向伏笔工作区报告脏状态并阻止切换', async () => {
