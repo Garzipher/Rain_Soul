@@ -8,15 +8,18 @@ import { publicWebAddress } from './public-web-address';
 import { parseWebArticle } from './web-article';
 import { getWebRenderCapability, renderLimits } from './restricted-render-policy';
 import { renderPublicArticle } from './restricted-web-renderer';
+import { globalPasteImportSchema, globalWebImportSchema, type GlobalExtractionPreview } from '../shared/global-book-extraction';
 
 const cancelRequest = z.object({ operationId: z.uuid() }).strict();
 const pasteRequest = z.object({ workId: z.uuid(), title: z.string().trim().min(1).max(200), text: z.string().min(1).refine(text => Array.from(text).length <= 200000) }).strict();
 export interface WebExtractionDependencies { fetch: typeof fetchPublicArticle; parse: typeof parseWebArticle;
   render?: typeof renderPublicArticle; capability?: typeof getWebRenderCapability }
 
-export function sourcePreview(workId: string, source: FrozenSourceDocument): BookExtractionPreview {
+export function sourcePreview(workId: string, source: FrozenSourceDocument): BookExtractionPreview;
+export function sourcePreview(workId: { kind: 'global' }, source: FrozenSourceDocument): GlobalExtractionPreview;
+export function sourcePreview(workId: string | { kind: 'global' }, source: FrozenSourceDocument): BookExtractionPreview | GlobalExtractionPreview {
   const missingLocations = source.kind === 'txt' || source.kind === 'docx' ? source.segments.filter(segment => segment.chapterIndex === undefined).length : 0;
-  return { token: randomUUID(), workId, filename: source.title, fileHash: source.rawHash, format: source.kind,
+  return { token: randomUUID(), ...(typeof workId === 'string' ? { workId } : { target: workId }), filename: source.title, fileHash: source.rawHash, format: source.kind,
     source, warnings: missingLocations ? [{ code: 'source-location-unknown', message: '旧素材未保存章内坐标，章序未知；段号仅表示原文顺序。', count: missingLocations }] : [],
     segments: source.segments.map(segment => ({ id: segment.id, chapterTitle: segment.chapterTitle || source.title,
       chapterIndex: segment.chapterIndex ?? (missingLocations ? 0 : 1), paragraphIndex: segment.paragraphIndex ?? segment.ordinal, text: segment.text,
@@ -24,11 +27,15 @@ export function sourcePreview(workId: string, source: FrozenSourceDocument): Boo
 }
 
 /** 网络与解析不进入文件串行队列；切换来源会立即取消旧任务。 */
-export class WebExtractionCommands {
+export class WebExtractionCommands<T extends BookExtractionPreview | GlobalExtractionPreview = BookExtractionPreview> {
   private current: { id: string; controller: AbortController } | null = null;
   private readonly running = new Set<Promise<unknown>>();
-  constructor(private readonly replace: (preview: BookExtractionPreview | null) => void,
-    private readonly dependencies: WebExtractionDependencies = { fetch: fetchPublicArticle, parse: parseWebArticle }) {}
+  constructor(private readonly replace: (preview: T | null) => void,
+    private readonly dependencies: WebExtractionDependencies = { fetch: fetchPublicArticle, parse: parseWebArticle },
+    private readonly target?: { kind: 'global' }) {}
+  private preview(workId: string | undefined, source: FrozenSourceDocument): T {
+    return (this.target ? sourcePreview(this.target, source) : sourcePreview(workId!, source)) as T;
+  }
   accepts(command: string) { return ['getWebRenderCapability', 'fetchWebExtraction', 'cancelWebExtraction', 'previewPastedExtraction'].includes(command); }
   reset() { this.current?.controller.abort(); this.current = null; this.replace(null); }
   execute(command: string, payload: unknown): Promise<unknown> {
@@ -53,11 +60,14 @@ export class WebExtractionCommands {
       if (this.current?.id === operationId) this.reset(); return;
     }
     if (command === 'previewPastedExtraction') {
-      const { workId, title, text } = pasteRequest.parse(payload); this.reset();
+      const request = this.target ? globalPasteImportSchema.parse(payload) : pasteRequest.parse(payload);
+      const { title, text } = request; this.reset();
       const source = freezeSource({ kind: 'paste', title, rawBytes: Buffer.from(text), segments: text.replace(/\r\n?/g, '\n').split('\n').map(text => ({ text })) });
-      const preview = sourcePreview(workId, source); this.replace(preview); return structuredClone(preview);
+      const workId = 'workId' in request && typeof request.workId === 'string' ? request.workId : undefined;
+      const preview = this.preview(workId, source); this.replace(preview); return structuredClone(preview);
     }
-    const { workId, operationId, url, mode } = webImportRequestSchema.parse(payload);
+    const request = this.target ? globalWebImportSchema.parse(payload) : webImportRequestSchema.parse(payload);
+    const { operationId, url, mode } = request;
     if (mode === 'restricted-browser') {
       const capability = (this.dependencies.capability ?? getWebRenderCapability)();
       if (!capability.enabled) throw new Error(capability.message);
@@ -78,7 +88,8 @@ export class WebExtractionCommands {
       const source = freezeSource({ kind: 'web', rawBytes, title: article.title, originalUrl: address.url, finalUrl: result.finalUrl,
         fetchedAt: capturedAt, capture: rendered ? { captureMethod: 'restricted-browser', capturedAt, policyVersion: 1, renderedDomHash: rendered.renderedDomHash }
           : { captureMethod: 'static', capturedAt, policyVersion: 1 }, segments: article.paragraphs.map(text => ({ text })) });
-      const preview = sourcePreview(workId, source);
+      const workId = 'workId' in request && typeof request.workId === 'string' ? request.workId : undefined;
+      const preview = this.preview(workId, source);
       if (rendered) preview.warnings.push(...rendered.warnings.map(message => ({ code: 'restricted-render-warning', message, count: 1 })));
       this.replace(preview); return structuredClone(preview);
     } finally { if (this.current === entry) this.current = null; }
