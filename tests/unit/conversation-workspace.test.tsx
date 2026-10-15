@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { operationError } from '../../src/shared/operation-errors';
 import { setup, stamp } from './conversation-workspace-fixture';
 import type { ConversationApi } from '../../src/renderer/components/conversation-workspace';
-afterEach(cleanup);
+afterEach(() => { cleanup(); localStorage.clear(); });
 describe('需求会话工作区', () => {
   it('删除当前会话后打开同作品的剩余会话', async () => {
     const { api } = setup();
@@ -48,7 +48,7 @@ describe('需求会话工作区', () => {
     const { api } = setup();
     vi.mocked(api.readConversation).mockResolvedValueOnce({ id: '会话甲', title: '开篇讨论', revision: 1, draft: '', createdAt: stamp, updatedAt: stamp, messageCount: 101, hasMore: true, nextBeforeMessageId: 'recent', messages: [{ id: 'recent', role: 'user', content: '最近消息', createdAt: stamp }] });
     fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
-    expect(await screen.findByText('云端预览仅发送最近100条历史；更早消息可在本机阅读。')).toBeVisible();
+    expect(await screen.findByText('仅发送最近100条历史；更早消息可在本机阅读。')).toBeVisible();
     vi.mocked(api.readConversation).mockResolvedValueOnce({ id: '会话甲', title: '开篇讨论', revision: 1, draft: '', createdAt: stamp, updatedAt: stamp, messageCount: 101, hasMore: false, messages: [{ id: 'early', role: 'user', content: '早期消息', createdAt: stamp }] });
     fireEvent.click(screen.getByRole('button', { name: '加载更早消息' }));
     expect(await screen.findByText('早期消息')).toBeVisible();
@@ -62,7 +62,7 @@ describe('需求会话工作区', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('会话版本冲突');
     expect(screen.getByRole('textbox', { name: '会话输入' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '重新读取会话并保留草稿' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('草稿已存本机'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Enter 发送 · Shift+Enter 换行'));
     expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('保留这份草稿');
   });
   it('新建结果不明时保留原操作ID，重试不重复创建', async () => {
@@ -83,21 +83,26 @@ describe('需求会话工作区', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: 'A' } });
     await waitFor(() => expect(api.manageConversation).toHaveBeenCalledTimes(1));
     fireEvent.change(screen.getByRole('textbox', { name: '会话输入' }), { target: { value: 'B' } });
-    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
     await act(async () => { complete({ id: '会话甲', title: '开篇讨论', revision: 2, draft: 'A', createdAt: stamp, updatedAt: stamp, messageCount: 0, messages: [], hasMore: false }); });
-    await screen.findByText('合成授权材料');
+    await waitFor(() => expect(api.executeConversationAi).toHaveBeenCalledTimes(1));
     expect(api.manageConversation).toHaveBeenCalledWith(expect.objectContaining({ action: expect.objectContaining({ type: 'saveDraft', draft: 'B', expectedRevision: 2 }) }));
   });
-  it('授权弹窗接管焦点，Escape取消并保留输入', async () => {
-    const { api } = setup();
+  it('连接准备中可停止，晚到授权被取消且不请求云端，草稿保留', async () => {
+    const { api, dirty } = setup();
+    let complete!: (value: Awaited<ReturnType<ConversationApi['prepareConversationAi']>>) => void;
+    const prepared = await api.prepareConversationAi({ workId: '作品甲', conversationId: '会话甲', expectedRevision: 1 });
+    vi.mocked(api.prepareConversationAi).mockClear().mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
     fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
     fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '合成测试' } });
-    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
-    const dialog = await screen.findByRole('dialog', { name: '云端会话发送确认' });
-    expect(screen.getByRole('button', { name: '取消发送' })).toHaveFocus();
-    fireEvent.keyDown(dialog, { key: 'Escape' });
-    await waitFor(() => expect(api.cancelConversationAi).toHaveBeenCalledWith('token'));
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await screen.findByRole('button', { name: '停止生成' }));
+    await waitFor(() => expect(dirty).toHaveBeenLastCalledWith(false));
+    await act(async () => complete(prepared));
+    expect(api.cancelConversationAi).toHaveBeenCalledWith('token');
+    expect(api.executeConversationAi).not.toHaveBeenCalled();
     expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('合成测试');
+    expect(screen.getByRole('button', { name: '发送' })).toBeEnabled();
   });
   it('按作品展示会话，读取持久化草稿并在停顿后保存', async () => {
     const { api, dirty } = setup();
@@ -106,25 +111,40 @@ describe('需求会话工作区', () => {
     await waitFor(() => expect(api.manageConversation).toHaveBeenCalledWith(expect.objectContaining({ action: expect.objectContaining({ type: 'saveDraft', draft: '离线构思' }) })));
     await waitFor(() => expect(dirty).toHaveBeenLastCalledWith(false));
   });
-  it('发送只打开授权预览，取消不执行云调用且保留草稿', async () => {
+  it('云端生成不锁住导航，停止后晚到回复不能覆盖草稿', async () => {
+    const { api, dirty } = setup();
+    let complete!: (value: Awaited<ReturnType<ConversationApi['executeConversationAi']>>) => void;
+    vi.mocked(api.executeConversationAi).mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    vi.mocked(api.readPendingConversationReply).mockRejectedValueOnce(operationError('没有完整回答', 'NOT_FOUND'));
+    fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '保留最新构思' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(api.executeConversationAi).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: '新建会话' })).toBeEnabled();
+    expect(dirty).toHaveBeenLastCalledWith(false);
+    fireEvent.click(screen.getByRole('button', { name: '停止生成' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '发送' })).toBeEnabled());
+    await act(async () => complete({ id: '会话甲', title: '开篇讨论', draft: '', revision: 3, createdAt: stamp, updatedAt: stamp, messageCount: 1, hasMore: false, messages: [{ id: '晚到回复', role: 'assistant', content: '取消后的晚到回答', createdAt: stamp }] }));
+    expect(api.cancelConversationAi).toHaveBeenCalledWith('token');
+    expect(screen.queryByText('取消后的晚到回答')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('保留最新构思');
+  });
+  it('点击发送立即执行一次，无二次确认，成功保存回复', async () => {
     const { api } = setup();
     fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
     fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '合成测试' } });
-    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
-    expect(await screen.findByText('合成授权材料')).toBeVisible();
-    expect(api.executeConversationAi).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '取消发送' }));
-    await waitFor(() => expect(api.cancelConversationAi).toHaveBeenCalled());
-    expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('合成测试');
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    expect(await screen.findByText('建议调整节奏')).toBeVisible();
+    expect(api.executeConversationAi).toHaveBeenCalledExactlyOnceWith({ confirmationToken: 'token', requestHash: 'hash', confirmed: true });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('');
   });
-  it('确认后保存回复；失败仍保留草稿，不自动重发', async () => {
+  it('明确发送失败仍保留草稿，不自动重发', async () => {
     const { api } = setup();
-    vi.mocked(api.executeConversationAi).mockRejectedValueOnce(new Error('额度不足'));
+    vi.mocked(api.executeConversationAi).mockRejectedValueOnce(operationError('额度不足', 'CONVERSATION_SEND_FAILED'));
     fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
     fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '不要丢失' } });
-    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
-    await screen.findByText('合成授权材料');
-    fireEvent.click(screen.getByRole('button', { name: '确认发送' }));
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('额度不足');
     expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('不要丢失');
     expect(api.executeConversationAi).toHaveBeenCalledTimes(1);
@@ -143,19 +163,20 @@ describe('需求会话工作区', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '原稿' } });
     expect(await screen.findByRole('alert')).toHaveTextContent('磁盘已满');
     expect(dirty).toHaveBeenLastCalledWith(true);
-    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
     expect(api.prepareConversationAi).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '重试保存草稿' }));
     await waitFor(() => expect(dirty).toHaveBeenLastCalledWith(false));
     const requests = vi.mocked(api.manageConversation).mock.calls;
     expect(requests[0][0]).toEqual(requests[1][0]);
   });
-  it('卸载时取消已打开的授权，避免晚回复进入其他作品', async () => {
+  it('卸载时取消进行中的请求，避免晚回复进入其他作品', async () => {
     const { api, unmount } = setup();
+    vi.mocked(api.executeConversationAi).mockImplementationOnce(() => new Promise(() => {}));
     fireEvent.click(await screen.findByRole('button', { name: '打开会话：开篇讨论' }));
     fireEvent.change(await screen.findByRole('textbox', { name: '会话输入' }), { target: { value: '合成测试' } });
-    fireEvent.click(screen.getByRole('button', { name: '预览发送' }));
-    await screen.findByText('合成授权材料');
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(api.executeConversationAi).toHaveBeenCalledTimes(1));
     await act(async () => { unmount(); });
     expect(api.cancelConversationAi).toHaveBeenCalledWith('token');
   });

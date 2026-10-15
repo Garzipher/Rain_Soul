@@ -4,24 +4,26 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/renderer/App';
 import { createStructureAdapter } from './renderer-structure-adapter';
+import { chooseSelect } from './select-field-helper';
 
 afterEach(cleanup);
 describe('正式会话接线', () => {
   it('新建作品立即进入会话目录，异步切换期间不能在旧作品创建会话', async () => {
     const adapter = createStructureAdapter();
     try {
-      const first = await adapter.api.createWork('作品甲');
+      await adapter.api.createWork('作品甲');
       render(<App api={adapter.api} />);
       fireEvent.click(await screen.findByRole('button', { name: '新建作品' }));
       fireEvent.change(screen.getByRole('textbox', { name: '作品名称' }), { target: { value: '新作品乙' } });
       fireEvent.click(screen.getByRole('button', { name: '创建作品' }));
       await screen.findByRole('textbox', { name: '章节标题' });
       fireEvent.click(screen.getByRole('button', { name: '需求会话' }));
-      expect(await screen.findByRole('option', { name: '新作品乙' })).toBeInTheDocument();
+      const selector = await screen.findByRole('combobox', { name: '会话所属作品' });
+      expect(selector).toHaveTextContent('新作品乙');
       let release!: () => void;
       const original = adapter.api.openWork;
       vi.spyOn(adapter.api, 'openWork').mockImplementation(async id => { await new Promise<void>(resolve => { release = resolve; }); return original(id); });
-      fireEvent.change(screen.getByRole('combobox', { name: '会话所属作品' }), { target: { value: first.id } });
+      await chooseSelect(selector, '作品甲');
       await waitFor(() => expect(screen.getByRole('button', { name: '新建会话' })).toBeDisabled());
       release();
       await waitFor(() => expect(screen.getByRole('button', { name: '新建会话' })).toBeEnabled());
@@ -40,7 +42,7 @@ describe('正式会话接线', () => {
       fireEvent.change(input, { target: { value: '第一章以雨声开场' } });
       fireEvent.click(screen.getByRole('button', { name: '作品集' }));
       expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('第一章以雨声开场');
-      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('草稿已存本机'));
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Enter 发送 · Shift+Enter 换行'));
       fireEvent.click(screen.getByRole('button', { name: '作品集' }));
       await screen.findByRole('heading', { name: '作品集' });
       fireEvent.click(screen.getByRole('button', { name: '需求会话' }));
