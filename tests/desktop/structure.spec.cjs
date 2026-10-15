@@ -54,9 +54,14 @@ async function deleteConfirmation(page, title) {
 }
 
 async function openRecovery(page, workTitle) {
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await activate(page.getByRole('button', { name: '设置', exact: true }));
   await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
-  await page.getByRole('combobox', { name: '选择恢复作品', exact: true }).selectOption({ label: workTitle });
+  await activate(page.getByRole('button', { name: '删除与恢复', exact: true }));
+  const select = page.getByRole('combobox', { name: '选择恢复作品', exact: true });
+  await select.press('Space');
+  await page.getByRole('option', { name: workTitle, exact: true }).press('Enter');
+  await expect(select).toHaveText(workTitle);
 }
 
 async function reopenFromShelf(page, title) {
@@ -206,7 +211,10 @@ test('同名作品删除和恢复按身份隔离，重启不串稿', async () =>
     }
     await expect(page.getByRole('button', { name: '打开作品：项目全流程开发学习', exact: true })).toBeVisible();
     await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await activate(page.getByRole('button', { name: '设置', exact: true }));
+    await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
+    await activate(page.getByRole('button', { name: '删除与恢复', exact: true }));
     const deletedCard = id => page.getByRole('group', { name: '已删除作品：同名作品', exact: true }).and(page.locator(`[data-work-id="${id}"]`));
     await activate(deletedCard(firstId).getByRole('button', { name: '恢复作品：同名作品', exact: true }));
     await expect(deletedCard(firstId)).toHaveCount(0);
@@ -215,6 +223,7 @@ test('同名作品删除和恢复按身份隔离，重启不串稿', async () =>
     await expect(page.getByRole('textbox', { name: '章节标题', exact: true })).toHaveValue('甲作品章');
     await expect(page.getByRole('textbox', { name: '章节正文', exact: true })).toHaveText('甲作品独有正文');
     await activate(page.getByRole('button', { name: '设置', exact: true }));
+    await activate(page.getByRole('button', { name: '删除与恢复', exact: true }));
     await activate(deletedCard(secondId).getByRole('button', { name: '恢复作品：同名作品', exact: true }));
     await expect(deletedCard(secondId)).toHaveCount(0);
     await activate(page.getByRole('button', { name: '作品集', exact: true }));

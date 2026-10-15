@@ -45,6 +45,11 @@ async function launch(directory, extraArgs = []) {
 async function offlineWindow(application) {
   const page = await application.firstWindow();
   await page.waitForURL('rainsoul://app/');
+  // 开发入口的后台验收必须隐藏；正式包安装矩阵另有前台运行约定。
+  if (!process.env.RAINSOUL_TEST_EXECUTABLE) {
+    expect(await application.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().every(window => !window.isVisible()))).toBe(true);
+  }
   await page.context().setOffline(true);
   await expect(page.getByRole('heading', { name: '作品集', exact: true })).toBeVisible();
   return page;
@@ -77,6 +82,9 @@ async function createWork(page, title) {
   await page.getByRole('textbox', { name: '作品名称', exact: true }).fill(title);
   await activate(page.getByRole('button', { name: '创建作品', exact: true }));
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+  // 创建弹窗使用退出动画；标题输入必须等原生 dialog 完全卸载，否则隐藏窗口下
+  // 仍在 top layer 的 inert dialog 会吞掉 Playwright 的 fill/input 事件。
+  await expect(page.getByRole('dialog', { name: '新建作品', exact: true })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: '章节标题', exact: true })).toBeEnabled();
 }
 
