@@ -7,20 +7,34 @@ import { errorCode } from '../../shared/operation-errors';
 
 type RecoveryApi = Pick<DesktopApi, 'retryConversationReply' | 'readPendingConversationReply' | 'discardConversationReply' | 'readConversation'>;
 /** 保存恢复始终使用原请求回执；此组件没有重新请求模型的权限。 */
-export function ConversationReplyRecovery({ requestHash, workId, conversationId, api, onResolved }: {
-  requestHash: string; workId: string; conversationId: string; api: RecoveryApi; onResolved: (detail: ConversationDetail) => void;
+export function ConversationReplyRecovery({ requestHash, workId, conversationId, api, onResolved, onProtectionChange }: {
+  requestHash: string; workId: string; conversationId: string; api: RecoveryApi; onResolved: (detail: ConversationDetail) => void; onProtectionChange?: (dirty: boolean) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [reply, setReply] = useState<PendingConversationReply | null>(null);
   const [discarding, setDiscarding] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [available, setAvailable] = useState(false);
+  const [durable, setDurable] = useState(false);
   const resolved = useRef(onResolved); resolved.current = onResolved;
+  const protection = useRef(onProtectionChange); protection.current = onProtectionChange;
   useEffect(() => {
     let active = true;
     // 只读取本机记录，不发送云请求；没有待存回答时自动解除未知状态。
     void (async () => {
-      try { await api.readPendingConversationReply(requestHash); }
+      try {
+        let pending: PendingConversationReply | null = null;
+        for (let attempt = 0; active; attempt += 1) {
+          try { pending = await api.readPendingConversationReply(requestHash); break; }
+          catch (reason) {
+            if (errorCode(reason) !== 'CONVERSATION_IN_PROGRESS' || attempt >= 14) throw reason;
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+        if (!pending) return;
+        if (active) { setAvailable(true); setDurable(pending.durable === true); protection.current?.(pending.durable !== true); }
+      }
       catch (reason) {
         if (errorCode(reason) !== 'NOT_FOUND') throw reason;
         const detail = await api.readConversation(workId, conversationId);
@@ -28,7 +42,7 @@ export function ConversationReplyRecovery({ requestHash, workId, conversationId,
       }
     })().catch(reason => { if (active) setError(reason instanceof Error ? reason.message : '本机核对未完成，请重试。'); })
       .finally(() => { if (active) setChecking(false); });
-    return () => { active = false; };
+    return () => { active = false; protection.current?.(false); };
   }, [requestHash, workId, conversationId, api]);
   async function run(action: () => Promise<void>) {
     if (busy || checking) return;
@@ -37,19 +51,22 @@ export function ConversationReplyRecovery({ requestHash, workId, conversationId,
     finally { setBusy(false); }
   }
   return <div className="conversation-recovery" role="region" aria-label="待保存回答恢复">
-    <strong>{checking ? '正在核对此次发送' : '回答需要确认'}</strong>
-    <p>草稿仍保存在本机。核对不会重新联网；如有待保存回答，请保存或复制后放弃，再离开。</p>
+    <strong>{checking ? '正在读取本机发送记录' : available ? '回答已收到' : '发送已结束，正在保留草稿'}</strong>
+    <p>{durable ? '回答已保存在本机恢复文件中，可随时切换页面，稍后继续保存到会话。' : available ? '回答尚未保存到磁盘，请先保存或复制后放弃。' : '原始草稿仍在本机。仅核对本机记录，不会重新发送。'}</p>
     {error && <p role="alert">{error}</p>}
-    <div className="conversation-recovery-actions"><button className="primary" disabled={busy || checking} onClick={() => void run(async () => onResolved(await api.retryConversationReply(requestHash)))}>保存回答</button>
-    <button className="secondary" disabled={busy || checking} onClick={() => void run(async () => setReply(await api.readPendingConversationReply(requestHash)))}>查看回答</button>
+    <div className="conversation-recovery-actions"><button className="primary" disabled={busy || checking || !available} onClick={() => void run(async () => onResolved(await api.retryConversationReply(requestHash)))}>保存回答</button>
+    <button className="secondary" disabled={busy || checking || !available} onClick={() => void run(async () => setReply(await api.readPendingConversationReply(requestHash)))}>查看回答</button>
     <button className="secondary" disabled={busy || checking} onClick={() => void run(async () => {
-      try { setReply(await api.readPendingConversationReply(requestHash)); }
+      try { const pending = await api.readPendingConversationReply(requestHash); setAvailable(true); setDurable(pending.durable === true); protection.current?.(pending.durable !== true); }
       catch (reason) {
         if (errorCode(reason) !== 'NOT_FOUND') throw reason;
         onResolved(await api.readConversation(workId, conversationId));
       }
     })}>重新核对</button>
-    <button className="secondary" disabled={busy || checking} onClick={() => setDiscarding(true)}>放弃回答</button></div>
+    <button className="secondary" disabled={busy || checking} onClick={() => {
+      if (available) setDiscarding(true);
+      else void run(async () => onResolved(await api.readConversation(workId, conversationId)));
+    }}>{available ? '放弃回答' : '保留草稿并返回'}</button></div>
     {reply && <ConversationDialog title="待保存回答对照" onCancel={() => setReply(null)}>
       <h3>待保存回答对照</h3><p>生成时版本 {reply.expectedRevision}；当前版本 {reply.currentRevision}。可选择文本复制保留。</p>
       <h4>发送时输入</h4><pre>{reply.userContent}</pre><h4>当前草稿</h4><pre>{reply.currentDraft}</pre><h4>完整回答</h4><pre>{reply.assistantContent}</pre>

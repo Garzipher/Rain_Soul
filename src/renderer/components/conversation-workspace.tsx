@@ -24,14 +24,17 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
   const [pending, setPending] = useState<ConversationRequest | null>(null);
   const [rejected, setRejected] = useState(false);
   const [refreshNeeded, setRefreshNeeded] = useState(false);
-  const [preview, setPreview] = useState<AiPreparedRequest | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendInfo, setSendInfo] = useState<AiPreparedRequest | null>(null);
+  const [replyUnsaved, setReplyUnsaved] = useState(false);
+  const generation = useRef(0);
   const [pendingReply, setPendingReply] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<ConversationSummary | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState('');
   const currentRef = useRef(current); currentRef.current = current;
   const textRef = useRef(text); textRef.current = text;
-  const previewRef = useRef(preview); previewRef.current = preview;
+  const activeRequest = useRef<AiPreparedRequest | null>(null);
   const saving = useRef<Promise<void> | null>(null);
   const mounted = useRef(true);
   const running = useRef(false);
@@ -42,12 +45,20 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
     narrowWindow.addEventListener('change', syncList);
     return () => narrowWindow.removeEventListener('change', syncList);
   }, []);
-  useEffect(() => { onDirtyChange(changed || !!pending || !!preview || !!pendingReply || localBusy || renaming || rejected); }, [changed, pending, preview, pendingReply, localBusy, renaming, rejected, onDirtyChange]);
+  useEffect(() => { onDirtyChange(changed || !!pending || localBusy || renaming || rejected || replyUnsaved); }, [changed, pending, localBusy, renaming, rejected, replyUnsaved, onDirtyChange]);
   useEffect(() => {
     mounted.current = true;
     if (work) void api.listConversations(work.id).then(setList).catch(reason => setError(messageOf(reason)));
-    return () => { mounted.current = false; onDirtyChange(false); if (previewRef.current) void api.cancelConversationAi(previewRef.current.confirmationToken).catch(() => {}); };
+    return () => { mounted.current = false; onDirtyChange(false); generation.current += 1; if (activeRequest.current) void api.cancelConversationAi(activeRequest.current.confirmationToken).catch(() => {}); };
   }, [work?.id, api, onDirtyChange]);
+  function rememberReply(conversationId: string, hash: string | null) {
+    try { const key = `rainsoul:conversation-reply:${work?.id}:${conversationId}`; if (hash) localStorage.setItem(key, hash); else localStorage.removeItem(key); }
+    catch { /* 受限存储不影响会话使用；完整回答仍由主进程的恢复文件保留。 */ }
+  }
+  function readRememberedReply(conversationId: string) {
+    try { return localStorage.getItem(`rainsoul:conversation-reply:${work?.id}:${conversationId}`); }
+    catch { return null; }
+  }
   function accept(detail: ConversationDetail) {
     setCurrent(detail); currentRef.current = detail;
     const { id, title, revision, createdAt, updatedAt, messageCount } = detail;
@@ -97,47 +108,62 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
     try { await operation; } finally { saving.current = null; }
   }
   useEffect(() => {
-    if (!changed || pending || busy || preview || pendingReply || rejected) return;
+    if (!changed || pending || busy || sending || pendingReply || rejected) return;
     const timer = setTimeout(() => { void saveDraft().catch(() => {}); }, 500);
     return () => clearTimeout(timer);
-  }, [text, current?.revision, pending, busy, preview, pendingReply, rejected]);
+  }, [text, current?.revision, pending, busy, sending, pendingReply, rejected]);
   async function run(action: () => Promise<void>) {
-    if (running.current || externalBusy || pending || pendingReply || rejected) return;
+    if (running.current || externalBusy || pending || rejected || replyUnsaved) return;
     running.current = true; setBusy(true); setError(null);
     try { await saveDraft(); await action(); }
     catch (reason) { if (mounted.current) setError(messageOf(reason)); }
     finally { running.current = false; if (mounted.current) setBusy(false); }
   }
-  function open(id: string) { void run(async () => { if (!work) return; const detail = await api.readConversation(work.id, id); accept(detail); setText(detail.draft); }); }
-  function create() { void run(async () => {
+  function open(id: string) { stop(); void run(async () => { if (!work) return; const detail = await api.readConversation(work.id, id); accept(detail); setText(detail.draft); textRef.current = detail.draft; setPendingReply(readRememberedReply(id)); }); }
+  function create() { stop(); setPendingReply(null); void run(async () => {
     if (!work) return;
     await write({ workId: work.id, operationId: crypto.randomUUID(), action: { type: 'create', id: crypto.randomUUID(), title: '新会话' } });
   }); }
-  function prepare() { void run(async () => {
-    const detail = currentRef.current;
-    if (!work || !detail || !textRef.current.trim()) return;
-    const prepared = await api.prepareConversationAi({ workId: work.id, conversationId: detail.id, expectedRevision: detail.revision });
-    if (!mounted.current) { await api.cancelConversationAi(prepared.confirmationToken); return; }
-    setPreview(prepared); previewRef.current = prepared;
-  }); }
-  async function cancel() {
-    const prepared = previewRef.current;
-    if (!prepared) return;
-    try { await api.cancelConversationAi(prepared.confirmationToken); setPreview(null); previewRef.current = null; }
-    catch (reason) { setError(messageOf(reason)); }
+  function stop() {
+    generation.current += 1;
+    const prepared = activeRequest.current; activeRequest.current = null;
+    setSending(false);
+    if (prepared) {
+      setPendingReply(prepared.requestHash);
+      void api.cancelConversationAi(prepared.confirmationToken).catch(reason => { if (mounted.current) setError(messageOf(reason)); });
+    }
   }
-  function send() { void run(async () => {
-    const prepared = previewRef.current;
-    if (!prepared) return;
-    try {
-      const updated = await api.executeConversationAi({ confirmationToken: prepared.confirmationToken, requestHash: prepared.requestHash, confirmed: true });
-      if (mounted.current) { accept(updated); setText(updated.draft); }
-    } catch (reason) {
-      // 明确的失败回执不应锁死导航和关闭；真正未知的回执仍在本机核对。
-      if (mounted.current && errorCode(reason) !== 'CONVERSATION_SEND_FAILED') setPendingReply(prepared.requestHash);
-      throw reason;
-    } finally { if (mounted.current) { setPreview(null); previewRef.current = null; } }
-  }); }
+  function send() {
+    if (running.current || sending || externalBusy || pending || pendingReply || rejected || renaming) return;
+    const attempt = ++generation.current;
+    void (async () => {
+      running.current = true; setBusy(true); setError(null);
+      try { await saveDraft(); }
+      catch (reason) { if (mounted.current) setError(messageOf(reason)); return; }
+      finally { running.current = false; if (mounted.current) setBusy(false); }
+      const detail = currentRef.current;
+      if (!work || !detail || !textRef.current.trim() || !mounted.current || generation.current !== attempt) return;
+      setSendInfo(null); setSending(true);
+      let prepared: AiPreparedRequest | null = null;
+      try {
+        prepared = await api.prepareConversationAi({ workId: work.id, conversationId: detail.id, expectedRevision: detail.revision });
+        if (!mounted.current || generation.current !== attempt) { await api.cancelConversationAi(prepared.confirmationToken); return; }
+        activeRequest.current = prepared; setSendInfo(prepared);
+        rememberReply(detail.id, prepared.requestHash);
+        const updated = await api.executeConversationAi({ confirmationToken: prepared.confirmationToken, requestHash: prepared.requestHash, confirmed: true });
+        rememberReply(detail.id, null);
+        if (mounted.current && generation.current === attempt) { accept(updated); setText(updated.draft); textRef.current = updated.draft; }
+      } catch (reason) {
+        if (prepared && errorCode(reason) === 'CONVERSATION_SEND_FAILED') rememberReply(detail.id, null);
+        if (mounted.current && generation.current === attempt) {
+          if (prepared && errorCode(reason) !== 'CONVERSATION_SEND_FAILED') setPendingReply(prepared.requestHash);
+          setError(messageOf(reason));
+        }
+      } finally {
+        if (generation.current === attempt) { activeRequest.current = null; if (mounted.current) setSending(false); }
+      }
+    })();
+  }
   function remove() { void run(async () => {
     if (!work || !deleting) return;
     const detail = await api.readConversation(work.id, deleting.id);
@@ -169,13 +195,13 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
   }
   return <section className={`conversation-workspace ${listCollapsed ? 'list-collapsed' : ''}`} aria-label="作品需求会话">
     <aside id="conversation-list" className="conversation-list" aria-label="作品与会话" hidden={listCollapsed}>
-      <label className="conversation-work-select">作品<SelectField aria-label="会话所属作品" value={work?.id ?? ''} disabled={busy || changed || !!pending || !!preview || !!pendingReply || renaming} onChange={event => onSelectWork(event.target.value)}>
+      <label className="conversation-work-select">作品<SelectField aria-label="会话所属作品" value={work?.id ?? ''} disabled={busy || changed || !!pending || replyUnsaved || renaming} onChange={event => { stop(); onSelectWork(event.target.value); }}>
         {!work && <option value="">选择作品</option>}{works.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
       </SelectField></label>
-      {work && <><div className="conversation-project"><span className="conversation-project-label">会话列表</span><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply || renaming || rejected} onClick={create}>新建会话</button></div>
+      {work && <><div className="conversation-project"><span className="conversation-project-label">会话列表</span><button className="secondary" disabled={busy || !!pending || replyUnsaved || renaming || rejected} onClick={create}>新建会话</button></div>
         {list.map(item => <div key={item.id} className={`conversation-row ${current?.id === item.id ? 'active' : ''}`}>
-          <button aria-label={`打开会话：${item.title}`} title={item.title} disabled={busy || !!pending || !!preview || !!pendingReply || renaming} onClick={() => open(item.id)}>{item.title}</button>
-          <button className="conversation-delete" aria-label={`删除会话：${item.title}`} disabled={busy || !!pending || !!preview || !!pendingReply || renaming} onClick={() => setDeleting(item)}>×</button>
+          <button aria-label={`打开会话：${item.title}`} title={item.title} disabled={busy || !!pending || replyUnsaved || renaming} onClick={() => open(item.id)}>{item.title}</button>
+          <button className="conversation-delete" aria-label={`删除会话：${item.title}`} disabled={busy || !!pending || replyUnsaved || renaming} onClick={() => { stop(); setDeleting(item); }}>×</button>
         </div>)}{!list.length && <p>尚无会话</p>}</>}
     </aside>
     <div className="conversation-main">
@@ -183,17 +209,17 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
         <button type="button" className="conversation-list-toggle secondary" aria-label={listCollapsed ? '展开会话列表' : '收起会话列表'} aria-expanded={!listCollapsed} aria-controls="conversation-list" title={listCollapsed ? '展开会话列表' : '收起会话列表'} onClick={() => setListCollapsed(value => !value)}>
           <span className="conversation-list-toggle-icon" aria-hidden="true">☰</span><span>会话列表</span>
         </button>
-        {current && <div className="conversation-heading"><h2 title={current.title}>{current.title}</h2><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply} onClick={() => { setName(current.title); setRenaming(true); }}>重命名</button></div>}
+        {current && <div className="conversation-heading"><h2 title={current.title}>{current.title}</h2><button className="secondary" disabled={busy || !!pending || replyUnsaved} onClick={() => { stop(); setName(current.title); setRenaming(true); }}>重命名</button></div>}
       </div>
       {error && <div role="alert" className="page-error"><span>{error}</span><div className="conversation-error-actions">{refreshNeeded && work && <button className="secondary" disabled={busy} onClick={() => void run(() => refreshRemaining(work.id))}>重新读取会话列表</button>}{pending && <button className="secondary" onClick={() => void write(pending).catch(() => {})}>{pending.action.type === 'saveDraft' ? '重试保存草稿' : '重试会话操作'}</button>}{rejected && current && <button className="secondary" onClick={() => void reload()}>重新读取会话并保留草稿</button>}{!pending && !pendingReply && !rejected && !busy && !changed && onOpenSettings && <button className="secondary" onClick={onOpenSettings}>打开模型设置</button>}</div></div>}
       {!current ? <div className="conversation-empty">{work ? '新建或选择一个会话' : '先选择一部作品'}</div> : <>
         {renaming && <form className="conversation-rename" onSubmit={event => { event.preventDefault(); rename(); }}><input aria-label="会话名称" value={name} maxLength={120} onChange={event => setName(event.target.value)} /><button className="primary" disabled={busy || !name.trim()}>保存名称</button><button className="secondary" type="button" disabled={busy} onClick={() => setRenaming(false)}>取消改名</button></form>}
-        <div className="conversation-messages" role="log" aria-label="会话消息">{current.hasMore && <button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply} onClick={older}>加载更早消息</button>}{current.messages.map(item => <article key={item.id} className={`conversation-message ${item.role}`}><span>{item.role === 'user' ? '你' : 'AI 建议'}</span><p>{item.content}</p></article>)}</div>
-        {current.messageCount > 100 && <p className="conversation-range">云端预览仅发送最近100条历史；更早消息可在本机阅读。</p>}
-        <div className="conversation-composer"><textarea aria-label="会话输入" placeholder="输入消息" value={text} maxLength={200000} disabled={busy || !!pending || !!preview || !!pendingReply} onChange={event => { textRef.current = event.target.value; onDirtyChange(true); setText(event.target.value); }} /><div><span role="status">{pending ? '草稿保存失败' : changed ? '正在保存草稿…' : '草稿已存本机'}</span><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply || renaming || rejected || !text.trim()} onClick={record}>仅记录</button><button className="primary" disabled={busy || !!pending || !!preview || !!pendingReply || renaming || rejected || !text.trim()} onClick={prepare}>预览发送</button></div></div>
+        <div className="conversation-messages" role="log" aria-label="会话消息">{current.hasMore && <button className="secondary" disabled={busy || !!pending || replyUnsaved} onClick={older}>加载更早消息</button>}{current.messages.map(item => <article key={item.id} className={`conversation-message ${item.role}`}><span>{item.role === 'user' ? '你' : 'AI 建议'}</span><p>{item.content}</p></article>)}</div>
+        {current.messageCount > 100 && <p className="conversation-range">仅发送最近100条历史；更早消息可在本机阅读。</p>}
+        {sending && <div className="conversation-generating" role="status"><span className="conversation-generating-dot" aria-hidden="true" />{sendInfo ? `${sendInfo.service} 正在思考…` : '正在连接模型…'}<button type="button" className="secondary" onClick={stop}>停止生成</button></div>}
+        <div className="conversation-composer"><textarea aria-label="会话输入" placeholder="输入消息" value={text} maxLength={200000} disabled={busy || sending || !!pending || !!pendingReply} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }} onChange={event => { textRef.current = event.target.value; onDirtyChange(true); setText(event.target.value); }} /><div><span role="status">{pending ? '草稿保存失败' : changed ? '正在保存草稿…' : 'Enter 发送 · Shift+Enter 换行'}</span><button className="secondary" disabled={busy || sending || !!pending || !!pendingReply || renaming || rejected || !text.trim()} onClick={record}>仅记录</button><button className="primary" disabled={busy || sending || !!pending || !!pendingReply || renaming || rejected || !text.trim()} onClick={send}>发送</button></div></div>
       </>}
-      {pendingReply && work && current && <ConversationReplyRecovery requestHash={pendingReply} workId={work.id} conversationId={current.id} api={api} onResolved={detail => { accept(detail); setText(detail.draft); textRef.current = detail.draft; setPendingReply(null); setError(null); }} />}
-      {preview && <ConversationDialog title="云端会话发送确认" onCancel={() => void cancel()}><h3>发送前确认</h3><p>{preview.service} · {preview.model}</p><p>{preview.scopeLabel}</p><p>{preview.billingHint}</p><pre>{preview.previewText}</pre><button className="secondary" onClick={() => void cancel()}>取消发送</button><button className="primary" disabled={busy} onClick={send}>确认发送</button></ConversationDialog>}
+      {pendingReply && work && current && <ConversationReplyRecovery key={pendingReply} requestHash={pendingReply} workId={work.id} conversationId={current.id} api={api} onProtectionChange={setReplyUnsaved} onResolved={detail => { rememberReply(detail.id, null); accept(detail); setText(detail.draft); textRef.current = detail.draft; setPendingReply(null); setReplyUnsaved(false); setError(null); }} />}
       {deleting && <ConversationDialog title="删除会话" onCancel={() => { if (!busy) setDeleting(null); }}><h3>删除会话</h3><p>确认删除“{deleting.title}”及其消息和草稿？</p><button className="secondary" disabled={busy} onClick={() => setDeleting(null)}>取消删除</button><button className="danger" disabled={busy} onClick={remove}>确认删除会话</button></ConversationDialog>}
     </div>
   </section>;
