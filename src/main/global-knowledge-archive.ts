@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { globalKnowledgeArchiveDataSchema, globalKnowledgeArchiveManifestSchema, type GlobalKnowledgeArchiveData } from '../shared/global-knowledge-archive';
 import { globalKnowledgePageSchema } from '../shared/global-knowledge-schema';
 import type { GlobalKnowledgeTransport } from './global-knowledge-commands';
+import { operationError } from '../shared/operation-errors';
 
 const limits = { input: 257 * 1024 * 1024, expanded: 256 * 1024 * 1024, manifest: 64 * 1024, ratio: 200 };
 const sha = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
@@ -74,7 +75,7 @@ export class GlobalKnowledgeArchiveCommands {
       if (!this.accepts(command)) throw new Error('未知全局知识归档命令。');
       if (command === 'confirmGlobalKnowledgeArchive') {
         const request = confirmation.parse(payload);
-        if (!this.preview || this.preview.token !== request.token) throw new Error('全局知识归档预览已失效，请重新选择。');
+        if (!this.preview || this.preview.token !== request.token) throw operationError('全局知识归档预览已失效，请重新选择。', 'INVALID_ARCHIVE_TOKEN');
         return globalKnowledgePageSchema.parse(await this.client.request('importData', { operationId: request.operationId, data: this.preview.data }));
       }
       z.object({}).strict().parse(payload);
