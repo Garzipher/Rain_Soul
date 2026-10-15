@@ -33,7 +33,7 @@ export class GlobalBookExtractionCommands {
   }
   private async begin(preview: GlobalExtractionPreview) {
     await this.drafts.save({ schemaVersion: 1, target: { kind: 'global' }, taskId: randomUUID(), previewToken: preview.token,
-      source: preview.source!, reviews: [], committing: null });
+      source: preview.source!, batches: [], reviews: [], committing: null });
     this.preview = preview; return structuredClone(preview);
   }
   private valid(token: string) {
@@ -113,6 +113,21 @@ export class GlobalBookExtractionCommands {
         `《${request.sourceTitle}》／${request.sourceAuthor || '作者未填写'}；${request.chapter || segments[index].chapterTitle}；原文第${segments[index].paragraphIndex ?? segments[index].ordinal}段；原始 SHA-256：${preview.fileHash}${sourceDocument.originalUrl ? `；${sourceDocument.originalUrl}` : ''}` })) };
     const pending = { ...draft, committing: commit };
     await this.drafts.save(pending); return this.settle(pending);
+  }
+  /** 主进程内部 AI 协调入口，读取和批次落盘与手工审核共用串行队列。 */
+  async getAiContext(token: string) {
+    await this.queue;
+    const preview = this.valid(token), draft = await this.drafts.read();
+    if (!draft || draft.previewToken !== token || draft.committing) throw new Error('全局拆书草稿不可分析。');
+    return { preview: structuredClone(preview), draft };
+  }
+  recordAiBatch(token: string, batch: GlobalExtractionDraft['batches'][number]): Promise<void> {
+    const operation = this.queue.then(async () => {
+      this.valid(token); const draft = await this.drafts.read();
+      if (!draft || draft.previewToken !== token || draft.committing) throw new Error('全局拆书任务已替换，原结果不能写入新任务。');
+      await this.drafts.save({ ...draft, batches: [...draft.batches.filter(item => item.requestHash !== batch.requestHash), batch] });
+    });
+    this.queue = operation.catch(() => {}); return operation;
   }
   async drain() { await this.web.drain(); await this.queue; }
 }

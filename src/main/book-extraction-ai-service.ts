@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import type { AiExecuteRequest, AiPreparedRequest, AiProvider } from '../shared/ai';
 import type { BookExtractionAiResult } from '../shared/book-extraction-ai';
+import type { GlobalBookExtractionAiResult } from '../shared/global-book-extraction-ai';
 import type { AiServiceDependencies } from './ai-service';
 import { aiCompletionEndpoint, sendAiCompletion } from './ai-transport';
 
@@ -9,6 +10,8 @@ export interface BookExtractionAiInput {
   workId: string; previewToken: string; baselineRevision: number; provider: AiProvider;
   segments: { id: string; text: string }[]; categories: { id: string; name: string }[]; tags: { id: string; name: string }[];
 }
+export type GlobalBookExtractionAiInput = Omit<BookExtractionAiInput, 'workId'> & { target: { kind: 'global'; libraryId: string } };
+type ScopedInput = BookExtractionAiInput | GlobalBookExtractionAiInput;
 const dictionary = z.array(z.object({ id: z.uuid(), name: z.string().min(1).max(200) }).strict()).max(1000).refine(items => new Set(items.map(item => item.id)).size === items.length);
 const inputSchema = z.object({
   workId: z.uuid(), previewToken: z.uuid(), baselineRevision: z.number().int().positive(),
@@ -21,7 +24,8 @@ const suggestionsSchema = z.object({ suggestions: z.array(z.object({
   segmentId: z.uuid(), excerpt: z.string().min(1).max(20000).refine(text => !!text.trim()), categoryId: z.uuid(),
   tagIds: z.array(z.uuid()).max(100).refine(ids => new Set(ids).size === ids.length), technique: adviceText, usage: adviceText, exercise: adviceText,
 }).strict()).max(20).refine(items => new Set(items.map(item => item.segmentId)).size === items.length) }).strict();
-interface Frozen { request: BookExtractionAiInput; prepared: AiPreparedRequest; url: string; hostname: string; body: string }
+const globalInputSchema = inputSchema.omit({ workId: true }).extend({ target: z.object({ kind: z.literal('global'), libraryId: z.uuid() }).strict() }).strict();
+interface Frozen { request: ScopedInput; prepared: AiPreparedRequest; url: string; hostname: string; body: string }
 
 /** 独立拆书提示与冻结授权；素材只能作为分析数据，完整回答交由作者逐条审核。 */
 export class BookExtractionAiService {
@@ -29,8 +33,10 @@ export class BookExtractionAiService {
   private readonly active = new Map<string, AbortController>();
   private readonly now: () => number;
   constructor(private readonly dependencies: AiServiceDependencies) { this.now = dependencies.now ?? Date.now; }
-  prepare(value: BookExtractionAiInput): AiPreparedRequest {
-    const parsed = inputSchema.safeParse(value);
+  prepare(value: BookExtractionAiInput): AiPreparedRequest { return this.prepareScoped(value); }
+  prepareGlobal(value: GlobalBookExtractionAiInput): AiPreparedRequest { return this.prepareScoped(value); }
+  private prepareScoped(value: ScopedInput): AiPreparedRequest {
+    const parsed = ('target' in value ? globalInputSchema : inputSchema).safeParse(value);
     if (!parsed.success) throw new Error('拆书分析范围无效；请选择最多二十段原文及有效分类标签。');
     const request = parsed.data, address = aiCompletionEndpoint(request.provider.baseUrl), maxOutputTokens = 4096;
     if (request.provider.enabled === false) throw new Error('云端 AI 已关闭，请先在设置中开启。');
@@ -49,7 +55,7 @@ export class BookExtractionAiService {
     const body = JSON.stringify({ model: request.provider.model, stream: false, max_tokens: maxOutputTokens, messages });
     const confirmationToken = randomBytes(32).toString('hex');
     const prepared: AiPreparedRequest = {
-      confirmationToken, requestHash: createHash('sha256').update(JSON.stringify([confirmationToken, address.url, body, request.provider, request.workId, request.previewToken, request.baselineRevision])).digest('hex'),
+      confirmationToken, requestHash: createHash('sha256').update(JSON.stringify([confirmationToken, address.url, body, request.provider, 'target' in request ? request.target : request.workId, request.previewToken, request.baselineRevision])).digest('hex'),
       expiresAt: this.now() + (this.dependencies.confirmationTtlMs ?? 300000), service: request.provider.name, model: request.provider.model, paragraphIds: request.segments.map(item => item.id),
       scopeLabel, previewText, billingHint: request.provider.billingHint || '按所选云服务计费；当前无法准确估算金额，确认发送可能产生费用。', estimatedInputTokens, maxOutputTokens,
     };
@@ -57,9 +63,20 @@ export class BookExtractionAiService {
     return prepared;
   }
   async execute(value: AiExecuteRequest, options: { signal?: AbortSignal; beforeSend?: () => Promise<void> } = {}): Promise<BookExtractionAiResult> {
+    const result = await this.executeScoped(value, options, 'work');
+    if ('target' in result) throw new Error('拆书结果目标不匹配。');
+    return result;
+  }
+  async executeGlobal(value: AiExecuteRequest, options: { signal?: AbortSignal; beforeSend?: () => Promise<void> } = {}): Promise<GlobalBookExtractionAiResult> {
+    const result = await this.executeScoped(value, options, 'global');
+    if (!('target' in result)) throw new Error('拆书结果目标不匹配。');
+    return result;
+  }
+  private async executeScoped(value: AiExecuteRequest, options: { signal?: AbortSignal; beforeSend?: () => Promise<void> }, target: 'work' | 'global'): Promise<BookExtractionAiResult | GlobalBookExtractionAiResult> {
     if (value.confirmed !== true) throw new Error('请先明确确认拆书服务、原文及字典范围和费用提示。');
     const frozen = this.pending.get(value.confirmationToken);
     if (!frozen || frozen.prepared.expiresAt <= this.now()) { this.pending.delete(value.confirmationToken); throw new Error('拆书确认已过期、取消或使用，请重新预览。'); }
+    if (('target' in frozen.request ? 'global' : 'work') !== target) throw new Error('拆书授权目标不匹配。');
     if (value.requestHash !== frozen.prepared.requestHash) throw new Error('拆书确认内容不一致，请重新预览。');
     this.pending.delete(value.confirmationToken);
     const controller = new AbortController(); this.active.set(value.confirmationToken, controller);
@@ -72,7 +89,8 @@ export class BookExtractionAiService {
         if (controller.signal.aborted) abort(); else controller.signal.addEventListener('abort', abort, { once: true });
       });
       const rawText = await Promise.race([sendAiCompletion({ provider: frozen.request.provider, url: frozen.url, hostname: frozen.hostname, body: frozen.body }, this.dependencies, controller.signal, options.beforeSend), cancelled]);
-      const result: BookExtractionAiResult = { workId: frozen.request.workId, previewToken: frozen.request.previewToken, requestHash: frozen.prepared.requestHash, suggestions: [], rawText };
+      const identity = 'target' in frozen.request ? { target: frozen.request.target } : { workId: frozen.request.workId };
+      const result: BookExtractionAiResult | GlobalBookExtractionAiResult = { ...identity, previewToken: frozen.request.previewToken, requestHash: frozen.prepared.requestHash, suggestions: [], rawText } as BookExtractionAiResult | GlobalBookExtractionAiResult;
       try {
         const { suggestions } = suggestionsSchema.parse(JSON.parse(rawText));
         if (suggestions.some(item => !frozen.request.segments.find(segment => segment.id === item.segmentId)?.text.includes(item.excerpt) ||

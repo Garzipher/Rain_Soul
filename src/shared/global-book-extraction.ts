@@ -19,13 +19,21 @@ export const globalPasteImportSchema = z.object({ title: z.string().trim().min(1
   .refine(value => Array.from(value).length <= 200000) }).strict();
 export const globalExtractionDraftSchema = z.object({
   schemaVersion: z.literal(1), target: z.object({ kind: z.literal('global') }).strict(), taskId: z.uuid(), previewToken: z.uuid(),
-  source: frozenSourceDocumentSchema, reviews: extractionDraftSchema.shape.reviews,
+  source: frozenSourceDocumentSchema, batches: extractionDraftSchema.shape.batches.default([]), reviews: extractionDraftSchema.shape.reviews,
   committing: globalExtractionCommitSchema.nullable(),
 }).strict().superRefine((draft, ctx) => {
   if (new Set(draft.reviews.map(item => item.segmentId)).size !== draft.reviews.length
     || draft.reviews.some(item => !draft.source.segments.some(segment => segment.id === item.segmentId
       && (!['approved', 'committed'].includes(item.status) || segment.text.includes(item.body.trim()) && !!item.body.trim()))))
     ctx.addIssue({ code: 'custom', message: '审核摘录必须逐字属于本次来源，且段落身份唯一' });
+  const segments = new Map(draft.source.segments.map(segment => [segment.id, segment]));
+  if (new Set(draft.batches.map(batch => batch.id)).size !== draft.batches.length
+    || new Set(draft.batches.map(batch => batch.requestHash)).size !== draft.batches.length
+    || draft.batches.some(batch => batch.segmentIds.some(id => !segments.has(id))
+      || new Set(batch.suggestions.map(item => item.segmentId)).size !== batch.suggestions.length
+      || batch.suggestions.some(item => !batch.segmentIds.includes(item.segmentId) || !segments.get(item.segmentId)?.text.includes(item.excerpt)
+        || !batch.categoryIds.includes(item.categoryId) || item.tagIds.some(id => !batch.tagIds.includes(id)))))
+    ctx.addIssue({ code: 'custom', message: '全局 AI 批次必须绑定冻结原文和真实分类标签' });
   const pending = draft.committing;
   if (pending) {
     const source = pending.sourceDocument;
