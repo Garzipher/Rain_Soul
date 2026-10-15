@@ -137,7 +137,7 @@ describe('地址与故障保护', () => {
     const prepared = service.prepare(request()); service.cancel(prepared.confirmationToken);
     await expect(service.execute({ ...prepared, confirmed: true })).rejects.toThrow(/取消|失效/);
     const next = service.prepare(request()); fetcher.mockRejectedValueOnce(new Error(`网络出错：${secret}`));
-    await expect(service.execute({ ...next, confirmed: true })).rejects.toThrow('云端服务连接失败，请检查网络后手动重试。');
+    await expect(service.execute({ ...next, confirmed: true })).rejects.toThrow('连接云端服务失败；请检查网络、代理或服务可用性后重试。');
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it('取消正在发送的请求会 abort，停止后不自动重新发送', async () => {

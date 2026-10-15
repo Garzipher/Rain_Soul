@@ -77,7 +77,7 @@ it('取消完成候选不删除ready；后续失败和取消均保留前批，�
   const state = await setup(), ready = await state.prepare(); await state.execute(ready);
   await state.commands.execute('cancelBookExtractionAi', { confirmationToken: ready.confirmationToken });
   const failed = await state.prepare(); state.fetcher.mockRejectedValueOnce(new Error('断网'));
-  await expect(state.execute(failed)).rejects.toThrow(/连接失败/);
+  await expect(state.execute(failed)).rejects.toThrow(/连接云端服务失败/);
   const cancelled = await state.prepare(); state.fetcher.mockImplementationOnce(async () => new Promise(() => {}));
   const rejected = expect(state.execute(cancelled)).rejects.toThrow(/取消/);
   await vi.waitFor(() => expect(state.fetcher).toHaveBeenCalledTimes(3));

@@ -141,7 +141,7 @@ describe('拆书 AI 命令只推荐不写入', () => {
   });
   it('连接失败没有自动重发，作者重新预览确认同素材后允许手动重试', async () => {
     const state = setup(), first = await state.prepare(); state.fetcher.mockRejectedValueOnce(new Error('网络失效'));
-    await expect(state.execute(first)).rejects.toThrow(/连接失败/); expect(state.fetcher).toHaveBeenCalledTimes(1);
+    await expect(state.execute(first)).rejects.toThrow(/连接云端服务失败/); expect(state.fetcher).toHaveBeenCalledTimes(1);
     const retry = await state.prepare(); expect(retry.requestHash).not.toBe(first.requestHash); expect(state.fetcher).toHaveBeenCalledTimes(1);
     await expect(state.execute(retry)).resolves.toMatchObject({ rawText: expect.stringContaining('风穿过门缝') }); expect(state.fetcher).toHaveBeenCalledTimes(2);
     await expect(state.commands.execute('getBookExtractionAiResult', state.lookup(first))).resolves.toEqual({ status: 'missing' });

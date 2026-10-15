@@ -40,15 +40,15 @@ describe('固定公开IP的默认HTTPS通道', () => {
     network.lookup.mockResolvedValueOnce([{ address: 'not-an-ip' }]);
     await expect(sendAiCompletion(request, { credentials }, new AbortController().signal)).rejects.toThrow(/公开/);
     network.lookup.mockRejectedValueOnce(new Error('sensitive-dns-error'));
-    await expect(sendAiCompletion(request, { credentials }, new AbortController().signal)).rejects.toThrow(/无法确认/);
+    await expect(sendAiCompletion(request, { credentials }, new AbortController().signal)).rejects.toThrow('无法解析云端服务域名，未发送内容；请检查服务地址、网络或 DNS 后重试。');
   });
   it('流式接收超过2MB立即关闭，不把过大回答交给解析器', async () => {
     response('x'.repeat(2000001));
-    await expect(sendAiCompletion(request, { credentials }, new AbortController().signal)).rejects.toThrow(/连接失败/);
+    await expect(sendAiCompletion(request, { credentials }, new AbortController().signal)).rejects.toThrow(/连接云端服务失败/);
   });
   it('异常状态码或无状态只提示失败，不暴露服务响应', async () => {
     response('isolated-https-secret', 9999);
-    await expect(sendAiCompletion(request, { credentials }, new AbortController().signal)).rejects.toThrow(/连接失败/);
+    await expect(sendAiCompletion(request, { credentials }, new AbortController().signal)).rejects.toThrow(/连接云端服务失败/);
     response('isolated-https-secret');
     const original = network.request.getMockImplementation()!;
     network.request.mockImplementation((url: string, options: Options, listener: (stream: ResponseStream) => void) => original(url, options, (stream: ResponseStream) => { stream.statusCode = undefined; listener(stream); }));
@@ -56,7 +56,7 @@ describe('固定公开IP的默认HTTPS通道', () => {
   });
   it('客户端错误统一转换，无效凭据、超大JSON和坏JSON均不展示原始响应', async () => {
     network.request.mockImplementation(() => { const outgoing = new EventEmitter() as EventEmitter & { end: () => void }; outgoing.end = () => queueMicrotask(() => outgoing.emit('error', new Error('isolated-https-secret'))); return outgoing; });
-    await expect(sendAiCompletion(request, { credentials }, new AbortController().signal)).rejects.toThrow('云端服务连接失败，请检查网络后手动重试。');
+    await expect(sendAiCompletion(request, { credentials }, new AbortController().signal)).rejects.toThrow('连接云端服务失败；请检查网络、代理或服务可用性后重试。');
     await expect(sendAiCompletion(request, { credentials: { read: async () => null } }, new AbortController().signal)).rejects.toThrow(/有效/);
     await expect(sendAiCompletion(request, { credentials: { read: async () => 'invalid\nkey' } }, new AbortController().signal)).rejects.toThrow(/有效/);
     for (const body of ['invalid-json', 'x'.repeat(2000001)]) await expect(sendAiCompletion(request, { credentials, fetch: async () => new Response(body) }, new AbortController().signal)).rejects.toThrow(/格式无效|过大/);

@@ -63,7 +63,7 @@ describe('会话主进程冻结与原子双消息写入', () => {
     await commands.execute('cancelConversationAi', { confirmationToken: preview.confirmationToken });
     await expect(commands.execute('executeConversationAi', { confirmationToken: preview.confirmationToken, requestHash: preview.requestHash, confirmed: true })).rejects.toThrow(/失效|取消/);
     const next = await commands.execute('prepareConversationAi', request) as AiPreparedRequest; fetcher.mockRejectedValueOnce(new Error('test-conversation-key'));
-    await expect(commands.execute('executeConversationAi', { confirmationToken: next.confirmationToken, requestHash: next.requestHash, confirmed: true })).rejects.toThrow(/连接失败/);
+    await expect(commands.execute('executeConversationAi', { confirmationToken: next.confirmationToken, requestHash: next.requestHash, confirmed: true })).rejects.toThrow(/连接云端服务失败/);
     expect(getDetail().draft).toBe('当前需求草稿'); expect(getDetail().messages).toHaveLength(1); expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it('执行中取消能中止发送并且drain等候结束', async () => {
