@@ -41,7 +41,8 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
     setBatches(savedBatches); setPreview(value); setReviews(Object.fromEntries(value.segments.map(segment => [segment.id, map.get(segment.id) ?? {
       segmentId: segment.id, body: segment.text, categoryId, tagIds: [], status: 'pending', annotation: { ...blankAnnotation },
     }])));
-    setSourceTitle(value.source?.title ?? value.filename); setAuthor(''); setChapter(''); setPermission(false); setPage(0);
+    setSourceTitle(value.source?.title ?? value.filename); setAuthor(''); setChapter(''); setRights('public-excerpt'); setSourceMetrics([]);
+    setPermission(false); setPage(0);
   };
   function restoreMetadata(metadata: GlobalExtractionDraft['metadata']) {
     if (!metadata) return;
@@ -69,10 +70,18 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
     if (locked.current || blocked || preview) return;
     locked.current = true; setBusy(true); setError('');
     try {
-      const value = await api.previewGlobalPastedExtraction({ title: `${starter.workTitle} · ${starter.chapter}`, text: globalSourceStarterText(starter), source: {
+      const value = await api.previewGlobalPastedExtraction({ starterId: starter.id, title: `${starter.workTitle} · ${starter.chapter}`, text: globalSourceStarterText(starter), source: {
         workUrl: starter.workUrl, chapterUrl: starter.chapterUrl, author: starter.author, chapter: starter.chapter, fetchedAt: starter.fetchedAt, metrics: starter.metrics,
       } });
-      accept(value); setSourceTitle(starter.workTitle); setAuthor(starter.author); setChapter(starter.chapter); setRights('public-excerpt'); setSourceMetrics(starter.metrics);
+      const starterReviews = value.segments.flatMap(segment => {
+        const excerpt = starter.excerpts.find(item => item.text === segment.text && item.paragraphIndex === segment.paragraphIndex);
+        if (!excerpt) return [];
+        const categoryId = categories.find(item => item.systemKey === excerpt.categoryKey)?.id
+          ?? categories.find(item => item.systemKey === 'uncategorized')?.id ?? categories[0]?.id ?? '';
+        return [{ segmentId: segment.id, body: segment.text, categoryId, tagIds: [], status: 'pending' as const,
+          annotation: { ...excerpt.annotation } }];
+      });
+      accept(value, starterReviews); setSourceTitle(starter.workTitle); setAuthor(starter.author); setChapter(starter.chapter); setRights('public-excerpt'); setSourceMetrics(starter.metrics);
       setMessage('已载入首批核实素材。原句仍需逐条核对，确认后才会进入全局库。');
     } catch (failure) { setError(failure instanceof Error ? failure.message : '首批素材载入失败。'); }
     finally { locked.current = false; setBusy(false); }
@@ -102,7 +111,7 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
   }
   const selected = Object.values(reviews).filter(item => item.status === 'approved');
   async function commit() {
-    if (!preview || locked.current || !permission || !selected.length || pendingReceipt) return;
+    if (!preview || locked.current || aiBusy || !permission || !selected.length || pendingReceipt) return;
     const content = { token: preview.token, expectedRevision: library.revision, sourceTitle, sourceAuthor: author, chapter,
       rightsBasis: rights, metrics: sourceMetrics, permissionConfirmed: true as const, items: selected.map(({ segmentId, body, categoryId, tagIds, annotation }) => ({ segmentId, body, categoryId, tagIds, annotation })) };
     const fingerprint = JSON.stringify(content);
@@ -161,7 +170,7 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
           <div className="book-extraction-tags">{tags.map(tag => <label key={tag.id}><input type="checkbox" checked={item.tagIds.includes(tag.id)} onChange={event => update(segment.id, { tagIds: event.target.checked ? [...item.tagIds, tag.id] : item.tagIds.filter(id => id !== tag.id), status: 'pending' })} />{tag.name}</label>)}</div>
           <label><input type="checkbox" checked={item.status === 'approved' || item.status === 'committed'} disabled={!item.body.trim() || !segment.text.includes(item.body.trim()) || !categories.some(category => category.id === item.categoryId)} onChange={event => update(segment.id, { status: event.target.checked ? 'approved' : 'pending' })} />已逐字核对，审核入库</label>
         </fieldset>;
-      })}</div></section></div><footer className="book-extraction-footer"><button disabled={busy || !page} onClick={() => setPage(value => value - 1)}>上一页</button><span>第 {page + 1} / {Math.ceil(preview.segments.length / 20)} 页</span><button disabled={busy || (page + 1) * 20 >= preview.segments.length} onClick={() => setPage(value => value + 1)}>下一页</button><button className="primary" disabled={busy || pendingReceipt || !permission || !selected.length || !sourceTitle.trim() || rights === 'public-excerpt' && (!author.trim() || !chapter.trim())} onClick={() => void commit()}>确认加入全局库（{selected.length}）</button></footer></>}
+      })}</div></section></div><footer className="book-extraction-footer"><button disabled={busy || !page} onClick={() => setPage(value => value - 1)}>上一页</button><span>第 {page + 1} / {Math.ceil(preview.segments.length / 20)} 页</span><button disabled={busy || (page + 1) * 20 >= preview.segments.length} onClick={() => setPage(value => value + 1)}>下一页</button><button className="primary" disabled={busy || aiBusy || pendingReceipt || !permission || !selected.length || !sourceTitle.trim() || rights === 'public-excerpt' && (!author.trim() || !chapter.trim())} onClick={() => void commit()}>确认加入全局库（{selected.length}）</button></footer></>}
     <AnimatePresence>{confirmRender && <StructureDialog busy={busy} onClose={() => setConfirmRender(false)} state={{ heading: '确认受限网页渲染', submitLabel: '确认渲染', submitTone: 'primary', onSubmit: async () => { setConfirmRender(false); void source('restricted-browser'); return true; } }}><p>将联网执行该网页的脚本，在隔离和时间上限内提取可见正文。不会登录、点击或绕过验证码。</p><p>{url}</p></StructureDialog>}</AnimatePresence>
     <AnimatePresence>{discard && <StructureDialog busy={busy} onClose={() => setDiscard(false)} state={{ heading: '更换全局拆书素材？', description: '未入库草稿将删除；已审核入库的短摘录继续保留。', submitLabel: '更换素材', onSubmit: async () => {
       if (!preview) return true; try { await api.discardGlobalExtractionDraft(preview.token); setPreview(null); setReviews({}); setDiscard(false); return true; }
