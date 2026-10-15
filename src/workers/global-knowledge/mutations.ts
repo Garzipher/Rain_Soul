@@ -15,7 +15,7 @@ export function applyGlobalAction(db: Database.Database, action: GlobalKnowledge
   };
   const checkEntry = (value: { categoryId: string; tagIds: string[] }) => { category(value.categoryId); if (value.tagIds.some(id => !tags.some(tag => tag.id === id))) fail('标签不存在或已删除。'); };
   switch (action.type) {
-    case 'createCategory': checkCategory(action.name, action.parentId); putCategory(db, { id: randomUUID(), name: action.name, parentId: action.parentId, sortOrder: categories.length, systemKey: null, deletedAt: null }); break;
+    case 'createCategory': checkCategory(action.name, action.parentId); putCategory(db, { id: randomUUID(), name: action.name, parentId: action.parentId, sortOrder: Math.max(-1, ...categories.map(item => item.sortOrder)) + 1, systemKey: null, deletedAt: null }); break;
     case 'updateCategory': { const previous = category(action.id); checkCategory(action.name, action.parentId, action.id); putCategory(db, { ...previous, name: action.name, parentId: action.parentId }); break; }
     case 'moveCategory': {
       const current = category(action.id), siblings = categories.filter(item => item.parentId === current.parentId), index = siblings.findIndex(item => item.id === current.id), next = siblings[index + (action.direction === 'up' ? -1 : 1)];

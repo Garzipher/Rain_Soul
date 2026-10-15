@@ -67,12 +67,16 @@ export class GlobalKnowledgeRepository {
   recordUsage(input: unknown): void {
     const request = globalUsageSchema.parse(input);
     this.db.transaction(() => {
+      const hash = digest(JSON.stringify({ kind: 'usage', request }));
+      const receipt = this.db.prepare('SELECT request_hash FROM global_operation WHERE operation_id=?').get(request.operationId) as { request_hash: string } | undefined;
+      if (receipt) { if (receipt.request_hash !== hash) fail('同一使用操作身份不能用于不同内容。'); return; }
       const add = this.db.prepare('INSERT OR IGNORE INTO global_usage VALUES(?,?,?,?,?)');
       for (const entry of request.entries) {
         const prior = this.db.prepare('SELECT work_id,revision,work_revision FROM global_usage WHERE operation_id=? AND entry_id=?').get(request.operationId, entry.entryId) as { work_id: string; revision: number; work_revision: number } | undefined;
         if (prior && (prior.work_id !== request.workId || prior.revision !== entry.revision || prior.work_revision !== request.workRevision)) fail('使用台账操作身份冲突。');
         add.run(request.operationId, request.workId, entry.entryId, entry.revision, request.workRevision);
       }
+      this.db.prepare('INSERT INTO global_operation VALUES(?,?,?)').run(request.operationId, hash, this.meta().revision);
     })();
   }
   close() { this.db.close(); }

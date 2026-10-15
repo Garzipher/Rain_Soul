@@ -10,8 +10,8 @@ import { RepositoryError } from '../database/errors';
 
 export const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 export const fail = (message: string, code = 'INVALID_INPUT'): never => { throw new RepositoryError(code, message); };
-const tables = ['global_category', 'global_tag', 'global_source_document', 'global_source_segment', 'global_knowledge_entry', 'global_learning_annotation'] as const;
-export function rows<T>(db: Database.Database, table: typeof tables[number], schema: z.ZodType<T>): T[] {
+type GlobalTable = 'global_category' | 'global_tag' | 'global_source_document' | 'global_source_segment' | 'global_knowledge_entry' | 'global_learning_annotation';
+export function rows<T>(db: Database.Database, table: GlobalTable, schema: z.ZodType<T>): T[] {
   return (db.prepare(`SELECT payload FROM ${table} ORDER BY rowid`).all() as { payload: string }[]).map(row => schema.parse(JSON.parse(row.payload)));
 }
 export const readCategories = (db: Database.Database): Category[] => rows(db, 'global_category', globalCategorySchema).sort((a, b) => a.sortOrder - b.sortOrder);
@@ -35,7 +35,10 @@ export function readSources(db: Database.Database, entries: GlobalKnowledgeEntry
   const sourceIds = new Set(entries.flatMap(entry => entry.sourceDocumentId ? [entry.sourceDocumentId] : []));
   const sourceRows = db.prepare('SELECT payload,metadata FROM global_source_document').all() as { payload: string; metadata: string }[];
   const selected = sourceRows.map(row => ({ document: verifySource(JSON.parse(row.payload)), metadata: globalSourceMetadataSchema.parse(JSON.parse(row.metadata)) })).filter(row => sourceIds.has(row.document.id));
-  const documents = selected.map(row => row.document), metadata = selected.map(row => ({ ...row.metadata, sourceDocumentId: row.document.id }));
+  const documents = selected.map(row => {
+    const segments = row.document.segments.filter(segment => entries.some(entry => entry.segmentId === segment.id)).map((segment, index) => ({ ...segment, ordinal: index + 1 }));
+    return { ...row.document, segments, bodyHash: digest(JSON.stringify(segments.map(segment => segment.text))) };
+  }), metadata = selected.map(row => ({ ...row.metadata, sourceDocumentId: row.document.id }));
   const entryIds = new Set(entries.map(entry => entry.id));
   const links = entries.filter(entry => entry.sourceDocumentId).map(entry => ({ entryId: entry.id, sourceId: entry.sourceDocumentId!, segmentId: entry.segmentId! }));
   if (links.some(link => !documents.some(document => document.id === link.sourceId && document.segments.some(segment => segment.id === link.segmentId && segment.text === entries.find(entry => entry.id === link.entryId)!.body)))) fail('全局知识来源关联损坏。');

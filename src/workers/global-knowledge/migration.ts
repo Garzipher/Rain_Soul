@@ -8,7 +8,7 @@ import { globalDefaults, globalSchema } from './schema';
 export async function openGlobalDatabase(directory: string): Promise<Database.Database> {
   mkdirSync(directory, { recursive: true });
   const filename = join(directory, 'knowledge.sqlite'), existed = existsSync(filename);
-  let db = new Database(filename);
+  const db = new Database(filename);
   db.pragma('busy_timeout=3000'); db.pragma('foreign_keys=ON');
   const version = db.pragma('user_version', { simple: true }) as number;
   if (version > 1) { db.close(); throw new Error('全局知识库来自较新版本，请升级应用后重试。'); }
