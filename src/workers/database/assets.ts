@@ -7,6 +7,7 @@ import { applyEvidenceAsset, readEvidence } from './assets-evidence';
 import { applyStyleAsset } from './assets-style';
 import { RepositoryError } from './errors';
 import { recordAssetChanges } from './assets-history';
+import { globalKnowledgeOriginSchema } from '../../shared/global-work-copy';
 
 export function applyAsset(db: Database.Database, input: AssetAction, revision: number): void {
   const parsed = assetActionSchema.safeParse(input);
@@ -27,8 +28,12 @@ export function readAssets(db: Database.Database): AssetState {
     evidence: readEvidence(db),
     categories: db.prepare('SELECT id,name,parent_id AS parentId,sort_order AS sortOrder,system_key AS systemKey,deleted_at AS deletedAt FROM category ORDER BY sort_order,rowid').all() as AssetState['categories'],
     tags: db.prepare('SELECT id,name,deleted_at AS deletedAt FROM tag ORDER BY rowid').all() as AssetState['tags'],
-    knowledge: knowledge.map(entry => ({ ...entry, origin: entry.origin ? JSON.parse(entry.origin) as AssetState['knowledge'][number]['origin'] : null,
-      tagIds: (db.prepare('SELECT tag_id AS id FROM knowledge_tag WHERE entry_id=? ORDER BY rowid').all(entry.id) as { id: string }[]).map(row => row.id) })),
+    knowledge: knowledge.map(entry => {
+      const stored = entry.origin ? JSON.parse(entry.origin) as Record<string, unknown> : null;
+      const globalOrigin = stored?.kind === 'global' ? globalKnowledgeOriginSchema.parse(stored) : undefined;
+      return ({ ...entry, origin: globalOrigin ? null : stored as AssetState['knowledge'][number]['origin'],
+      ...(globalOrigin ? { globalOrigin } : {}),
+      tagIds: (db.prepare('SELECT tag_id AS id FROM knowledge_tag WHERE entry_id=? ORDER BY rowid').all(entry.id) as { id: string }[]).map(row => row.id) }); }),
     styleProfiles: profiles.map(profile => ({ ...profile, payload: JSON.parse(profile.payload) as AssetState['styleProfiles'][number]['payload'] })),
     chapterStyles: db.prepare('SELECT chapter_id AS chapterId,profile_id AS profileId FROM chapter_style').all() as AssetState['chapterStyles'],
     defaultStyleId: (db.prepare('SELECT profile_id AS id FROM style_default WHERE singleton=1').get() as { id: string | null }).id,

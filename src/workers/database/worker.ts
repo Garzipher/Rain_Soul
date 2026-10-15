@@ -15,6 +15,8 @@ import type { SnapshotCreateRequest, SnapshotRestoreRequest } from '../../shared
 import type { ConversationRequest, ConversationTurnRequest } from '../../shared/conversations';
 import type { BookExtractionCommit } from '../../shared/book-extraction';
 import type { BookExtractionReceiptRequest } from './book-extraction';
+import type { GlobalWorkCopyRequest } from '../../shared/global-work-copy';
+import type { GlobalKnowledgeFrozen } from '../../shared/global-knowledge';
 
 const directory = (workerData as { directory: string }).directory;
 ensureLearningWork(join(directory, 'Projects'), JSON.parse(readFileSync(join(__dirname, 'learning-course.json'), 'utf8')));
@@ -23,6 +25,8 @@ parentPort?.on('message', async ({ requestId, command, payload }: { requestId: s
   try {
     let data: unknown;
     switch (command) {
+      case 'getGlobalFreezeReceipt': data = repository.getGlobalFreezeReceipt(payload as unknown as GlobalWorkCopyRequest); break;
+      case 'freezeGlobalKnowledge': data = repository.freezeGlobalKnowledge(payload.request as GlobalWorkCopyRequest, payload.frozen as GlobalKnowledgeFrozen); break;
       case 'listConversations': data = repository.listConversations(payload.workId as string); break;
       case 'readConversation': data = repository.readConversation(payload.workId as string, payload.conversationId as string, payload.beforeMessageId as string | undefined); break;
       case 'manageConversation': data = repository.manageConversation(payload as unknown as ConversationRequest); break;

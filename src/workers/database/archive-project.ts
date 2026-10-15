@@ -13,6 +13,7 @@ import { rebuildAssetSearch } from './assets-search';
 import { sourceAssetTables, legacySourceAssetTables, sourceSchema as legacySourceSchema } from './source-schema';
 import { readSourceAssets, normalizeSourceCoordinates } from './source-document';
 import { validateLearningPayload } from './snapshots';
+import { globalKnowledgeOriginSchema } from '../../shared/global-work-copy';
 
 const oldTables = ['work_meta', 'volume', 'chapter', 'category', 'tag', 'knowledge_entry', 'knowledge_tag', 'knowledge_history', 'outline_node', 'outline_knowledge', 'foreshadow', 'evidence', 'style_profile', 'style_default', 'chapter_style', 'asset_history'] as const;
 const tables = [...oldTables, ...sourceAssetTables];
@@ -109,6 +110,7 @@ function checkGraph(db: Database.Database, projectId: string) {
     if ((item.type === 'volume' && parent) || (item.type === 'chapter' && parent && parent.type !== 'volume') || (item.type === 'detail' && parent?.type !== 'chapter')) throw new Error('归档剧情树层级无效。');
   }
   for (const item of assets.knowledge) if (item.origin !== null) originSchema.parse(item.origin);
+  for (const item of assets.knowledge) if (item.globalOrigin) globalKnowledgeOriginSchema.parse(item.globalOrigin);
   for (const item of assets.evidence) sourceSchema.parse(item.originalSource);
   for (const item of assets.styleProfiles) styleSchema.parse(item.payload);
   for (const row of db.prepare('SELECT * FROM asset_history').all() as Row[]) {

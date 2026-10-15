@@ -29,6 +29,9 @@ import { listConversations, readConversation, manageConversation, appendConversa
 import type { ConversationRequest, ConversationTurnRequest } from '../../shared/conversations';
 import { importBookExtraction, getBookExtractionReceipt, type BookExtractionReceiptRequest } from './book-extraction';
 import type { BookExtractionCommit } from '../../shared/book-extraction';
+import type { GlobalWorkCopyRequest } from '../../shared/global-work-copy';
+import type { GlobalKnowledgeFrozen } from '../../shared/global-knowledge';
+import { freezeGlobalIntoWork, globalWorkCopyReceipt } from './global-work-copy';
 export { RepositoryError } from './schema';
 
 interface Meta { id: string; title: string; revision: number; updated_at: string; deleted_at: string | null }
@@ -158,6 +161,14 @@ export class WorkRepository {
   getBookExtractionReceipt(request: BookExtractionReceiptRequest) {
     const receipt = getBookExtractionReceipt(this.projectDb(request.workId), request);
     return receipt.status === 'missing' ? receipt : { ...receipt, result: this.openWork(request.workId) };
+  }
+  getGlobalFreezeReceipt(request: GlobalWorkCopyRequest) {
+    const db = this.projectDb(request.workId);
+    return globalWorkCopyReceipt(db, request) ? this.openWork(request.workId) : null;
+  }
+  freezeGlobalKnowledge(request: GlobalWorkCopyRequest, frozen: GlobalKnowledgeFrozen) {
+    freezeGlobalIntoWork(this.projectDb(request.workId), request, frozen);
+    this.refreshCache(request.workId); return this.openWork(request.workId);
   }
 
   listDeletedWorks(): DeletedWork[] {

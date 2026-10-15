@@ -8,7 +8,7 @@ export interface Evidence { id: string; foreshadowId: string; kind: EvidenceKind
 export interface Category { id: string; name: string; parentId: string | null; sortOrder: number; systemKey: string | null; deletedAt: string | null }
 export interface KnowledgeTag { id: string; name: string; deletedAt: string | null }
 export interface KnowledgeOrigin { workId: string; entryId: string; sourceRevision: number; workTitle: string }
-export interface KnowledgeEntry { id: string; body: string; source: string; categoryId: string; tagIds: string[]; origin: KnowledgeOrigin | null; revision: number; deletedAt: string | null }
+export interface KnowledgeEntry { id: string; body: string; source: string; categoryId: string; tagIds: string[]; origin: KnowledgeOrigin | null; globalOrigin?: import('./global-work-copy').GlobalKnowledgeOrigin; revision: number; deletedAt: string | null }
 export interface StylePayload { narrativePerson: string; pace: string; prohibited: string[]; referenceWorks: string[] }
 export interface StyleProfile { id: string; version: number; payload: StylePayload; createdAt: string }
 export interface ChapterStyle { chapterId: string; profileId: string }

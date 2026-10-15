@@ -9,12 +9,17 @@ import { archiveManifestSchema } from '../shared/archive';
 import { snapshotCreateRequestSchema, snapshotRestoreRequestSchema } from '../shared/snapshots';
 import { conversationRequestSchema, conversationTurnSchema } from '../shared/conversations';
 import { bookExtractionCommitSchema } from '../shared/book-extraction';
+import { globalWorkCopyRequestSchema } from '../shared/global-work-copy';
+import { globalKnowledgeFrozenSchema } from '../shared/global-knowledge-schema';
 
 type Transport = (command: string, payload: unknown) => Promise<unknown>;
 const id = z.uuid();
 const title = z.string().refine(value => value.trim().length > 0, '名称不能为空');
 const mutation = { workId: id, expectedRevision: z.number().int().positive(), operationId: id };
 const schemas = {
+  getGlobalFreezeReceipt: globalWorkCopyRequestSchema,
+  freezeGlobalKnowledge: z.object({ workId: id, request: globalWorkCopyRequestSchema, frozen: globalKnowledgeFrozenSchema }).strict()
+    .refine(value => value.workId === value.request.workId, '目标作品身份不一致'),
   listConversations: z.object({ workId: id }).strict(),
   readConversation: z.object({ workId: id, conversationId: id, beforeMessageId: id.optional() }).strict(),
   manageConversation: conversationRequestSchema,
