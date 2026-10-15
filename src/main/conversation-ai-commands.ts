@@ -5,6 +5,7 @@ import type { ConversationAiService } from './conversation-ai-service';
 import type { ConversationDetail, ConversationTurnRequest } from '../shared/conversations';
 import { conversationAiPrepareRequestSchema, type ConversationAiPrepareRequest, type PendingConversationReply } from '../shared/conversation-ai';
 import { errorCode, operationError } from '../shared/operation-errors';
+import { ConversationReplyStore } from './conversation-reply-store';
 
 const replyRequestSchema = z.object({ requestHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 const schemas = {
@@ -16,14 +17,21 @@ const schemas = {
 };
 interface Frozen { request: ConversationAiPrepareRequest; draft: string; providerHash: string; requestHash: string; operationId: string; userMessageId: string; assistantMessageId: string }
 
-/** 会话云请求不能绕过显式授权，也没有正文修改权限。 */
+/** 点击发送即授权当前会话请求；会话没有正文修改权限。 */
 export class ConversationAiCommands {
   private readonly confirmations = new Map<string, Frozen>();
   private readonly active = new Map<string, AbortController>();
   private readonly activeHashes = new Set<string>();
   private readonly running = new Set<Promise<unknown>>();
-  private readonly replies = new Map<string, { request: ConversationTurnRequest; committed: boolean }>();
-  constructor(private readonly store: { execute: (command: string, payload: unknown) => Promise<unknown> }, private readonly settings: { get: () => AiSettings }, private readonly service: ConversationAiService) {}
+  private readonly replies = new Map<string, { request: ConversationTurnRequest; committed: boolean; durable: boolean }>();
+  private readonly replyStore?: ConversationReplyStore;
+  constructor(private readonly store: { execute: (command: string, payload: unknown) => Promise<unknown> }, private readonly settings: { get: () => AiSettings }, private readonly service: ConversationAiService, replyDirectory?: string) {
+    if (replyDirectory) {
+      this.replyStore = new ConversationReplyStore(replyDirectory);
+      try { for (const request of this.replyStore.readAll()) this.replies.set(request.requestHash, { request, committed: false, durable: true }); }
+      catch { /* 恢复目录暂不可读时仍可离线写作；后续回答必须成功保存才解除保护。 */ }
+    }
+  }
   accepts(command: string): boolean { return Object.hasOwn(schemas, command); }
   execute(command: string, payload: unknown): Promise<unknown> {
     const operation = this.run(command, payload).catch(reason => {
@@ -63,9 +71,9 @@ export class ConversationAiCommands {
       this.assertCompleted(requestHash);
       if (!entry) throw operationError('未收到可恢复的完整回答，或本次运行的回答记录已失效。', 'NOT_FOUND');
       const detail = await this.store.execute('readConversation', { workId: entry.request.workId, conversationId: entry.request.conversationId }) as ConversationDetail;
-      if (command === 'discardConversationReply') { this.replies.delete(requestHash); return; }
+      if (command === 'discardConversationReply') { this.replyStore?.remove(requestHash); this.replies.delete(requestHash); return; }
       const result: PendingConversationReply = { workId: entry.request.workId, conversationId: entry.request.conversationId, requestHash,
-        userContent: entry.request.userContent, assistantContent: entry.request.assistantContent, currentDraft: detail.draft, currentRevision: detail.revision, expectedRevision: entry.request.expectedRevision };
+        userContent: entry.request.userContent, assistantContent: entry.request.assistantContent, currentDraft: detail.draft, currentRevision: detail.revision, expectedRevision: entry.request.expectedRevision, durable: entry.durable };
       return result;
     }
     if (command === 'cancelConversationAi') {
@@ -93,9 +101,12 @@ export class ConversationAiCommands {
     try {
       await this.validate(frozen, controller.signal);
       const reply = await this.service.execute(request, { signal: controller.signal, beforeSend: () => this.validate(frozen, controller.signal) });
-      this.replies.set(reply.requestHash, { committed: false, request: { workId: frozen.request.workId, conversationId: frozen.request.conversationId,
+      const entry = { committed: false, durable: false, request: { workId: frozen.request.workId, conversationId: frozen.request.conversationId,
         expectedRevision: frozen.request.expectedRevision, operationId: frozen.operationId, userMessageId: frozen.userMessageId, assistantMessageId: frozen.assistantMessageId,
-        userContent: frozen.draft, assistantContent: reply.text, requestHash: reply.requestHash } });
+        userContent: frozen.draft, assistantContent: reply.text, requestHash: reply.requestHash } };
+      this.replies.set(reply.requestHash, entry);
+      try { this.replyStore?.save(entry.request); entry.durable = !!this.replyStore; }
+      catch { /* 保留内存中的完整回答；恢复界面会保护尚未落盘的内容。 */ }
       try { await this.validate(frozen, controller.signal); }
       catch { throw operationError('完整回答已收到，但会话或配置变化、保存检查未完成；请核对待保存回答，不会自动重新联网。', 'CONVERSATION_REPLY_PENDING'); }
       return await this.persistReply(reply.requestHash);
@@ -114,10 +125,18 @@ export class ConversationAiCommands {
     const entry = this.replies.get(requestHash)!;
     try {
       const result = await this.store.execute('appendConversationTurn', structuredClone(entry.request)) as ConversationDetail;
-      entry.committed = true; return result;
+      entry.committed = true;
+      try { this.replyStore?.remove(requestHash); } catch { /* 已提交回执保持幂等，下次恢复不会重复写入。 */ }
+      return result;
     } catch {
       throw operationError('完整回答已收到，但保存尚未确认；请重试保存回答，保持原操作标识且不会重新联网。', 'CONVERSATION_REPLY_PENDING');
     }
   }
-  async drain(): Promise<void> { await Promise.allSettled([...this.running]); }
+  async drain(): Promise<void> {
+    for (const [token, controller] of this.active) { this.service.cancel(token); controller.abort(); }
+    for (const token of this.confirmations.keys()) this.service.cancel(token);
+    this.confirmations.clear();
+    await Promise.allSettled([...this.running]);
+    if ([...this.replies.values()].some(entry => !entry.committed && !entry.durable)) throw new Error('完整回答尚未保存到本机，请先保存或复制回答。');
+  }
 }
