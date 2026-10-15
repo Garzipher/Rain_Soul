@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
+import { chooseSelect } from './select-field-helper';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import App from '../../src/renderer/App';
@@ -55,6 +56,7 @@ it('剧情脏草稿阻止标签、页面和关闭，保存后持久化且正文�
 it('知识页从真实 SQLite 搜索、保存失败保留草稿，取消后才能导航', async () => {
   const adapter = await setup();
   fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  fireEvent.click(await screen.findByRole('button', { name: /^作品知识库/ }));
   fireEvent.click(await screen.findByRole('button', { name: '新增知识' }));
   fireEvent.change(screen.getByLabelText('知识内容'), { target: { value: '雨水漫过旧站台。' } });
   const manage = adapter.api.manageAssets;
@@ -75,8 +77,9 @@ it('搜索命中稳定段落后打开正文，段落 ID 在实际编辑器节点
   fireEvent.paste(screen.getByLabelText('章节正文'), { clipboardData: { getData: () => '第一段\n灯光下的第二段', types: ['text/plain'], files: [] } });
   await waitFor(() => expect(screen.getByLabelText('章节正文')).toHaveTextContent('灯光下的第二段'));
   fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  fireEvent.click(await screen.findByRole('button', { name: /^作品知识库/ }));
   await screen.findByRole('searchbox');
-  fireEvent.change(screen.getByLabelText('搜索范围'), { target: { value: 'all' } });
+  await chooseSelect(screen.getByLabelText('搜索范围'), '正文与知识');
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: '灯光' } });
   fireEvent.click(await screen.findByRole('button', { name: '定位正文：第一章' }));
   const editor = await screen.findByLabelText('章节正文');

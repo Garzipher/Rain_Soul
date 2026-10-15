@@ -1,26 +1,28 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
+import { chooseSelect } from './select-field-helper';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import App from '../../src/renderer/App';
 import { createStructureAdapter } from './renderer-structure-adapter';
 const adapters: ReturnType<typeof createStructureAdapter>[] = [];
 afterEach(() => { cleanup(); adapters.splice(0).forEach(adapter => adapter.dispose()); });
-it('首次进入知识库先选择作品，不把未选作品误报为功能未交付', async () => {
+it('首次进入知识库展示全局入口，选择作品后可访问作品知识', async () => {
   const adapter = createStructureAdapter(); adapters.push(adapter);
   const work = await adapter.api.createWork('知识入口验收');
   await adapter.api.manageAssets({ workId: work.id, expectedRevision: work.revision, operationId: crypto.randomUUID(), action: { type: 'createKnowledge', body: '雨夜的灯光映在窗上。', source: '原创参考', categoryId: work.assets!.categories[0].id, tagIds: [] } });
   render(<App api={adapter.api} />);
   await screen.findByRole('button', { name: '打开作品：知识入口验收' });
   fireEvent.click(screen.getByRole('button', { name: '知识库' }));
-  const empty = await screen.findByRole('region', { name: '选择知识库作品' });
+  expect(await screen.findByRole('button', { name: /^作品知识库/ })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '全局知识库' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.queryByText(/本功能尚未交付/)).not.toBeInTheDocument();
-  expect(empty).toHaveTextContent('知识按作品保存');
-  fireEvent.click(within(empty).getByRole('button', { name: '前往作品集选择作品' }));
+  fireEvent.click(screen.getByRole('button', { name: '作品集' }));
   fireEvent.click(await screen.findByRole('button', { name: '打开作品：知识入口验收' }));
   await screen.findByLabelText('章节标题');
   await waitFor(() => expect(screen.getByRole('button', { name: '知识库' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  fireEvent.click(await screen.findByRole('button', { name: /^作品知识库/ }));
   expect(await screen.findByRole('article', { name: '知识：雨夜的灯光映在窗上。' })).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: '选择知识库作品' })).not.toBeInTheDocument();
 });
@@ -39,20 +41,22 @@ it('删除已选知识释放参考额度，AI 只预览有效条目且不跨作�
   await screen.findByLabelText('章节标题');
   await waitFor(() => expect(screen.getByRole('button', { name: '知识库' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  fireEvent.click(await screen.findByRole('button', { name: /^作品知识库/ }));
   for (let index = 1; index <= 5; index++) {
-    fireEvent.click(within(await screen.findByRole('article', { name: `知识：参考内容${index}` })).getByRole('button', { name: '用于写作参考' }));
+    fireEvent.click(within(await screen.findByRole('article', { name: `知识：参考内容${index}` })).getByRole('button', { name: '选作参考' }));
   }
-  expect(within(screen.getByRole('article', { name: '知识：参考内容6' })).getByRole('button', { name: '用于写作参考' })).toBeDisabled();
+  expect(within(screen.getByRole('article', { name: '知识：参考内容6' })).getByRole('button', { name: '选作参考' })).toBeDisabled();
   for (let index = 1; index <= 5; index++) {
     const card = screen.getByRole('article', { name: `知识：参考内容${index}` });
+    fireEvent.click(within(card).getByLabelText(/^知识操作：/));
     fireEvent.click(within(card).getByRole('button', { name: '删除知识' }));
     fireEvent.click(await screen.findByRole('button', { name: '确认删除' }));
     await waitFor(() => expect(screen.queryByRole('article', { name: `知识：参考内容${index}` })).not.toBeInTheDocument());
   }
-  const remaining = within(screen.getByRole('article', { name: '知识：参考内容6' })).getByRole('button', { name: '用于写作参考' });
+  const remaining = within(screen.getByRole('article', { name: '知识：参考内容6' })).getByRole('button', { name: '选作参考' });
   expect(remaining).toBeEnabled();
   fireEvent.click(remaining);
-  expect(within(screen.getByRole('article', { name: '知识：参考内容6' })).getByRole('button', { name: '移除写作参考' })).toHaveAttribute('aria-pressed', 'true');
+  expect(within(screen.getByRole('article', { name: '知识：参考内容6' })).getByRole('button', { name: '已选参考' })).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(screen.getByRole('button', { name: '返回写作' }));
   await screen.findByLabelText('章节标题');
   fireEvent.click(screen.getByRole('button', { name: 'AI 工具' }));
@@ -81,6 +85,7 @@ it('知识库读取失败就地重试，加载时不展示后置功能占位', a
   await screen.findByLabelText('章节标题');
   await waitFor(() => expect(screen.getByRole('button', { name: '知识库' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  fireEvent.click(await screen.findByRole('button', { name: /^作品知识库/ }));
   fireEvent.click(await screen.findByRole('button', { name: '重新加载知识库' }));
   expect(screen.queryByText(/本功能尚未交付/)).not.toBeInTheDocument();
   await screen.findByRole('searchbox', { name: '模糊搜索知识与正文' });
@@ -96,7 +101,8 @@ it('全局知识只读，复制保留源作品且目标独立，范围查看不�
   fireEvent.click(await screen.findByRole('button', { name: '打开作品：正在写的作品' }));
   await screen.findByLabelText('章节标题');
   fireEvent.click(screen.getByRole('button', { name: '知识库' }));
-  fireEvent.change(await screen.findByLabelText('作品范围'), { target: { value: 'all' } });
+  fireEvent.click(await screen.findByRole('button', { name: /^作品知识库/ }));
+  await chooseSelect(await screen.findByLabelText('作品范围'), '全部作品（只读）');
   const card = await screen.findByRole('article', { name: /知识：雨光/ });
   expect(within(card).queryByRole('button', { name: '编辑知识' })).not.toBeInTheDocument();
   fireEvent.click(within(card).getByRole('button', { name: '复制到当前作品' }));
@@ -105,7 +111,7 @@ it('全局知识只读，复制保留源作品且目标独立，范围查看不�
   expect(adapter.works.get(target.id)!.assets!.knowledge[0].origin?.workId).toBe(source.id);
   const scope = await screen.findByLabelText('作品范围');
   await waitFor(() => expect(scope).not.toBeDisabled());
-  fireEvent.change(scope, { target: { value: target.id } });
+  await chooseSelect(scope, `当前作品：${target.title}`);
   const copied = await screen.findByRole('article', { name: /知识：雨光/ });
   expect(within(copied).getByRole('button', { name: '编辑知识' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '新增知识' }));

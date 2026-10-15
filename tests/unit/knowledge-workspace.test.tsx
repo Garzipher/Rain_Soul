@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
+import { chooseSelect } from './select-field-helper';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AssetState, SearchResult } from '../../src/shared/assets';
@@ -38,12 +39,12 @@ describe('知识卡片与搜索', () => {
   it('当前作品知识卡可逐条选用和移除写作参考，跨作品必须先复制', () => {
     const onToggleReference = vi.fn();
     const { view, ...props } = setup({ onToggleReference, referenceIds: [] });
-    fireEvent.click(screen.getAllByRole('button', { name: '用于写作参考' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: '选作参考' })[0]);
     expect(onToggleReference).toHaveBeenCalledWith('a');
     view.rerender(<KnowledgeWorkspace {...props} referenceIds={['a']} />);
-    fireEvent.click(screen.getByRole('button', { name: '移除写作参考' })); expect(onToggleReference).toHaveBeenLastCalledWith('a');
+    fireEvent.click(screen.getByRole('button', { name: '已选参考' })); expect(onToggleReference).toHaveBeenLastCalledWith('a');
     view.rerender(<KnowledgeWorkspace {...props} scopeProps={{ works: [], scopeId: 'other', canEdit: false, onScopeChange: vi.fn() }} />);
-    expect(screen.queryByRole('button', { name: '用于写作参考' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '选作参考' })).not.toBeInTheDocument();
   });
   it('默认使用关键词检索，显示回退原因并按页请求本机知识', async () => {
     const replies: RetrievalReply[] = [{ queryId: 'q1', hits: [{ workId: 'work', entryId: 'a', bodyHash: 'hash', excerpt: '站台的雨水', source: '雨夜练习', matchedBy: ['keyword'], reliable: true }], total: 21, sourceRevisions: { a: 1 }, modelFingerprint: null, status: 'fallback', message: '本机模型未安装，已回退关键词' }, { queryId: 'q2', hits: [{ workId: 'work', entryId: 'b', bodyHash: 'hash', excerpt: '月光', source: '另一篇练习', matchedBy: ['keyword'], reliable: true }], total: 21, sourceRevisions: { b: 1 }, modelFingerprint: null, status: 'ready' }];
@@ -65,21 +66,21 @@ describe('知识卡片与搜索', () => {
     const onRetrieve = vi.fn((request) => request.query === '旧' ? new Promise<RetrievalReply>(resolve => { resolveOld = resolve; }) : Promise.resolve({ queryId: request.queryId, hits: [], total: 0, sourceRevisions: {}, modelFingerprint: 'm', status: 'ready' as const }));
     setup({ onRetrieve });
     fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '旧' } });
-    fireEvent.change(screen.getByRole('combobox', { name: '检索方式' }), { target: { value: 'semantic' } });
+    await chooseSelect(screen.getByRole('combobox', { name: '检索方式' }), '语义');
     fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '新' } });
     await waitFor(() => expect(onRetrieve).toHaveBeenCalledWith(expect.objectContaining({ query: '新', mode: 'semantic' })));
     resolveOld({ queryId: 'old', hits: [{ workId: 'work', entryId: 'a', bodyHash: 'hash', excerpt: '旧', source: '旧', matchedBy: ['semantic'], reliable: true }], total: 1, sourceRevisions: { a: 1 }, modelFingerprint: 'm', status: 'ready' });
     await Promise.resolve();
     expect(screen.queryByRole('button', { name: /展开知识：站台/ })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole('combobox', { name: '搜索范围' }), { target: { value: 'all' } });
-    expect(screen.getByRole('combobox', { name: '检索方式' })).toHaveValue('keyword');
+    await chooseSelect(screen.getByRole('combobox', { name: '搜索范围' }), '正文与知识');
+    expect(screen.getByRole('combobox', { name: '检索方式' })).toHaveTextContent('关键词');
   });
 
   it('正文与知识范围不发送语义检索请求', async () => {
     const onRetrieve = vi.fn(async () => ({ queryId: 'q', hits: [], total: 0, sourceRevisions: {}, modelFingerprint: null, status: 'ready' as const }));
     setup({ onRetrieve });
-    fireEvent.change(screen.getByRole('combobox', { name: '搜索范围' }), { target: { value: 'all' } });
-    fireEvent.change(screen.getByRole('combobox', { name: '检索方式' }), { target: { value: 'semantic' } });
+    await chooseSelect(screen.getByRole('combobox', { name: '搜索范围' }), '正文与知识');
+    expect(screen.getByRole('combobox', { name: '检索方式' })).toBeDisabled();
     fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '雨' } });
     await Promise.resolve();
     expect(onRetrieve).not.toHaveBeenCalled();
@@ -140,7 +141,7 @@ describe('知识卡片与搜索', () => {
     let old!: (rows: SearchResult[]) => void;
     const onSearch = vi.fn((query) => query.text === '旧' ? new Promise<SearchResult[]>(resolve => { old = resolve; }) : Promise.resolve([{ id: 'p', kind: 'paragraph' as const, chapterId: 'chapter', paragraphId: 'paragraph', title: '旧站台', snippet: '新的雨声', source: '雨落之后 / 旧站台' }]));
     const { onLocate } = setup({ onSearch });
-    fireEvent.change(screen.getByLabelText('搜索范围'), { target: { value: 'all' } });
+    await chooseSelect(screen.getByLabelText('搜索范围'), '正文与知识');
     fireEvent.change(screen.getByRole('searchbox', { name: '模糊搜索知识与正文' }), { target: { value: '旧' } });
     await waitFor(() => expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ text: '旧', mode: 'all' })));
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '新' } });
@@ -163,8 +164,10 @@ describe('知识编辑与跨作品权限', () => {
     const { onAction } = setup({ assets: custom });
     expect(screen.getByText('雨夜练习')).toBeVisible();
     expect(screen.queryByText(/"candidateId"/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /展开知识：站台/ }));
     const details = screen.getByText('AI 审核记录').closest('details')!;
     expect(details).not.toHaveAttribute('open');
+    fireEvent.click(screen.getAllByLabelText(/^知识操作：/)[0]);
     fireEvent.click(screen.getAllByRole('button', { name: '编辑知识' })[0]);
     expect(screen.getByLabelText('出处')).toHaveValue('雨夜练习');
     fireEvent.change(screen.getByLabelText('出处'), { target: { value: '作者修订出处' } });
@@ -190,6 +193,7 @@ describe('知识编辑与跨作品权限', () => {
   });
   it('删除先确认；失败留在确认框，不提前移除卡片', async () => {
     const onAction = vi.fn(async () => false); setup({ onAction });
+    fireEvent.click(screen.getAllByLabelText(/^知识操作：/)[0]);
     fireEvent.click(screen.getAllByRole('button', { name: '删除知识' })[0]);
     expect(onAction).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '确认删除' }));
@@ -202,7 +206,8 @@ describe('知识编辑与跨作品权限', () => {
     expect(screen.getByRole('button', { name: '新增知识' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: '编辑知识' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: '正文与知识' })).not.toBeInTheDocument();
-    expect(screen.getByText('长夜列车')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /展开知识：站台/ }));
+    expect(screen.getByText('作品：长夜列车')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: '复制到当前作品' })[0]);
     await waitFor(() => expect(onCopy).toHaveBeenCalledWith('a'));
   });

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
+import { chooseSelect } from './select-field-helper';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AssetState } from '../../src/shared/assets';
@@ -87,21 +88,21 @@ describe('知识分类字典', () => {
     expect(screen.getByRole('button', { name: '新增标签' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '保存分类' })).toBeDisabled();
   });
-  it('删除确认聚焦取消按钮，Tab限制在确认内，Escape关闭并返回触发按钮', () => {
+  it('删除确认聚焦取消按钮，Tab限制在确认内，Escape关闭并返回触发按钮', async () => {
     setup(); const trigger = screen.getByRole('button', { name: '删除分类：天气' }); trigger.focus(); fireEvent.click(trigger);
     const dialog = screen.getByRole('alertdialog'), cancel = within(dialog).getByRole('button', { name: '取消' });
-    expect(cancel).toHaveFocus();
+    await waitFor(() => expect(cancel).toHaveFocus());
     fireEvent.keyDown(cancel, { key: 'Tab' });
     expect(within(dialog).getByLabelText('迁移到分类')).toHaveFocus();
     fireEvent.keyDown(dialog, { key: 'Escape' });
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(); expect(trigger).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()); await waitFor(() => expect(trigger).toHaveFocus());
   });
   it('可新增并编辑层级分类，编辑失败保留内容与 dirty 状态', async () => {
     const onAction = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const { onDirtyChange } = setup(onAction);
     fireEvent.click(screen.getByRole('button', { name: '新增分类' }));
     fireEvent.change(screen.getByLabelText('分类名称'), { target: { value: '人物描写' } });
-    fireEvent.change(screen.getByLabelText('上级分类'), { target: { value: 'scene' } });
+    await chooseSelect(screen.getByLabelText('上级分类'), '景物描写');
     fireEvent.click(screen.getByRole('button', { name: '保存分类' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/失败|未完成/);
     expect(screen.getByLabelText('分类名称')).toHaveValue('人物描写');
@@ -123,7 +124,7 @@ describe('知识分类字典', () => {
     const onAction = vi.fn(async () => true); setup(onAction);
     fireEvent.click(screen.getByRole('button', { name: '删除分类：天气' }));
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('迁移到分类'), { target: { value: 'unc' } });
+    await chooseSelect(screen.getByLabelText('迁移到分类'), '未分类');
     fireEvent.click(screen.getByRole('button', { name: '确认迁移并删除分类' }));
     await waitFor(() => expect(onAction).toHaveBeenCalledWith({ type: 'deleteCategory', id: 'weather', destinationId: 'unc' }));
   });

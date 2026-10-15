@@ -15,9 +15,10 @@ it('两个真实SHA长出处完整呈现、原位展开，操作区保留不压�
   expect(within(card).getByText(source)).toBeTruthy();
   fireEvent.click(within(card).getByRole('button', { name: /^展开知识/ }));
   expect(within(card).getByRole('button', { name: /^收起知识/ })).toHaveProperty('textContent', body);
+  fireEvent.click(within(card).getByLabelText(/^知识操作：/));
   expect(within(card).getByRole('button', { name: '编辑知识' })).toBeTruthy();
   const css = readFileSync('src/renderer/components/knowledge-workspace.css', 'utf-8');
-  expect(css).toMatch(/\.knowledge-entry-bottom\s*\{[^}]*flex-wrap:\s*wrap/s);
-  expect(css).toMatch(/\.knowledge-entry-bottom\s*>\s*div:first-child\s*\{[^}]*flex-shrink:\s*0/s);
+  expect(css).toMatch(/\.knowledge-source\s*\{[^}]*overflow-wrap:\s*anywhere[^}]*min-width:\s*0/s);
+  expect(css).toMatch(/\.knowledge-entry-actions\s*\{[^}]*flex-shrink:\s*0/s);
   expect(css).toMatch(/\.knowledge-entry-bottom button\s*\{[^}]*white-space:\s*nowrap/s);
 });

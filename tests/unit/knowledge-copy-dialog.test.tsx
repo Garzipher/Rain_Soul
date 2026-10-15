@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
+import { chooseSelect } from './select-field-helper';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { KnowledgeCopyDialog, prepareKnowledgeCopy } from '../../src/renderer/components/knowledge-copy-dialog';
@@ -44,7 +45,7 @@ it('预览内容出处及两端字典；标签按名称匹配目标ID，未匹�
   expect(screen.getByRole('dialog')).toHaveTextContent('内心');
   expect(screen.getByRole('dialog')).toHaveTextContent('请先在设置维护');
   expect(screen.getByRole('checkbox', { name: '雨夜' })).toBeChecked();
-  fireEvent.change(screen.getByLabelText('目标主分类'), { target: { value: 'scene' } });
+  await chooseSelect(screen.getByLabelText('目标主分类'), '景物描写');
   fireEvent.click(screen.getByRole('checkbox', { name: '情绪' }));
   fireEvent.click(screen.getByRole('button', { name: '确认复制' }));
   await waitFor(() => expect(onConfirm).toHaveBeenCalledWith('scene', ['target-tag', 'extra']));
@@ -52,10 +53,10 @@ it('预览内容出处及两端字典；标签按名称匹配目标ID，未匹�
 it('取消不提交，失败保留分类和标签选择并可重试', async () => {
   const confirm = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
   const { onClose } = setup(confirm);
-  fireEvent.change(screen.getByLabelText('目标主分类'), { target: { value: 'scene' } });
+  await chooseSelect(screen.getByLabelText('目标主分类'), '景物描写');
   fireEvent.click(screen.getByRole('button', { name: '确认复制' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('选择已保留');
-  expect(screen.getByLabelText('目标主分类')).toHaveValue('scene');
+  expect(screen.getByLabelText('目标主分类')).toHaveTextContent('景物描写');
   expect(screen.getByRole('checkbox', { name: '雨夜' })).toBeChecked();
   expect(onClose).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: '取消' }));

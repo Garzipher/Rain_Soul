@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
+import { chooseSelect } from './select-field-helper';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import App from '../../src/renderer/App';
@@ -19,7 +20,8 @@ async function setup() {
   render(<App api={adapter.api} />);
   fireEvent.click(await screen.findByRole('button', { name: '打开作品：当前作品' }));
   await screen.findByLabelText('章节标题'); fireEvent.click(screen.getByRole('button', { name: '知识库' }));
-  fireEvent.change(await screen.findByLabelText('作品范围'), { target: { value: 'all' } });
+  fireEvent.click(await screen.findByRole('button', { name: /^作品知识库/ }));
+  await chooseSelect(await screen.findByLabelText('作品范围'), '全部作品（只读）');
   const card = await screen.findByRole('article', { name: /知识：雨落在窗边/ });
   fireEvent.click(within(card).getByRole('button', { name: '复制到当前作品' }));
   return { adapter, source, target, copy };
@@ -36,14 +38,14 @@ it('确认后写入作者选定分类、目标标签ID，保留来源且不暗�
   const { copy, adapter, source, target } = await setup();
   const dialog = await screen.findByRole('dialog', { name: '复制知识到当前作品' });
   const categoryId = target.assets!.categories.find(item => item.name === '景物描写')!.id;
-  fireEvent.change(within(dialog).getByLabelText('目标主分类'), { target: { value: categoryId } });
+  await chooseSelect(within(dialog).getByLabelText('目标主分类'), target.assets!.categories.find(item => item.id === categoryId)!.name);
   fireEvent.click(within(dialog).getByRole('button', { name: '确认复制' }));
   await waitFor(() => expect(adapter.works.get(target.id)!.assets!.knowledge).toHaveLength(1));
   expect(copy).toHaveBeenCalledOnce();
   expect(copy.mock.calls[0][0]).toMatchObject({ workId: target.id, categoryId, tagIds: [target.assets!.tags[0].id], sourceExpectedRevision: source.revision });
   const updated = adapter.works.get(target.id)!;
   expect(updated.assets!.knowledge[0]).toMatchObject({ categoryId, tagIds: [target.assets!.tags[0].id], origin: { workId: source.id, entryId: source.assets!.knowledge[0].id } });
-  expect(updated.assets!.tags).toHaveLength(1); expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(updated.assets!.tags).toHaveLength(1); await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
 it('明确失败保留映射选择，手动确认可重试', async () => {
   const { copy, target } = await setup();
@@ -51,10 +53,10 @@ it('明确失败保留映射选择，手动确认可重试', async () => {
   copy.mockImplementationOnce(async () => { throw operationError('分类暂不可用', 'INVALID_INPUT'); }).mockImplementation(original);
   const dialog = await screen.findByRole('dialog', { name: '复制知识到当前作品' });
   const categoryId = target.assets!.categories[1].id;
-  fireEvent.change(within(dialog).getByLabelText('目标主分类'), { target: { value: categoryId } });
+  await chooseSelect(within(dialog).getByLabelText('目标主分类'), target.assets!.categories.find(item => item.id === categoryId)!.name);
   fireEvent.click(within(dialog).getByRole('button', { name: '确认复制' }));
   expect(await within(dialog).findByRole('alert')).toHaveTextContent('选择已保留');
-  expect(within(dialog).getByLabelText('目标主分类')).toHaveValue(categoryId);
+  expect(within(dialog).getByLabelText('目标主分类')).toHaveTextContent(target.assets!.categories.find(item => item.id === categoryId)!.name);
   fireEvent.click(within(dialog).getByRole('button', { name: '确认复制' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(copy).toHaveBeenCalledTimes(2);
@@ -103,9 +105,9 @@ it('全部作品中的当前作品知识显示归属，不提供自我复制入�
   await act(async () => {
     await adapter.api.manageAssets({ workId: target.id, expectedRevision: target.revision, operationId: crypto.randomUUID(), action: { type: 'createKnowledge', body: '当前作品自己的知识。', source: '本作', categoryId: target.assets!.categories[0].id, tagIds: [] } });
   });
-  fireEvent.change(screen.getByLabelText('作品范围'), { target: { value: target.id } });
+  await chooseSelect(screen.getByLabelText('作品范围'), `当前作品：${target.title}`);
   await screen.findByRole('article', { name: /知识：当前作品自己的/ });
-  fireEvent.change(screen.getByLabelText('作品范围'), { target: { value: 'all' } });
+  await chooseSelect(screen.getByLabelText('作品范围'), '全部作品（只读）');
   const card = await screen.findByRole('article', { name: /知识：当前作品自己的/ });
   expect(card).toHaveTextContent('已在当前作品');
   expect(within(card).queryByRole('button', { name: '复制到当前作品' })).not.toBeInTheDocument();
@@ -121,5 +123,5 @@ it('未知失败重试被明确拒绝后解除待确认状态，保留映射并�
   expect(copy).toHaveBeenCalledTimes(2); expect(copy.mock.calls[0][0]).toEqual(copy.mock.calls[1][0]);
   expect(within(dialog).getByRole('checkbox', { name: '雨夜' })).toBeChecked();
   fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
