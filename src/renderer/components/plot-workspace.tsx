@@ -1,3 +1,5 @@
+import { AnimatePresence } from 'motion/react';
+import { AnimatedCollapse } from '../motion/animated-collapse';
 import { SelectField } from './select-field';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssetAction, AssetState, OutlineKind, OutlineNode } from '../../shared/assets';
@@ -60,10 +62,10 @@ export function PlotWorkspace(props: AssetWorkspaceProps) {
   const tree = (parentId: string | null): ReactNode => nodes.filter((node) => node.parentId === parentId)
     .sort((a, b) => a.sortOrder - b.sortOrder).map((node) => <div key={node.id} className="asset-tree-node">
       <div className="asset-tree-row">
-        {nodes.some((item) => item.parentId === node.id) && <button type="button" aria-label={`${collapsed.includes(node.id) ? '展开' : '收起'}剧情：${node.title}`} aria-expanded={!collapsed.includes(node.id)} onClick={() => setCollapsed((items) => items.includes(node.id) ? items.filter((id) => id !== node.id) : [...items, node.id])}>{collapsed.includes(node.id) ? '›' : '⌄'}</button>}
+        {nodes.some((item) => item.parentId === node.id) && <button type="button" aria-label={`${collapsed.includes(node.id) ? '展开' : '收起'}剧情：${node.title}`} aria-expanded={!collapsed.includes(node.id)} onClick={event => { event.currentTarget.focus(); setCollapsed((items) => items.includes(node.id) ? items.filter((id) => id !== node.id) : [...items, node.id]); }}>⌄</button>}
         <button type="button" aria-label={`选择剧情：${node.title}`} aria-current={selected?.id === node.id ? 'true' : undefined} disabled={parent.locked} onClick={() => select(node.id)}>{node.title}</button>
       </div>
-      {!collapsed.includes(node.id) && tree(node.id)}
+      <AnimatedCollapse open={!collapsed.includes(node.id)}>{tree(node.id)}</AnimatedCollapse>
     </div>);
   return <section className="assets-workspace" aria-label="剧情架构">
     <aside className="assets-tree"><h2>剧情节点</h2><div className="asset-buttons"><button className="secondary" disabled={parent.locked} onClick={() => create('volume', null)}>新增卷节点</button><button className="secondary" disabled={parent.locked} onClick={() => create('chapter', selected?.type === 'volume' ? selected.id : null)}>新增章节点</button><button className="secondary" disabled={parent.locked || !selected || selected.type === 'volume'} onClick={() => create('detail', selected?.type === 'chapter' ? selected.id : selected?.parentId ?? null)}>新增详细节点</button></div>{tree(null)}{!nodes.length && <p>尚无剧情节点，从卷或章开始。</p>}</aside>
@@ -110,6 +112,6 @@ function PlotDetails(props: AssetWorkspaceProps & { node: OutlineNode }) {
     <div className="asset-selected">{entries.filter((entry) => knowledge.includes(entry.id)).map((entry) => <div key={entry.id}><details><summary>{entry.body.slice(0, 50)}</summary><p>{entry.body}</p><small>{readableKnowledgeSource(entry.source)}</small></details><button className="secondary" aria-label={`移除知识：${entry.body}`} disabled={action.locked || dirty} onClick={() => void associate('knowledge', entry.id, false)}>移除</button></div>)}</div>
     <details className="asset-picker"><summary>关联伏笔</summary><div className="asset-picker-options">{foreshadows.length ? foreshadows.map((hint) => <label key={hint.id}><input type="checkbox" checked={hints.includes(hint.id)} disabled={action.locked || dirty} onChange={(event) => void associate('hint', hint.id, event.target.checked)} /><span>{hint.name}<small>{hint.outlineId === node.id ? '当前节点' : hint.outlineId ? `原归属：${props.assets.outlines.find((item) => item.id === hint.outlineId)?.title ?? '已删除节点'}；勾选后移到本节点` : '未归属；勾选后移到本节点'}</small></span></label>) : <p>尚无伏笔，请先在伏笔架构添加。</p>}</div></details>
     <div className="asset-selected">{foreshadows.filter((hint) => hints.includes(hint.id)).map((hint) => <div key={hint.id}><span>{hint.name} · {hint.status}</span>{props.onSelectForeshadow && <button className="secondary" aria-label={`定位伏笔：${hint.name}`} disabled={action.locked || dirty} onClick={() => props.onSelectForeshadow?.(hint.id)}>定位伏笔</button>}<button className="secondary" aria-label={`移除伏笔：${hint.name}`} disabled={action.locked || dirty} onClick={() => void associate('hint', hint.id, false)}>移除</button></div>)}</div>
-    {confirmDelete && <StructureDialog busy={action.locked} onClose={() => setConfirmDelete(false)} state={{ heading: '删除剧情节点', description: '将删除本节点及子节点，解除关联；正文、知识与伏笔均保留。', submitLabel: '确认删除', onSubmit: () => action.execute({ type: 'deleteOutline', id: node.id }) }} />}
+    <AnimatePresence>{confirmDelete && <StructureDialog busy={action.locked} onClose={() => setConfirmDelete(false)} state={{ heading: '删除剧情节点', description: '将删除本节点及子节点，解除关联；正文、知识与伏笔均保留。', submitLabel: '确认删除', onSubmit: () => action.execute({ type: 'deleteOutline', id: node.id }) }} />}</AnimatePresence>
   </>;
 }

@@ -1,18 +1,12 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useAnimatedDialog } from '../motion/animated-dialog';
+import { useRef, type ReactNode } from 'react';
 import './workspace-tool-dialog.css';
 
 /** 工具按需打开；关闭只隐藏内容，AI 候选保留在本次作品会话中。 */
 export function WorkspaceToolDialog({ title, open, busy, onClose, children }: { title: string; open: boolean; busy: boolean; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const close = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    const element = dialog.current;
-    if (!open) { element?.close?.(); element?.removeAttribute('open'); return; }
-    const previous = document.activeElement as HTMLElement | null;
-    if (typeof element?.showModal === 'function') element.showModal(); else element?.setAttribute('open', '');
-    close.current?.focus();
-    return () => { element?.close?.(); if (previous?.isConnected) previous.focus(); };
-  }, [open]);
+  useAnimatedDialog(dialog, open);
   return <dialog ref={dialog} className="workspace-tool-dialog" aria-label={title} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onKeyDown={event => {
     if ((event.target as Element).closest('dialog') !== dialog.current) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!busy) onClose(); }

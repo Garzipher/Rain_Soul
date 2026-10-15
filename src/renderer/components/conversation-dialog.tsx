@@ -1,13 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useAnimatedDialog } from '../motion/animated-dialog';
+import { useRef, type ReactNode } from 'react';
 
 export function ConversationDialog({ title, onCancel, children }: { title: string; onCancel: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null, node = dialog.current;
-    if (typeof node?.showModal === 'function') node.showModal(); else node?.setAttribute('open', '');
-    node?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
-    return () => { node?.close?.(); if (previous?.isConnected) previous.focus(); };
-  }, []);
+  useAnimatedDialog(dialog);
   return <dialog ref={dialog} className="conversation-confirm" aria-label={title} onCancel={event => { event.preventDefault(); onCancel(); }} onKeyDown={event => {
     if (event.key === 'Escape') { event.preventDefault(); onCancel(); }
     if (event.key !== 'Tab') return;

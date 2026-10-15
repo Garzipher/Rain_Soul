@@ -1,3 +1,5 @@
+import { AnimatePresence, m } from 'motion/react';
+import { motionTokens, seconds } from '../motion/tokens';
 import { SelectField } from './select-field';
 import { useEffect, useRef, useState } from 'react';
 import type { DesktopApi, WorkDetail, WorkSummary } from '../../shared/contracts';
@@ -194,19 +196,19 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
     finally { setBusy(false); }
   }
   return <section className={`conversation-workspace ${listCollapsed ? 'list-collapsed' : ''}`} aria-label="作品需求会话">
-    <aside id="conversation-list" className="conversation-list" aria-label="作品与会话" hidden={listCollapsed}>
+    <aside id="conversation-list" className="conversation-list" aria-label="作品与会话" inert={listCollapsed} aria-hidden={listCollapsed}>
       <label className="conversation-work-select">作品<SelectField aria-label="会话所属作品" value={work?.id ?? ''} disabled={busy || changed || !!pending || replyUnsaved || renaming} onChange={event => { stop(); onSelectWork(event.target.value); }}>
         {!work && <option value="">选择作品</option>}{works.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
       </SelectField></label>
       {work && <><div className="conversation-project"><span className="conversation-project-label">会话列表</span><button className="secondary" disabled={busy || !!pending || replyUnsaved || renaming || rejected} onClick={create}>新建会话</button></div>
-        {list.map(item => <div key={item.id} className={`conversation-row ${current?.id === item.id ? 'active' : ''}`}>
+        <AnimatePresence initial={false}>{list.map(item => <m.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: seconds(motionTokens.collapse), ease: motionTokens.enter }} key={item.id} className={`conversation-row ${current?.id === item.id ? 'active' : ''}`}>
           <button aria-label={`打开会话：${item.title}`} title={item.title} disabled={busy || !!pending || replyUnsaved || renaming} onClick={() => open(item.id)}>{item.title}</button>
           <button className="conversation-delete" aria-label={`删除会话：${item.title}`} disabled={busy || !!pending || replyUnsaved || renaming} onClick={() => { stop(); setDeleting(item); }}>×</button>
-        </div>)}{!list.length && <p>尚无会话</p>}</>}
+        </m.div>)}</AnimatePresence>{!list.length && <p>尚无会话</p>}</>}
     </aside>
     <div className="conversation-main">
       <div className="conversation-main-toolbar">
-        <button type="button" className="conversation-list-toggle secondary" aria-label={listCollapsed ? '展开会话列表' : '收起会话列表'} aria-expanded={!listCollapsed} aria-controls="conversation-list" title={listCollapsed ? '展开会话列表' : '收起会话列表'} onClick={() => setListCollapsed(value => !value)}>
+        <button type="button" className="conversation-list-toggle secondary" aria-label={listCollapsed ? '展开会话列表' : '收起会话列表'} aria-expanded={!listCollapsed} aria-controls="conversation-list" title={listCollapsed ? '展开会话列表' : '收起会话列表'} onClick={event => { event.currentTarget.focus(); setListCollapsed(value => !value); }}>
           <span className="conversation-list-toggle-icon" aria-hidden="true">☰</span><span>会话列表</span>
         </button>
         {current && <div className="conversation-heading"><h2 title={current.title}>{current.title}</h2><button className="secondary" disabled={busy || !!pending || replyUnsaved} onClick={() => { stop(); setName(current.title); setRenaming(true); }}>重命名</button></div>}
@@ -220,7 +222,7 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
         <div className="conversation-composer"><textarea aria-label="会话输入" placeholder="输入消息" value={text} maxLength={200000} disabled={busy || sending || !!pending || !!pendingReply} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }} onChange={event => { textRef.current = event.target.value; onDirtyChange(true); setText(event.target.value); }} /><div><span role="status">{pending ? '草稿保存失败' : changed ? '正在保存草稿…' : 'Enter 发送 · Shift+Enter 换行'}</span><button className="secondary" disabled={busy || sending || !!pending || !!pendingReply || renaming || rejected || !text.trim()} onClick={record}>仅记录</button><button className="primary" disabled={busy || sending || !!pending || !!pendingReply || renaming || rejected || !text.trim()} onClick={send}>发送</button></div></div>
       </>}
       {pendingReply && work && current && <ConversationReplyRecovery key={pendingReply} requestHash={pendingReply} workId={work.id} conversationId={current.id} api={api} onProtectionChange={setReplyUnsaved} onResolved={detail => { rememberReply(detail.id, null); accept(detail); setText(detail.draft); textRef.current = detail.draft; setPendingReply(null); setReplyUnsaved(false); setError(null); }} />}
-      {deleting && <ConversationDialog title="删除会话" onCancel={() => { if (!busy) setDeleting(null); }}><h3>删除会话</h3><p>确认删除“{deleting.title}”及其消息和草稿？</p><button className="secondary" disabled={busy} onClick={() => setDeleting(null)}>取消删除</button><button className="danger" disabled={busy} onClick={remove}>确认删除会话</button></ConversationDialog>}
+      <AnimatePresence>{deleting && <ConversationDialog title="删除会话" onCancel={() => { if (!busy) setDeleting(null); }}><h3>删除会话</h3><p>确认删除“{deleting.title}”及其消息和草稿？</p><button className="secondary" disabled={busy} onClick={() => setDeleting(null)}>取消删除</button><button className="danger" disabled={busy} onClick={remove}>确认删除会话</button></ConversationDialog>}</AnimatePresence>
     </div>
   </section>;
 }

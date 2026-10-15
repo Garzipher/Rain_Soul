@@ -1,0 +1,47 @@
+:root {
+  --motion-press: 90ms; --motion-release: 150ms; --motion-menu-enter: 160ms; --motion-menu-exit: 140ms;
+  --motion-dialog-enter: 220ms; --motion-dialog-exit: 160ms; --motion-page: 180ms; --motion-collapse: 200ms;
+  --motion-enter: cubic-bezier(.16,1,.3,1); --motion-exit: cubic-bezier(.4,0,1,1);
+}
+button, [role="button"], summary {
+  transition: background-color var(--motion-release), color var(--motion-release), border-color var(--motion-release), box-shadow var(--motion-release), translate var(--motion-release) var(--motion-enter);
+}
+button:active:not(:disabled), [role="button"]:active:not([aria-disabled="true"]), summary:active { translate: 0 1px; transition-duration: var(--motion-press); }
+.motion-collapse { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows var(--motion-collapse) var(--motion-enter), opacity var(--motion-menu-enter); }
+.motion-collapse.is-open { grid-template-rows: 1fr; opacity: 1; }
+.motion-collapse-content { min-height: 0; overflow: hidden; }
+.context-menu[data-motion="enter"] { animation: rainsoul-menu-in var(--motion-menu-enter) var(--motion-enter) both; transform-origin: top left; }
+.context-menu[data-motion="exit"] { animation: rainsoul-menu-out var(--motion-menu-exit) var(--motion-exit) both; pointer-events: none; }
+dialog[data-motion="enter"] { animation: rainsoul-dialog-in var(--motion-dialog-enter) var(--motion-enter) both; }
+dialog[data-motion="exit"] { animation: rainsoul-dialog-out var(--motion-dialog-exit) var(--motion-exit) both; pointer-events: none; }
+dialog[data-motion="enter"]::backdrop { animation: rainsoul-fade-in var(--motion-dialog-enter) both; }
+dialog[data-motion="exit"]::backdrop { animation: rainsoul-fade-out var(--motion-dialog-exit) both; }
+@keyframes rainsoul-dialog-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes rainsoul-dialog-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(5px) scale(.99); } }
+@keyframes rainsoul-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rainsoul-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes rainsoul-menu-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes rainsoul-menu-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-3px) scale(.99); } }
+::view-transition-old(root) { animation: rainsoul-fade-out var(--motion-page) var(--motion-exit) both; }
+::view-transition-new(root) { animation: rainsoul-fade-in var(--motion-page) var(--motion-enter) both; }
+:where(.page-error, .asset-error, .dialog-error, .conversation-generating, .conversation-message, .import-warning, [role="status"]) { animation: rainsoul-fade-in var(--motion-menu-enter) var(--motion-enter); }
+.rail { transition: width var(--motion-collapse) var(--motion-enter); }
+.app { transition: grid-template-columns var(--motion-collapse) var(--motion-enter); }
+.rail-brand { display: flex; align-items: center; gap: 11px; min-width: 0; max-width: 0; opacity: 0; overflow: hidden; transition: max-width var(--motion-collapse) var(--motion-enter), opacity var(--motion-menu-enter); }
+.rail-brand.is-visible { max-width: 170px; opacity: 1; }
+.rail-label { white-space: nowrap; min-width: 0; max-width: 170px; overflow: hidden; opacity: 1; transition: max-width var(--motion-collapse), opacity var(--motion-menu-enter); }
+.is-collapsed .rail-label { max-width: 0; opacity: 0; }
+.is-collapsed .rail nav button, .is-collapsed .rail-bottom button { gap: 0; }
+.brand-copy, .brand-mark, .rail nav button > span, .rail-bottom button > span { animation: rainsoul-fade-in var(--motion-menu-enter); }
+.rail nav button[aria-current="page"] { box-shadow: inset 3px 0 0 var(--accent, #4ba3df); }
+.conversation-workspace { transition: grid-template-columns var(--motion-collapse) var(--motion-enter); }
+.conversation-list { min-width: 0; overflow: hidden; transition: opacity var(--motion-menu-enter); }
+.list-collapsed .conversation-list { opacity: 0; pointer-events: none; }
+.asset-tree-row button[aria-expanded] { transition: rotate var(--motion-collapse) var(--motion-enter); }
+.asset-tree-row button[aria-expanded="false"] { rotate: -90deg; }
+.settings-group, .knowledge-card, .source-segment { transition: background-color var(--motion-release), border-color var(--motion-release), box-shadow var(--motion-release); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  button:active:not(:disabled), [role="button"]:active { translate: none; }
+}
+html[data-reduced-motion="true"] *, html[data-reduced-motion="true"] *::before, html[data-reduced-motion="true"] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

@@ -1,5 +1,6 @@
+import { useAnimatedDialog } from '../motion/animated-dialog';
 import { SelectField } from './select-field';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ManuscriptDraft } from '../../shared/manuscript';
 import { canMoveManuscriptChapter, normalizeManuscriptOrder } from '../lib/manuscript-order';
 import './manuscript-dialog.css';
@@ -13,12 +14,7 @@ export function ManuscriptDialog({ draft, busy, error, onConfirm, onClose }: { d
     return keys.current.get(paragraphs)!;
   }
   const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const element = dialog.current, previous = document.activeElement as HTMLElement | null;
-    if (typeof element?.showModal === 'function') element.showModal(); else element?.setAttribute('open', '');
-    element?.querySelector<HTMLInputElement>('input')?.focus();
-    return () => { element?.close?.(); if (previous?.isConnected) previous.focus(); };
-  }, []);
+  useAnimatedDialog(dialog);
   const valid = edited.title.trim() && edited.chapters.every(chapter => chapter.title.trim());
   function changeChapter(index: number, field: 'title' | 'volumeTitle', value: string) {
     if (busy) return;

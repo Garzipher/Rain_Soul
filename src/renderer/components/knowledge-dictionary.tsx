@@ -1,3 +1,5 @@
+import { AnimatePresence, m } from 'motion/react';
+import { motionTokens, seconds } from '../motion/tokens';
 import { SelectField } from './select-field';
 import { useEffect, useRef, useState } from 'react';
 import type { AssetAction, AssetState, Category, KnowledgeTag } from '../../shared/assets';
@@ -91,10 +93,10 @@ export function KnowledgeDictionary({ assets, busy, onAction, onDirtyChange }: K
 
   return <section className="knowledge-dictionary" aria-label="知识分类与标签维护">
     <div><h2>知识分类</h2><p>按层级整理人物描写、景物描写、内心描写、经典引用等知识。</p>
-      <div className="knowledge-dictionary-list">{orderedCategories(null).map(({ item, depth, first, last }) => <div className="knowledge-dictionary-row" key={item.id}>
+      <div className="knowledge-dictionary-list"><AnimatePresence initial={false}>{orderedCategories(null).map(({ item, depth, first, last }) => <m.div layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: seconds(motionTokens.collapse), ease: motionTokens.enter }} className="knowledge-dictionary-row" key={item.id}>
         <span style={{ paddingInlineStart: depth * 22 }}>{depth ? '↳ ' : ''}{item.name}</span>
         <div><button type="button" aria-label={`上移分类：${item.name}`} disabled={dictionaryLocked || first} onClick={() => void operate({ type: 'moveCategory', id: item.id, direction: 'up' })}>上移</button><button type="button" aria-label={`下移分类：${item.name}`} disabled={dictionaryLocked || last} onClick={() => void operate({ type: 'moveCategory', id: item.id, direction: 'down' })}>下移</button><button type="button" disabled={dictionaryLocked} onClick={() => openCategory(item)}>编辑分类：{item.name}</button><button type="button" aria-label={`删除分类：${item.name}`} disabled={dictionaryLocked || item.systemKey === 'uncategorized'} onClick={() => { setError(null); setDeleteCategory(item); setDestinationId(''); }}>删除</button></div>
-      </div>)}</div>
+      </m.div>)}</AnimatePresence></div>
       {draft && <form onSubmit={event => void saveCategory(event)}><h3>{draft.id ? '编辑分类' : '新增分类'}</h3>
         <label>分类名称<input aria-label="分类名称" value={draft.name} disabled={disabled} onChange={event => setDraft({ ...draft, name: event.target.value })} required /></label>
         <label>上级分类<SelectField aria-label="上级分类" value={draft.parentId ?? ''} disabled={disabled} onChange={event => setDraft({ ...draft, parentId: event.target.value || null })}><option value="">顶级分类</option>{categories.filter(item => item.id !== draft.id && !descendants(draft.id ?? '').has(item.id)).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectField></label>
@@ -103,19 +105,19 @@ export function KnowledgeDictionary({ assets, busy, onAction, onDirtyChange }: K
       {!draft && <button type="button" disabled={dictionaryLocked} onClick={() => openCategory()}>新增分类</button>}
     </div>
     <div><h2>知识标签</h2><p>标签可组合筛选；删除标签只解除知识与该标签的关联。</p>
-      <div className="knowledge-dictionary-list">{tags.map(item => <div className="knowledge-dictionary-row" key={item.id}><span>{item.name}</span><button type="button" aria-label={`删除标签：${item.name}`} disabled={dictionaryLocked} onClick={() => { setError(null); setDeleteTag(item); }}>删除</button></div>)}</div>
+      <div className="knowledge-dictionary-list"><AnimatePresence initial={false}>{tags.map(item => <m.div layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: seconds(motionTokens.collapse), ease: motionTokens.enter }} className="knowledge-dictionary-row" key={item.id}><span>{item.name}</span><button type="button" aria-label={`删除标签：${item.name}`} disabled={dictionaryLocked} onClick={() => { setError(null); setDeleteTag(item); }}>删除</button></m.div>)}</AnimatePresence></div>
       {tagDraft !== null && <form onSubmit={event => void saveTag(event)}><h3>新增标签</h3><label>标签名称<input aria-label="标签名称" value={tagDraft} disabled={disabled} onChange={event => setTagDraft(event.target.value)} required /></label><div><button type="button" disabled={disabled} onClick={() => setTagDraft(null)}>取消</button><button type="submit" disabled={disabled || !tagDraft.trim() || tags.some(item => item.name.toLocaleLowerCase() === tagDraft.trim().toLocaleLowerCase())}>保存标签</button></div></form>}
       {tagDraft === null && <button type="button" disabled={dictionaryLocked} onClick={openTag}>新增标签</button>}
     </div>
     {hasDraftChanges && <p role="status">请先保存或取消当前草稿，再操作其他分类或标签。</p>}
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
-    {deleteCategory && <StructureDialog role="alertdialog" busy={disabled} submitDisabled={!!categoryChildren.length || (categoryEntries.length > 0 && !destinationId)} onClose={() => setDeleteCategory(null)} state={{
+    <AnimatePresence>{deleteCategory && <StructureDialog key="delete-category" role="alertdialog" busy={disabled} submitDisabled={!!categoryChildren.length || (categoryEntries.length > 0 && !destinationId)} onClose={() => setDeleteCategory(null)} state={{
       heading: `删除分类：${deleteCategory.name}`, description: categoryEntries.length ? `此分类下有 ${categoryEntries.length} 条知识，确认后先迁移知识，再删除分类。` : '删除后无法恢复分类。',
       submitLabel: categoryEntries.length ? '确认迁移并删除分类' : '确认删除分类', onSubmit: () => operate({ type: 'deleteCategory', id: deleteCategory.id, destinationId: categoryEntries.length ? destinationId : null }),
-    }}>{categoryChildren.length ? <p role="alert">该分类有子分类，请先处理子分类。</p> : categoryEntries.length > 0 && <label>迁移到分类<SelectField aria-label="迁移到分类" value={destinationId} disabled={disabled} onChange={event => setDestinationId(event.target.value)}><option value="">选择目标分类</option>{deleteTargets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectField></label>}</StructureDialog>}
-    {deleteTag && <StructureDialog role="alertdialog" busy={disabled} onClose={() => setDeleteTag(null)} state={{
+    }}>{categoryChildren.length ? <p role="alert">该分类有子分类，请先处理子分类。</p> : categoryEntries.length > 0 && <label>迁移到分类<SelectField aria-label="迁移到分类" value={destinationId} disabled={disabled} onChange={event => setDestinationId(event.target.value)}><option value="">选择目标分类</option>{deleteTargets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectField></label>}</StructureDialog>}</AnimatePresence>
+    <AnimatePresence>{deleteTag && <StructureDialog key="delete-tag" role="alertdialog" busy={disabled} onClose={() => setDeleteTag(null)} state={{
       heading: `删除标签：${deleteTag.name}`, description: usedTag ? '此标签会从知识条目解除关联，知识内容和其他标签会保留。' : '删除该标签。', submitLabel: '确认删除标签',
       onSubmit: async () => { const success = await operate({ type: 'deleteTag', id: deleteTag.id }); if (success) setNotice(usedTag ? '标签已删除，相关知识内容已保留。' : '标签已删除。'); return success; },
-    }} />}
+    }} />}</AnimatePresence>
   </section>;
 }

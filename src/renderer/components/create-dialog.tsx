@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useAnimatedDialog } from '../motion/animated-dialog';
+import { useRef, useState, type KeyboardEvent } from 'react';
 
 export interface CreateDialogProps { busy: boolean; error: string | null; onClose: () => void; onCreate: (title: string) => void }
 
@@ -7,14 +8,7 @@ export function CreateDialog({ busy, error, onClose, onCreate }: CreateDialogPro
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const dialog = dialogRef.current;
-    if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
-    else dialog?.setAttribute('open', '');
-    inputRef.current?.focus();
-    return () => { dialog?.close?.(); previous?.focus(); };
-  }, []);
+  useAnimatedDialog(dialogRef);
   function handleKey(event: KeyboardEvent<HTMLDialogElement>) {
     if (event.key === 'Escape' && !busy) { event.preventDefault(); onClose(); }
     if (event.key !== 'Tab') return;

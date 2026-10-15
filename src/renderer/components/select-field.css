@@ -27,6 +27,7 @@
 .select-field-trigger[data-state="open"] .select-field-chevron { transform: rotate(180deg); }
 .select-field-chevron svg { width: 15px; height: 15px; }
 .select-field-content {
+  transform-origin: var(--radix-select-content-transform-origin);
   z-index: 1200;
   min-width: var(--radix-select-trigger-width);
   max-width: min(560px, calc(100vw - 24px));
@@ -39,6 +40,8 @@
   box-shadow: 0 4px 12px rgb(23 35 48 / 8%), 0 16px 36px rgb(23 35 48 / 12%);
   font-size: 13px;
 }
+.select-field-content[data-state="open"] { animation: rainsoul-menu-in var(--motion-menu-enter, 160ms) var(--motion-enter, ease-out) both; }
+.select-field-content[data-state="closed"] { animation: rainsoul-menu-out var(--motion-menu-exit, 140ms) var(--motion-exit, ease-in) both; pointer-events: none; }
 .select-field-viewport { padding: 5px; }
 .select-field-option { position: relative; display: flex; align-items: center; gap: 12px; min-height: 32px; padding: 7px 30px 7px 10px; border-radius: 5px; outline: none; cursor: default; user-select: none; line-height: 1.45; overflow-wrap: anywhere; }
 .select-field-option > span:first-child { display: block; min-width: 0; }

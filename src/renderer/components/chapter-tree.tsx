@@ -1,3 +1,5 @@
+import { AnimatePresence, m } from 'motion/react';
+import { motionTokens, seconds } from '../motion/tokens';
 import { useState, type KeyboardEvent, type MouseEvent } from 'react';
 import type { Chapter, WorkDetail } from '../../shared/contracts';
 import { countDocumentWords } from '../../shared/document';
@@ -15,21 +17,21 @@ export function ChapterTree(props: ChapterTreeProps) {
   }
   function chapterButton(chapter: Chapter) {
     const target: StructureTarget = { kind: 'chapter', id: chapter.id, title: props.draft?.id === chapter.id ? props.draft.title || '未命名章节' : chapter.title };
-    return <button key={chapter.id} className={props.draft?.id === chapter.id ? 'selected' : ''} aria-label={`打开章节：${chapter.title}`} aria-current={props.draft?.id === chapter.id ? 'page' : undefined} onClick={() => props.onSelectChapter(chapter.id)} disabled={props.busy} onContextMenu={(event) => props.onMenu(target, event)} onKeyDown={(event) => menuKey(event, target)}>
+    return <m.button layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: seconds(motionTokens.collapse), ease: motionTokens.enter }} key={chapter.id} className={props.draft?.id === chapter.id ? 'selected' : ''} aria-label={`打开章节：${chapter.title}`} aria-current={props.draft?.id === chapter.id ? 'page' : undefined} onClick={() => props.onSelectChapter(chapter.id)} disabled={props.busy} onContextMenu={(event) => props.onMenu(target, event)} onKeyDown={(event) => menuKey(event, target)}>
       <Icon name="chapter" /><span>{target.title}</span><small>{words(chapter)}</small>
-    </button>;
+    </m.button>;
   }
   return <aside className="chapter-pane" aria-label="章节列表">
     <div className="pane-heading"><strong>卷与章节</strong><div className="pane-actions"><button className="icon-button" aria-label="添加分卷" title="添加分卷" onClick={props.onAddVolume} disabled={props.busy}><Icon name="folder" /></button><button className="icon-button" aria-label="添加章节" title="添加章节" onClick={() => props.onAddChapter()} disabled={props.busy}><Icon name="plus" /></button></div></div>
     <div className="chapter-tree">
-      {props.work.chapters.filter((chapter) => chapter.volumeId === null).map(chapterButton)}
+      <AnimatePresence initial={false}>{props.work.chapters.filter((chapter) => chapter.volumeId === null).map(chapterButton)}</AnimatePresence>
       {props.work.volumes.map((volume) => {
         const chapters = props.work.chapters.filter((chapter) => chapter.volumeId === volume.id);
         const isCollapsed = collapsed.has(volume.id) && !(props.draft?.volumeId === volume.id && collapsed.get(volume.id) !== props.draft.id);
         const target: StructureTarget = { kind: 'volume', id: volume.id, title: volume.title };
         return <div key={volume.id} className="volume-group" role="group" aria-label={`分卷：${volume.title}`}>
-          <button className="volume-heading" aria-label={`${isCollapsed ? '展开' : '收起'}分卷：${volume.title}`} aria-expanded={!isCollapsed} disabled={props.busy} onClick={() => { props.onSelectVolume(volume.id); setCollapsed((previous) => { const next = new Map(previous); if (isCollapsed) next.delete(volume.id); else next.set(volume.id, props.draft?.id ?? null); return next; }); }} onContextMenu={(event) => props.onMenu(target, event)} onKeyDown={(event) => menuKey(event, target)}><span className="volume-chevron" aria-hidden="true"><Icon name="chevron" /></span><span>{volume.title}</span><small>{chapters.reduce((sum, chapter) => sum + words(chapter), 0)}</small></button>
-          <div className={`volume-reveal${isCollapsed ? ' is-collapsed' : ''}`} inert={isCollapsed} aria-hidden={isCollapsed}><div className="volume-chapters">{chapters.map(chapterButton)}{chapters.length === 0 && <p className="empty-volume">暂无章节</p>}</div></div>
+          <button className="volume-heading" aria-label={`${isCollapsed ? '展开' : '收起'}分卷：${volume.title}`} aria-expanded={!isCollapsed} disabled={props.busy} onClick={event => { event.currentTarget.focus(); props.onSelectVolume(volume.id); setCollapsed((previous) => { const next = new Map(previous); if (isCollapsed) next.delete(volume.id); else next.set(volume.id, props.draft?.id ?? null); return next; }); }} onContextMenu={(event) => props.onMenu(target, event)} onKeyDown={(event) => menuKey(event, target)}><span className="volume-chevron" aria-hidden="true"><Icon name="chevron" /></span><span>{volume.title}</span><small>{chapters.reduce((sum, chapter) => sum + words(chapter), 0)}</small></button>
+          <div className={`volume-reveal${isCollapsed ? ' is-collapsed' : ''}`} inert={isCollapsed} aria-hidden={isCollapsed}><div className="volume-chapters"><AnimatePresence initial={false}>{chapters.map(chapterButton)}</AnimatePresence>{chapters.length === 0 && <p className="empty-volume">暂无章节</p>}</div></div>
         </div>;
       })}
     </div>

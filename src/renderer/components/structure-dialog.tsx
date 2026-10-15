@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useAnimatedDialog } from '../motion/animated-dialog';
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 export interface StructureDialogState { heading: string; description?: string; field?: string; initialValue?: string; submitLabel: string; submitTone?: 'primary' | 'danger'; onSubmit: (value: string) => Promise<boolean> }
 
@@ -8,13 +9,7 @@ export function StructureDialog({ state, busy, onClose, children, submitDisabled
   const cancel = useRef<HTMLButtonElement>(null);
   const [value, setValue] = useState(state.initialValue ?? '');
   const submitTone = state.submitTone ?? (state.field ? 'primary' : 'danger');
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const element = dialog.current;
-    if (typeof element?.showModal === 'function') element.showModal(); else element?.setAttribute('open', '');
-    if (state.field) { initial.current?.focus(); initial.current?.select(); } else cancel.current?.focus();
-    return () => { element?.close?.(); if (previous?.isConnected) previous.focus(); };
-  }, [state.field]);
+  useAnimatedDialog(dialog);
   function key(event: KeyboardEvent<HTMLDialogElement>) {
     if (event.key === 'Escape' && !busy) { event.preventDefault(); onClose(); }
     if (event.key !== 'Tab') return;
