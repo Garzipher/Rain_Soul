@@ -3,19 +3,19 @@
 .ai-muted { color: var(--muted); font-size: 12px; line-height: 1.8; }
 .ai-request-form, .ai-settings form { display: flex; flex-direction: column; gap: 16px; }
 .ai-request-form label, .ai-settings label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; color: var(--text-secondary); }
-.ai-workspace input:not([type=checkbox]), .ai-workspace :is(select, .select-field-trigger), .ai-workspace textarea, .ai-settings input:not([type=checkbox]), .ai-settings textarea { min-height: var(--control-height); padding: 7px 11px; border: 1px solid var(--line); border-radius: var(--radius-control); background-color: #fff; color: var(--text); font: inherit; }
+.ai-workspace input:not([type=checkbox]), .ai-workspace :is(select, .select-field-trigger), .ai-workspace textarea, .ai-settings input:not([type=checkbox]), .ai-settings textarea { min-height: var(--control-height); padding: 7px 11px; border: 1px solid transparent; border-radius: var(--radius-control); background-color: var(--surface-muted); color: var(--text); font: inherit; }
 .ai-workspace textarea, .ai-settings textarea { min-height: 90px; resize: vertical; }
-.ai-workspace fieldset { border: 1px solid var(--line); border-radius: var(--radius-control); margin: 10px 0; padding: 14px; background: var(--surface-muted); }
+.ai-workspace fieldset { border: 0; border-radius: 0; margin: 10px 0; padding: 10px 0; background: transparent; }
 .ai-workspace fieldset label { display: flex; flex-direction: row; margin: 10px 0; }
-.ai-request-form > details { border: 1px solid var(--line); border-radius: var(--radius-control); padding: 12px 14px; background: #fafbfc; }
+.ai-request-form > details { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 14px 0; background: transparent; }
 .ai-request-form summary { cursor: pointer; color: var(--text-secondary); font-size: 13px; }
 .ai-card { padding: 22px; color: var(--text); }
 .ai-card h2 { margin: 0 0 16px; font-size: 16px; font-weight: 650; }
-.consistency-finding { margin-top: 14px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
+.consistency-finding { margin-top: 14px; padding: 16px 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: var(--surface); }
 .consistency-finding p { font-size: 13px; line-height: 1.8; }
 .consistency-finding blockquote { margin: 12px 0; border-left: 3px solid #b4cfe2; padding-left: 14px; color: var(--text-secondary); line-height: 1.8; }
 .ai-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; line-height: 1.8; }
-.ai-original, .ai-proposal { padding: 18px 20px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
+.ai-original, .ai-proposal { padding: 18px 20px; margin-bottom: 16px; border: 0; border-radius: var(--radius-panel); background: var(--surface-muted); }
 .ai-original h3, .ai-proposal h3 { font-size: 14px; color: #647e8c; }
 .ai-proposal del { color: #9c3645; background: #fff0f2; text-decoration: line-through; }
 .ai-proposal ins { color: #146297; background: #eaf5ff; text-decoration: underline; text-underline-offset: 3px; }

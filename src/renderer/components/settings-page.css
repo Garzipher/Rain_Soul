@@ -9,7 +9,7 @@
 .settings-section-heading h2 { margin: 0 0 6px; font-size: 18px; font-weight: 650; color: var(--text); }
 .settings-section-heading p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-secondary); overflow-wrap: anywhere; }
 .settings-work-heading { margin-top: 36px; }
-.settings-layout .settings-group { width: 100%; margin: 0 0 18px; padding: 22px 24px; }
+.settings-layout .settings-group { width: 100%; margin: 0 0 18px; padding: 22px 0 30px; }
 .settings-anchor { scroll-margin-top: 24px; }
 .settings-anchor:focus { outline: 0; }
 .settings-layout .settings-group h2 { margin-bottom: 16px; }
@@ -18,26 +18,26 @@
 .settings-layout dd { overflow-wrap: anywhere; }
 .settings-layout .style-workspace { padding: 0; overflow: visible; }
 .settings-layout .style-workspace .asset-form { max-width: none; }
-.settings-recovery { margin-bottom: 18px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-panel); }
-.settings-recovery > summary { padding: 18px 24px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text); }
+.settings-recovery { margin-bottom: 18px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--surface); box-shadow: none; }
+.settings-recovery > summary { padding: 18px 0; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text); }
 .settings-recovery summary small { margin-left: 12px; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .settings-layout .settings-recovery .settings-group { border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; margin: 0; }
 .settings-layout .settings-recovery .settings-group:last-child { border-radius: 0 0 var(--radius-panel) var(--radius-panel); }
 @media (max-width: 1050px) {
   .settings-page.settings-layout { grid-template-columns: minmax(0, 860px); grid-template-rows: max-content; grid-auto-rows: max-content; gap: 20px; padding: 0 20px 40px; scroll-padding-top: 84px; }
-  .settings-index { top: 0; display: flex; gap: 20px; max-height: none; overflow-x: auto; overflow-y: visible; padding: 10px 0; background: var(--surface-muted); z-index: 2; border-bottom: 1px solid var(--line); }
+  .settings-index { top: 0; display: flex; gap: 20px; max-height: none; overflow-x: auto; overflow-y: visible; padding: 10px 0; background: var(--surface); z-index: 2; border-bottom: 1px solid var(--line); }
   .settings-index-group { display: flex; align-items: center; flex: none; gap: 4px; }
   .settings-index-group h2 { margin: 0 4px 0 0; white-space: nowrap; }
   .settings-index button { white-space: nowrap; }
   .settings-anchor { scroll-margin-top: 78px; }
-  .settings-layout .settings-group { padding: 20px; }
+  .settings-layout .settings-group { padding: 20px 0 28px; }
 }
 @media (max-width: 760px) {
   .settings-page.settings-layout { padding-inline: 16px; }
   .settings-index { gap: 12px; }
   .settings-index-group h2 { display: none; }
   .settings-layout .settings-group dl div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-  .settings-recovery > summary { padding: 16px 20px; }
+  .settings-recovery > summary { padding: 16px 0; }
   .settings-recovery summary small { display: block; margin: 6px 0 0 20px; }
 }
 @media (prefers-reduced-motion: reduce) { .settings-page { scroll-behavior: auto; } }
