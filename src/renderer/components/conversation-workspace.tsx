@@ -14,6 +14,7 @@ const messageOf = (reason: unknown) => reason instanceof Error ? reason.message 
 
 /** 会话只保存讨论与草稿，不具有改写作品的权限。 */
 export function ConversationWorkspace({ work, works, api, externalBusy = false, onSelectWork, onOpenSettings, onDirtyChange }: Props) {
+  const [listCollapsed, setListCollapsed] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches);
   const [list, setList] = useState<ConversationSummary[]>([]);
   const [current, setCurrent] = useState<ConversationDetail | null>(null);
   const [text, setText] = useState('');
@@ -35,6 +36,12 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
   const mounted = useRef(true);
   const running = useRef(false);
   const changed = !!current && text !== current.draft;
+  useEffect(() => {
+    const narrowWindow = window.matchMedia('(max-width: 760px)');
+    const syncList = (event: MediaQueryListEvent) => setListCollapsed(event.matches);
+    narrowWindow.addEventListener('change', syncList);
+    return () => narrowWindow.removeEventListener('change', syncList);
+  }, []);
   useEffect(() => { onDirtyChange(changed || !!pending || !!preview || !!pendingReply || localBusy || renaming || rejected); }, [changed, pending, preview, pendingReply, localBusy, renaming, rejected, onDirtyChange]);
   useEffect(() => {
     mounted.current = true;
@@ -160,21 +167,26 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
     catch (reason) { setError(messageOf(reason)); }
     finally { setBusy(false); }
   }
-  return <section className="conversation-workspace" aria-label="作品需求会话">
-    <aside className="conversation-list" aria-label="作品与会话">
+  return <section className={`conversation-workspace ${listCollapsed ? 'list-collapsed' : ''}`} aria-label="作品需求会话">
+    <aside id="conversation-list" className="conversation-list" aria-label="作品与会话" hidden={listCollapsed}>
       <label className="conversation-work-select">作品<SelectField aria-label="会话所属作品" value={work?.id ?? ''} disabled={busy || changed || !!pending || !!preview || !!pendingReply || renaming} onChange={event => onSelectWork(event.target.value)}>
         {!work && <option value="">选择作品</option>}{works.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
       </SelectField></label>
-      {work && <><div className="conversation-project"><strong>{work.title}</strong><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply || renaming || rejected} onClick={create}>新建会话</button></div>
+      {work && <><div className="conversation-project"><span className="conversation-project-label">会话列表</span><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply || renaming || rejected} onClick={create}>新建会话</button></div>
         {list.map(item => <div key={item.id} className={`conversation-row ${current?.id === item.id ? 'active' : ''}`}>
-          <button aria-label={`打开会话：${item.title}`} disabled={busy || !!pending || !!preview || !!pendingReply || renaming} onClick={() => open(item.id)}>{item.title}</button>
+          <button aria-label={`打开会话：${item.title}`} title={item.title} disabled={busy || !!pending || !!preview || !!pendingReply || renaming} onClick={() => open(item.id)}>{item.title}</button>
           <button className="conversation-delete" aria-label={`删除会话：${item.title}`} disabled={busy || !!pending || !!preview || !!pendingReply || renaming} onClick={() => setDeleting(item)}>×</button>
         </div>)}{!list.length && <p>尚无会话</p>}</>}
     </aside>
     <div className="conversation-main">
+      <div className="conversation-main-toolbar">
+        <button type="button" className="conversation-list-toggle secondary" aria-label={listCollapsed ? '展开会话列表' : '收起会话列表'} aria-expanded={!listCollapsed} aria-controls="conversation-list" title={listCollapsed ? '展开会话列表' : '收起会话列表'} onClick={() => setListCollapsed(value => !value)}>
+          <span className="conversation-list-toggle-icon" aria-hidden="true">☰</span><span>会话列表</span>
+        </button>
+        {current && <div className="conversation-heading"><h2 title={current.title}>{current.title}</h2><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply} onClick={() => { setName(current.title); setRenaming(true); }}>重命名</button></div>}
+      </div>
       {error && <div role="alert" className="page-error"><span>{error}</span><div className="conversation-error-actions">{refreshNeeded && work && <button className="secondary" disabled={busy} onClick={() => void run(() => refreshRemaining(work.id))}>重新读取会话列表</button>}{pending && <button className="secondary" onClick={() => void write(pending).catch(() => {})}>{pending.action.type === 'saveDraft' ? '重试保存草稿' : '重试会话操作'}</button>}{rejected && current && <button className="secondary" onClick={() => void reload()}>重新读取会话并保留草稿</button>}{!pending && !pendingReply && !rejected && !busy && !changed && onOpenSettings && <button className="secondary" onClick={onOpenSettings}>打开模型设置</button>}</div></div>}
       {!current ? <div className="conversation-empty">{work ? '新建或选择一个会话' : '先选择一部作品'}</div> : <>
-        <div className="conversation-heading"><h2>{current.title}</h2><button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply} onClick={() => { setName(current.title); setRenaming(true); }}>重命名会话</button></div>
         {renaming && <form className="conversation-rename" onSubmit={event => { event.preventDefault(); rename(); }}><input aria-label="会话名称" value={name} maxLength={120} onChange={event => setName(event.target.value)} /><button className="primary" disabled={busy || !name.trim()}>保存名称</button><button className="secondary" type="button" disabled={busy} onClick={() => setRenaming(false)}>取消改名</button></form>}
         <div className="conversation-messages" role="log" aria-label="会话消息">{current.hasMore && <button className="secondary" disabled={busy || !!pending || !!preview || !!pendingReply} onClick={older}>加载更早消息</button>}{current.messages.map(item => <article key={item.id} className={`conversation-message ${item.role}`}><span>{item.role === 'user' ? '你' : 'AI 建议'}</span><p>{item.content}</p></article>)}</div>
         {current.messageCount > 100 && <p className="conversation-range">云端预览仅发送最近100条历史；更早消息可在本机阅读。</p>}
