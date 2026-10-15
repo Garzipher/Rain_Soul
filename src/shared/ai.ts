@@ -11,7 +11,7 @@ export interface AiPreparedRequest {
   scopeLabel: string; previewText: string; paragraphIds: string[]; billingHint: string; estimatedInputTokens: number; maxOutputTokens: number;
 }
 export interface AiExecuteRequest { confirmationToken: string; requestHash: string; confirmed: boolean }
-export interface AiCandidate { id: string; operation: AiOperation; workId: string; baselineRevision: number; paragraphIds: string[]; text: string; requestHash: string; createdAt: string; selection?: AiSelection; referenceChapterIds?: string[] }
+export interface AiCandidate { id: string; operation: AiOperation; workId: string; baselineRevision: number; paragraphIds: string[]; text: string; requestHash: string; createdAt: string; selection?: AiSelection; referenceChapterIds?: string[]; referenceNotice?: string }
 export const aiPrepareRequestSchema: z.ZodType<AiPrepareRequest> = z.object({
   provider: z.object({ id: z.string().min(1).max(120), name: z.string().min(1).max(120), baseUrl: z.string().min(1).max(2048), model: z.string().min(1).max(120), billingHint: z.string().max(500).optional(), contextWindowTokens: z.number().int().min(1024).max(2_000_000).optional(), enabled: z.boolean().optional() }).strict(),
   operation: z.enum(aiOperations),
