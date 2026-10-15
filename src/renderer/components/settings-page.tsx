@@ -10,22 +10,24 @@ import { AiSettingsPanel } from './ai-settings-panel';
 import type { AiProvider } from '../../shared/ai';
 import type { RetrievalApi } from '../../shared/retrieval';
 import { RetrievalModelPanel } from './retrieval-model-panel';
+import { GlobalKnowledgeSettings, type GlobalKnowledgeSettingsState } from './global-knowledge-settings';
 import './knowledge-workspace.css';
 import './assets-workspace.css';
 import './settings-page.css';
 
-export function SettingsPage(props: RecoveryPanelProps & { api: RecoveryPanelProps['api'] & RetrievalApi; assetRecovery: {dictionary: number; style: number}; author?: AuthorProfileController; onAssetAction: (action: AssetAction) => Promise<boolean>; onAssetDirtyChange: (dirty: boolean) => void }) {
+export function SettingsPage(props: RecoveryPanelProps & { api: RecoveryPanelProps['api'] & RetrievalApi; assetRecovery: {dictionary: number; style: number}; author?: AuthorProfileController; globalKnowledge?: GlobalKnowledgeSettingsState; onAssetAction: (action: AssetAction) => Promise<boolean>; onAssetDirtyChange: (dirty: boolean) => void }) {
   const { api } = props;
   const [info, setInfo] = useState<RuntimeInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aiSettings, setAiSettings] = useState<{ provider: AiProvider | null; hasCredential: boolean } | null>(null);
-  const dirty = useRef({ dictionary: false, style: false, ai: false, retrieval: false });
+  const dirty = useRef({ dictionary: false, style: false, ai: false, retrieval: false, global: false });
   const dirtyCallback = useRef(props.onAssetDirtyChange);
   dirtyCallback.current = props.onAssetDirtyChange;
   const dictionaryDirty = useCallback((value: boolean) => { dirty.current.dictionary = value; dirtyCallback.current(Object.values(dirty.current).some(Boolean)); }, []);
   const styleDirty = useCallback((value: boolean) => { dirty.current.style = value; dirtyCallback.current(Object.values(dirty.current).some(Boolean)); }, []);
   const aiDirty = useCallback((value: boolean) => { dirty.current.ai = value; dirtyCallback.current(Object.values(dirty.current).some(Boolean)); }, []);
   const retrievalDirty = useCallback((value: boolean) => { dirty.current.retrieval = value; dirtyCallback.current(Object.values(dirty.current).some(Boolean)); }, []);
+  const globalDirty = useCallback((value: boolean) => { dirty.current.global = value; dirtyCallback.current(Object.values(dirty.current).some(Boolean)); }, []);
   useEffect(() => {
     let active = true;
     void api.getRuntimeInfo().then((runtime) => { if (active) setInfo(runtime); }).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : '无法读取运行信息'); });
@@ -46,6 +48,7 @@ export function SettingsPage(props: RecoveryPanelProps & { api: RecoveryPanelPro
         <button onClick={() => jump('protection')}>写作保护</button>
         <button onClick={() => jump('ai')}>云端模型</button>
         <button onClick={() => jump('retrieval')}>本机知识检索</button>
+        {props.globalKnowledge && <button onClick={() => jump('global-knowledge')}>全局知识库</button>}
         <button onClick={() => jump('recovery')}>删除与恢复</button>
       </div>
       {props.currentWork?.assets && <div className="settings-index-group"><h2>当前作品</h2>
@@ -60,6 +63,7 @@ export function SettingsPage(props: RecoveryPanelProps & { api: RecoveryPanelPro
       <div id="settings-protection" className="settings-group settings-anchor" tabIndex={-1}><h2>写作保护</h2><p>自动保存始终开启：停止输入 500ms 后保存，持续输入最多 5 秒提交。保存失败时保留草稿并阻止离开或关闭。</p><p>正文固定为微软雅黑 12pt、1.5 倍行距；章节标题 16pt 加粗。</p></div>
       <div id="settings-ai" className="settings-anchor" tabIndex={-1}>{aiSettings ? <AiSettingsPanel value={aiSettings} busy={props.busy} onDirtyChange={aiDirty} onSave={async (provider, key) => { setAiSettings(await api.saveAiSettings(provider, key)); }} onClear={async () => { setAiSettings(await api.clearAiSettings()); }} /> : <div className="settings-group"><h2>云端模型</h2><p>{error ?? '正在读取模型配置…'}</p></div>}</div>
       <div id="settings-retrieval" className="settings-anchor" tabIndex={-1}><RetrievalModelPanel api={api} busy={props.busy} workId={props.currentWork?.id ?? null} onBusyChange={retrievalDirty} /></div>
+      {props.globalKnowledge && <div id="settings-global-knowledge" className="settings-group settings-anchor" tabIndex={-1}><GlobalKnowledgeSettings {...props.globalKnowledge} api={api} locked={props.busy} onDirtyChange={globalDirty} /></div>}
       <details id="settings-recovery" className="settings-recovery settings-anchor" tabIndex={-1}><summary><span>删除与恢复</span><small>已删除作品、分卷和章节</small></summary><RecoveryPanel {...props} /></details>
       {props.currentWork?.assets && <>
         <header className="settings-section-heading settings-work-heading"><h2>当前作品设置</h2><p>{props.currentWork.title}</p></header>

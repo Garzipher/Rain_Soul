@@ -14,6 +14,12 @@
 .settings-anchor:focus { outline: 0; }
 .settings-layout .settings-group h2 { margin-bottom: 16px; }
 .settings-layout .settings-group p { color: var(--text-secondary); }
+.global-knowledge-settings .knowledge-dictionary { padding-block: 16px; }
+.global-archive-settings { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+.global-archive-settings h3, .global-archive-preview h4 { margin: 0 0 10px; color: var(--text); }
+.global-archive-settings p { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.global-archive-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.global-archive-preview { overflow: hidden; padding-block: 18px; margin-top: 16px; border-top: 1px solid var(--line); }
 .settings-layout .settings-group dl div { grid-template-columns: 120px minmax(0, 1fr); gap: 16px; }
 .settings-layout dd { overflow-wrap: anywhere; }
 .settings-layout .style-workspace { padding: 0; overflow: visible; }
