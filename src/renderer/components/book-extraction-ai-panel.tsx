@@ -1,3 +1,4 @@
+import { AnimatePresence } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import type { AiPreparedRequest } from '../../shared/ai';
 import type { WorkDetail } from '../../shared/contracts';
@@ -160,8 +161,8 @@ function BookExtractionAiPanelContent({ work, preview, api, permission, disabled
         <dt>主分类</dt><dd>{extractionCategoryPath(categories, item.categoryId)}</dd><dt>标签</dt><dd>{item.tagIds.map(id => tags.find(tag => tag.id === id)?.name ?? '标签已删除').join('、') || '无'}</dd>
       </dl><button disabled={disabled || busy || !permission || !!result.validationError} onClick={() => void adoptSuggestion(item)}>带入审核</button>
     </article>)}</div>}
-    {prepared && <StructureDialog busy={status !== 'prepared'} submitDisabled={disabled || !permission} onClose={() => void cancel()} state={{ heading: '确认 AI 辅助拆书', description: `${prepared.service} · ${prepared.model} · ${prepared.scopeLabel}`, submitLabel: '确认发送', submitTone: 'primary', onSubmit: execute }}>
+    <AnimatePresence>{prepared && <StructureDialog busy={status !== 'prepared'} submitDisabled={disabled || !permission} onClose={() => void cancel()} state={{ heading: '确认 AI 辅助拆书', description: `${prepared.service} · ${prepared.model} · ${prepared.scopeLabel}`, submitLabel: '确认发送', submitTone: 'primary', onSubmit: execute }}>
       <p>{prepared.billingHint}</p><p>预计输入 {prepared.estimatedInputTokens} token；输出上限 {prepared.maxOutputTokens} token。</p><details open><summary>完整发送内容</summary><pre className="book-extraction-ai-preview" tabIndex={0} aria-label="完整发送内容">{prepared.previewText}</pre></details>
-    </StructureDialog>}
+    </StructureDialog>}</AnimatePresence>
   </section>;
 }
