@@ -157,5 +157,10 @@ export class BookExtractionAiCommands {
       settle();
     }
   }
-  async drain(): Promise<void> { await Promise.allSettled([...this.running]); }
+  async drain(): Promise<void> {
+    for (const [token, hash] of this.tokenHashes) { this.entries.get(hash)?.controller?.abort(); this.service.cancel(token); }
+    for (const token of this.confirmations.keys()) this.service.cancel(token);
+    this.confirmations.clear();
+    await Promise.allSettled([...this.running]);
+  }
 }

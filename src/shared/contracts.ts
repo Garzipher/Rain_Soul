@@ -95,6 +95,7 @@ export interface DesktopApi extends BookExtractionAiApi, RetrievalApi {
   restoreSnapshot(request: SnapshotRestoreRequest): Promise<WorkDetail>;
   listDeletedWorks(): Promise<DeletedWork[]>;
   onCloseRequested(handler: () => Promise<void>): () => void;
+  onCloseFailed?(handler: (message: string) => void): () => void;
 }
 import type { AuthorProfile } from './profile';
 import type { ManuscriptDraft } from './manuscript';

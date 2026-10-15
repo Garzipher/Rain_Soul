@@ -358,9 +358,9 @@ export default function App({ api, textbook }: AppProps) {
     return prepared;
   }
   async function executeAi(request: AiExecuteRequest) {
-    let candidate: AiCandidate | undefined;
-    await guarded(async () => { candidate = await api.executeAi(request); setAiCandidates(previous => ({ ...previous, [candidate!.id]: candidate! })); });
-    if (!candidate) throw new Error('AI 发送未完成；原文已保留，请检查原因并手动重新预览。');
+    // 云请求只返回候选，不占用本地写入锁；采用候选仍经过 guarded 和版本校验。
+    const candidate = await api.executeAi(request);
+    setAiCandidates(previous => ({ ...previous, [candidate.id]: candidate }));
     return candidate;
   }
   async function applyAiOperation(operation: Extract<PendingOperation, { kind: 'applyAi' | 'approveAi' }>) {

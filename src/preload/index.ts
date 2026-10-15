@@ -1,10 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopApi } from '../shared/contracts';
-import { operationError } from '../shared/operation-errors';
+import { bridgeOperationError } from '../shared/operation-errors';
 
 const invoke = async <T>(command: string, payload: unknown): Promise<T> => {
   const reply = await ipcRenderer.invoke('rainsoul:command', command, payload) as { ok: boolean; data: T; message?: string; code?: string };
-  if (!reply.ok) throw operationError(reply.message ?? '本机操作失败', reply.code);
+  if (!reply.ok) throw bridgeOperationError(reply.message ?? '本机操作失败', reply.code);
   return reply.data;
 };
 const api: DesktopApi = {
@@ -79,6 +79,13 @@ const api: DesktopApi = {
     const listener = (_event: Electron.IpcRendererEvent, token: string) => { void handler().then(() => ipcRenderer.send('rainsoul:close-confirm', token)).catch(() => {}); };
     ipcRenderer.on('rainsoul:close-request', listener);
     return () => { ipcRenderer.removeListener('rainsoul:close-request', listener); };
+  },
+  onCloseFailed: handler => {
+    const listener = (_event: Electron.IpcRendererEvent, message: unknown) => {
+      if (typeof message === 'string') handler(message);
+    };
+    ipcRenderer.on('rainsoul:close-failed', listener);
+    return () => { ipcRenderer.removeListener('rainsoul:close-failed', listener); };
   },
 };
 contextBridge.exposeInMainWorld('rainSoul', api);

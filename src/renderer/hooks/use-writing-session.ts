@@ -80,6 +80,9 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
     if (currentDraft && chapter && currentDraft.volumeId !== chapter.volumeId) { const next = { ...currentDraft, volumeId: chapter.volumeId }; draftRef.current = next; setDraft(next); }
   }, []);
   const retry = useCallback(async () => { await coordinator.current?.retry(); }, []);
+  useEffect(() => api.onCloseFailed?.(message => {
+    closingRef.current = false; setClosing(false); setCloseError(message);
+  }), [api]);
   useEffect(() => api.onCloseRequested(async () => {
     if (composing.current) {
       const message = '输入法正在组词，请先确认输入后再关闭';

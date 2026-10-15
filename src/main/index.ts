@@ -77,7 +77,7 @@ else {
     const aiSettings = new AiSettingsStore(directory, safeStorage);
     const aiService = new AiService({ credentials: aiSettings });
     const ai = new AiCommands(store, aiSettings, aiService);
-    const conversationAi = new ConversationAiCommands(store, aiSettings, new ConversationAiService({ credentials: aiSettings }));
+    const conversationAi = new ConversationAiCommands(store, aiSettings, new ConversationAiService({ credentials: aiSettings }), join(directory, 'ConversationRecovery'));
     const extractionDrafts = new ExtractionDraftCoordinator(new ExtractionDraftStore(join(directory, 'ExtractionDrafts')), store);
     const books = new BookExtractionCommands(store, { choose: () => chooseLocalManuscript(() => dialog.showOpenDialog(window!, { title: '选择拆书素材', properties: ['openFile'], filters: [{ name: 'TXT / DOCX 素材', extensions: ['txt', 'docx'] }] })) }, undefined, extractionDrafts);
     const bookAi = new BookExtractionAiCommands(store, aiSettings, books, new BookExtractionAiService({ credentials: aiSettings }), extractionDrafts);
@@ -116,7 +116,9 @@ else {
     });
     ipcMain.on('rainsoul:close-confirm', (event, token: unknown) => {
       if (!trusted(event) || typeof token !== 'string' || token !== closeToken) return;
-      void Promise.all([store.drain(), profiles.drain(), manuscripts.drain(), archives.drain(), ai.drain(), conversationAi.drain(), books.drain(), bookAi.drain()]).then(() => { if (token === closeToken) { allowClose = true; window?.close(); } });
+      void Promise.all([store.drain(), profiles.drain(), manuscripts.drain(), archives.drain(), ai.drain(), conversationAi.drain(), books.drain(), bookAi.drain()])
+        .then(() => { if (token === closeToken) { allowClose = true; window?.close(); } })
+        .catch(() => { if (token === closeToken) window?.webContents.send('rainsoul:close-failed', '本机内容尚未保存，请保存或放弃未保存内容后再关闭。'); });
     });
     window.on('close', event => {
       if (allowClose) return;
