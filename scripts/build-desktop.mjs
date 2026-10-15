@@ -5,7 +5,7 @@ import { compileLearningCourse } from './build-learning-course.mjs';
 import { collectThirdPartyNotices } from './third-party-notices.mjs';
 
 await build({
-  entryPoints: { main: 'src/main/index.ts', preload: 'src/preload/index.ts', 'database-worker': 'src/workers/database/worker.ts', 'web-article-worker': 'src/main/web-article-worker.ts', 'retrieval-runtime': 'src/workers/retrieval/runtime.ts', 'retrieval-worker': 'src/workers/retrieval/worker.ts' },
+  entryPoints: { main: 'src/main/index.ts', preload: 'src/preload/index.ts', 'database-worker': 'src/workers/database/worker.ts', 'global-knowledge-worker': 'src/workers/global-knowledge/worker.ts', 'web-article-worker': 'src/main/web-article-worker.ts', 'retrieval-runtime': 'src/workers/retrieval/runtime.ts', 'retrieval-worker': 'src/workers/retrieval/worker.ts' },
   outdir: 'dist/desktop', outExtension: { '.js': '.cjs' },
   bundle: true, platform: 'node', target: 'node24', format: 'cjs',
   external: ['electron', 'better-sqlite3', 'onnxruntime-web/wasm'], sourcemap: false,

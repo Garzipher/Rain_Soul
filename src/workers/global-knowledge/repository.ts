@@ -6,6 +6,8 @@ import { digest, fail, readAnnotations, readCategories, readEntries, readSources
 import { applyGlobalAction } from './mutations';
 import { ingestGlobalExtraction } from './extraction';
 import { filterGlobalEntries } from './search';
+import { exportGlobalData, importGlobalData } from './archive';
+import { globalKnowledgeArchiveDataSchema, type GlobalKnowledgeArchiveData } from '../../shared/global-knowledge-archive';
 
 export class GlobalKnowledgeRepository {
   constructor(private readonly db: Database.Database) {}
@@ -38,6 +40,11 @@ export class GlobalKnowledgeRepository {
     })();
   }
   readAll(): GlobalKnowledgePage { return this.readPage({}, true); }
+  exportData(): GlobalKnowledgeArchiveData { return this.db.transaction(() => exportGlobalData(this.db, this.readAll()))(); }
+  importData(operationId: string, input: GlobalKnowledgeArchiveData): GlobalKnowledgePage {
+    const data = globalKnowledgeArchiveDataSchema.parse(input);
+    return this.change(operationId, this.meta().revision, { kind: 'archive', data }, () => importGlobalData(this.db, data));
+  }
   mutate(input: GlobalKnowledgeMutation): GlobalKnowledgePage {
     const request = globalKnowledgeMutationSchema.parse(input); return this.change(request.operationId, request.expectedRevision, request, () => applyGlobalAction(this.db, request.action));
   }
