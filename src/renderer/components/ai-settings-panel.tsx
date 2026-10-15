@@ -21,7 +21,7 @@ export function AiSettingsPanel(props: AiSettingsPanelProps) {
     } catch (reason) { setError(reason instanceof Error ? reason.message : '模型配置失败，请重试。'); }
     finally { lock.current = false; setPending(false); }
   }
-  return <section className="ai-settings settings-group"><h2>云端模型</h2><p className="ai-muted">作者自行配置公开 HTTPS 服务。每次发送前单独确认，密钥保存在本机安全存储中。</p><form onSubmit={event => { event.preventDefault(); void execute(); }}>
+  return <section className="ai-settings settings-group"><h2>云端模型</h2><p className="ai-muted">会话点击发送即使用当前服务；正文写作与拆书显示发送范围后确认。密钥仅保存在本机安全存储中。</p><form onSubmit={event => { event.preventDefault(); void execute(); }}>
     <label className="ai-enable"><span>启用云端 AI</span><input aria-label="启用云端 AI" type="checkbox" checked={provider.enabled !== false} disabled={disabled} onChange={event => setProvider({ ...provider, enabled: event.target.checked })} /><small>关闭后保留服务和密钥，保存配置后生效。</small></label>
     <label>服务名称<input aria-label="服务名称" value={provider.name} disabled={disabled} required onChange={event => setProvider({ ...provider, name: event.target.value })} /></label>
     <label>服务地址<input aria-label="服务地址" type="url" placeholder="https://api.example.com/v1" value={provider.baseUrl} disabled={disabled} required onChange={event => setProvider({ ...provider, baseUrl: event.target.value })} /></label>
