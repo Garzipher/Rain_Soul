@@ -60,6 +60,13 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
   const [aiOpened, setAiOpened] = useState(false);
   const [aiActive, setAiActive] = useState(!!props.ai.initialReview?.candidate);
   const [entryToken, setEntryToken] = useState(0);
+  const [chaptersCollapsed, setChaptersCollapsed] = useState(() => window.matchMedia('(max-width: 760px)').matches);
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 760px)');
+    const sync = (event: MediaQueryListEvent) => setChaptersCollapsed(event.matches);
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, []);
   const [selectionRequest, setSelectionRequest] = useState<WritingAiRequest>();
   const restoringSelection = useRef(!!props.savedSelection);
   function openSelection(request: WritingAiRequest) {
@@ -114,8 +121,14 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
     void selectTab(tabDefinitions[nextIndex].id);
   }
   return <>
-    <header className="topbar"><h1>{props.work.title}</h1><div className="header-actions"><button className="secondary" disabled={props.busy || !props.draft} onClick={() => showTool('ai')}>AI 工具</button><button className="secondary" disabled={props.busy} onClick={() => showTool('snapshots')}>版本历史</button><button className="secondary" disabled={props.busy} onClick={props.onBackup}>备份项目</button><button className="secondary" disabled={props.busy} onClick={() => props.onExport('txt')}>导出 TXT</button><button className="secondary" disabled={props.busy} onClick={() => props.onExport('docx')}>导出 DOCX</button><span role="status" className={`save-status ${props.status.phase}`}>{props.closing ? '正在保存并关闭…' : statusText}</span></div></header>
+    <header className="topbar work-topbar"><h1 title={props.work.title}>{props.work.title}</h1><div className="header-actions"><button className="secondary" disabled={props.busy || !props.draft} onClick={() => showTool('ai')}>AI 工具</button>
+      <details className="work-more" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
+        <summary>更多</summary><div className="work-more-items" role="group" aria-label="作品操作" onClick={event => { if ((event.target as HTMLElement).closest('button:not(:disabled)')) { const menu = event.currentTarget.closest('details'); menu?.removeAttribute('open'); menu?.querySelector('summary')?.focus(); } }}>
+          <button disabled={props.busy} onClick={() => showTool('snapshots')}>版本历史</button><button disabled={props.busy} onClick={props.onBackup}>备份项目</button><button disabled={props.busy} onClick={() => props.onExport('txt')}>导出 TXT</button><button disabled={props.busy} onClick={() => props.onExport('docx')}>导出 DOCX</button>
+        </div>
+      </details><span role="status" className={`save-status ${props.status.phase}`}>{props.closing ? '正在保存并关闭…' : statusText}</span></div></header>
     <div className="work-tabs">
+      {tab === 'body' && <button className="chapter-list-toggle" aria-expanded={!chaptersCollapsed} aria-controls="writing-chapters" onClick={() => setChaptersCollapsed(value => !value)}>{chaptersCollapsed ? '章节' : '收起章节'}</button>}
       <div className="work-tab-group" ref={tabsRef} role="tablist" aria-label="作品工作区">
         {tabDefinitions.map((item) => <button key={item.id} id={`tab-${item.id}`} role="tab" data-tab={item.id} aria-controls={`panel-${item.id}`} aria-selected={tab === item.id} tabIndex={tab === item.id ? 0 : -1} disabled={props.busy} onClick={() => void selectTab(item.id)} onKeyDown={(event) => handleTabKey(event, item.id)}>{item.label}</button>)}
       </div>
@@ -130,8 +143,10 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
     </WorkspaceToolDialog>
     {tab !== 'body' ? <div className="architecture-placeholder" role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
       {props.work.assets ? (tab === 'plot' ? <PlotWorkspace key={props.assetRecovery} work={props.work} assets={props.work.assets} busy={props.busy} onAction={props.onAssetAction} onLocate={locate} onDirtyChange={props.onAssetDirtyChange} selectedId={selectedOutlineId} onSelectForeshadow={id => locateAsset('foreshadow', id)} /> : <ForeshadowWorkspace key={props.assetRecovery} work={props.work} assets={props.work.assets} busy={props.busy} onAction={props.onAssetAction} onLocate={locate} onDirtyChange={props.onAssetDirtyChange} selectedId={selectedForeshadowId} onSelectOutline={(id) => { void props.changeTab(() => { setSelectedOutlineId(id); setTab('plot'); }); }} />) : <Placeholder onReturn={props.onReturn} />}
-    </div> : tab === 'body' && <div className="workspace" id="panel-body" role="tabpanel" aria-labelledby="tab-body">
+    </div> : tab === 'body' && <div className={`workspace ${chaptersCollapsed ? 'chapters-collapsed' : ''}`} id="panel-body" role="tabpanel" aria-labelledby="tab-body">
+      <div id="writing-chapters" className="writing-chapters" hidden={chaptersCollapsed}>
       <ChapterTree work={props.work} draft={props.draft} busy={props.busy} onSelectChapter={props.onSelectChapter} onAddChapter={props.onAddChapter} onAddVolume={props.onAddVolume} onSelectVolume={props.onSelectVolume} onMenu={props.onMenu} />
+      </div>
       <section className="editor-panel">
         {props.draft ? <LearningChapter key={props.work.id} textbook={props.textbook} workId={props.work.id} chapterId={props.draft.id} busy={props.busy} changeMode={props.changeTab}><div className="manuscript">
           <div className="manuscript-meta"><span>正文</span><span aria-live="polite">本章 {countDocumentWords(props.draft.document)} 字</span></div>

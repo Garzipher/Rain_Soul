@@ -125,9 +125,9 @@ export function ChapterEditor({ document, assets, locked, ghostPaused = false, o
     insertBookmarkAtSelection(editor, kind, targetId);
   }
   return <>
-    {assets && <div className="bookmark-toolbar"><SelectField aria-label="书签类型" value={kind} disabled={locked} onChange={event => { setKind(event.target.value as BookmarkNode['attrs']['kind']); setTarget(''); }}><option value="knowledge">知识引用</option><option value="foreshadow">伏笔标记</option></SelectField>
+    {assets && <details className="bookmark-tools"><summary>引用与伏笔书签</summary><div className="bookmark-toolbar"><SelectField aria-label="书签类型" value={kind} disabled={locked} onChange={event => { setKind(event.target.value as BookmarkNode['attrs']['kind']); setTarget(''); }}><option value="knowledge">知识引用</option><option value="foreshadow">伏笔标记</option></SelectField>
       <SelectField aria-label="书签目标" value={targetId} disabled={locked || !options?.length} onChange={event => setTarget(event.target.value)}>{!options?.length && <option value="">暂无可关联条目</option>}{options?.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
-      <button className="secondary" disabled={locked || !targetId} onMouseDown={event => event.preventDefault()} onClick={insertBookmark}>插入书签</button></div>}
+      <button className="secondary" disabled={locked || !targetId} onMouseDown={event => event.preventDefault()} onClick={insertBookmark}>插入书签</button></div></details>}
     <EditorContent editor={editor} />
     {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
     {detail && <BookmarkDetails bookmark={detail} assets={assets} onClose={() => setDetail(null)} onLocateAsset={onLocateAsset} locked={locked} />}
