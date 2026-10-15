@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { basename, extname } from 'node:path';
 import { z } from 'zod';
-import { globalBookExtractionConfirmationSchema, globalExtractionMetadataSchema, globalExtractionDraftSchema, type GlobalExtractionDraft, type GlobalExtractionPreview } from '../shared/global-book-extraction';
+import { globalBookExtractionConfirmationSchema, globalExtractionMetadataSchema, globalExtractionDraftSchema, globalPasteImportSchema, type GlobalExtractionDraft, type GlobalExtractionPreview } from '../shared/global-book-extraction';
 import type { GlobalKnowledgePage, GlobalExtractionCommit } from '../shared/global-knowledge';
 import { parseTxtManuscript } from './manuscript-text';
 import { parseDocxManuscript } from './manuscript-docx';
@@ -77,7 +77,14 @@ export class GlobalBookExtractionCommands {
     }
     if (command === 'fetchGlobalWebExtraction' || command === 'previewGlobalPastedExtraction') {
       if (draft) throw new Error('请先保存并返回，或明确更换现有全局拆书素材。');
-      const preview = await this.web.execute(command === 'fetchGlobalWebExtraction' ? 'fetchWebExtraction' : 'previewPastedExtraction', payload) as GlobalExtractionPreview;
+      const request = command === 'previewGlobalPastedExtraction' ? globalPasteImportSchema.parse(payload) : null;
+      const preview = request?.source
+        ? await this.begin(sourcePreview({ kind: 'global' }, freezeSource({ kind: 'web', title: request.title, rawBytes: Buffer.from(request.text), segments: request.text.replace(/\r\n?/g, '\n').split('\n').map((text: string) => ({ text })),
+          originalUrl: request.source.workUrl, finalUrl: request.source.chapterUrl, fetchedAt: request.source.fetchedAt })))
+        : await this.web.execute(command === 'fetchGlobalWebExtraction' ? 'fetchWebExtraction' : 'previewPastedExtraction', payload) as GlobalExtractionPreview;
+      if (request?.source) {
+        return preview;
+      }
       return this.begin(preview);
     }
     if (command === 'chooseGlobalBookExtraction') {
@@ -108,7 +115,7 @@ export class GlobalBookExtractionCommands {
     const sourceDocument = { ...preview.source!, segments, bodyHash: sha(JSON.stringify(segments.map(segment => segment.text))) };
     const commit: GlobalExtractionCommit = { operationId: request.operationId, expectedRevision: request.expectedRevision, sourceDocument,
       metadata: { author: request.sourceAuthor, workTitle: request.sourceTitle, chapter: request.chapter,
-        rightsBasis: request.rightsBasis, capturedAt: preview.source!.fetchedAt ?? new Date().toISOString(), metrics: [], verificationStatus: 'verified' },
+        rightsBasis: request.rightsBasis, capturedAt: preview.source!.fetchedAt ?? new Date().toISOString(), metrics: request.metrics, verificationStatus: 'verified' },
       items: request.items.map((item, index) => ({ ...item, body: segments[index].text, source:
         `《${request.sourceTitle}》／${request.sourceAuthor || '作者未填写'}；${request.chapter || segments[index].chapterTitle}；原文第${segments[index].paragraphIndex ?? segments[index].ordinal}段；原始 SHA-256：${preview.fileHash}${sourceDocument.originalUrl ? `；${sourceDocument.originalUrl}` : ''}` })) };
     const pending = { ...draft, committing: commit };

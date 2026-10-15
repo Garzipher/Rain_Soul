@@ -8,6 +8,8 @@ import type { GlobalKnowledgePage, GlobalSourceMetadata } from '../../shared/glo
 import { SelectField } from './select-field';
 import { StructureDialog } from './structure-dialog';
 import { extractionCategoryPath } from '../../shared/ai-extraction';
+import { globalSourceStarterText, globalSourceStarters, type GlobalSourceStarter } from '../../shared/global-source-starter';
+import { GlobalSourceStarterPanel } from './global-source-starter-panel';
 
 type Api = GlobalExtractionApi & Partial<GlobalBookExtractionAiApi> & Pick<BookExtractionApi, 'getWebRenderCapability'>;
 type Review = GlobalExtractionDraft['reviews'][number];
@@ -22,14 +24,15 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
   const [encoding, setEncoding] = useState<'utf-8' | 'gb18030'>('utf-8');
   const [url, setUrl] = useState(''), [paste, setPaste] = useState(''), [pasteTitle, setPasteTitle] = useState('');
   const [sourceTitle, setSourceTitle] = useState(''), [author, setAuthor] = useState(''), [chapter, setChapter] = useState('');
+  const [sourceMetrics, setSourceMetrics] = useState<GlobalSourceStarter['metrics']>([]);
   const [rights, setRights] = useState<GlobalSourceMetadata['rightsBasis']>('public-excerpt');
   const [permission, setPermission] = useState(false), [busy, setBusy] = useState(true), [blocked, setBlocked] = useState(false);
   const [error, setError] = useState(''), [message, setMessage] = useState(''), [page, setPage] = useState(0);
   const [renderReady, setRenderReady] = useState(false), [confirmRender, setConfirmRender] = useState(false);
   const [discard, setDiscard] = useState(false), [pendingReceipt, setPendingReceipt] = useState(false);
   const operation = useRef<string | null>(null), attempt = useRef<{ fingerprint: string; id: string } | null>(null), locked = useRef(false);
-  const latest = useRef({ preview, reviews, sourceTitle, sourceAuthor: author, chapter, rightsBasis: rights });
-  latest.current = { preview, reviews, sourceTitle, sourceAuthor: author, chapter, rightsBasis: rights };
+  const latest = useRef({ preview, reviews, sourceTitle, sourceAuthor: author, chapter, rightsBasis: rights, metrics: sourceMetrics });
+  latest.current = { preview, reviews, sourceTitle, sourceAuthor: author, chapter, rightsBasis: rights, metrics: sourceMetrics };
   const categories = library.categories.filter(item => !item.deletedAt), tags = library.tags.filter(item => !item.deletedAt);
   const accept = (value: GlobalExtractionPreview, saved: Review[] = [], savedBatches: GlobalExtractionDraft['batches'] = []) => {
     if (value.target.kind !== 'global') throw new Error('素材目标不属于全局知识库。');
@@ -42,7 +45,7 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
   };
   function restoreMetadata(metadata: GlobalExtractionDraft['metadata']) {
     if (!metadata) return;
-    setSourceTitle(metadata.sourceTitle); setAuthor(metadata.sourceAuthor); setChapter(metadata.chapter); setRights(metadata.rightsBasis);
+    setSourceTitle(metadata.sourceTitle); setAuthor(metadata.sourceAuthor); setChapter(metadata.chapter); setRights(metadata.rightsBasis); setSourceMetrics(metadata.metrics);
   }
   useEffect(() => {
     let alive = true;
@@ -59,8 +62,20 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
   async function persist() {
     const current = latest.current;
     if (current.preview) await api.saveGlobalExtractionReview({ token: current.preview.token, reviews: Object.values(current.reviews), metadata: {
-      sourceTitle: current.sourceTitle, sourceAuthor: current.sourceAuthor, chapter: current.chapter, rightsBasis: current.rightsBasis,
+      sourceTitle: current.sourceTitle, sourceAuthor: current.sourceAuthor, chapter: current.chapter, rightsBasis: current.rightsBasis, metrics: current.metrics,
     } });
+  }
+  async function loadStarter(starter: GlobalSourceStarter) {
+    if (locked.current || blocked || preview) return;
+    locked.current = true; setBusy(true); setError('');
+    try {
+      const value = await api.previewGlobalPastedExtraction({ title: `${starter.workTitle} · ${starter.chapter}`, text: globalSourceStarterText(starter), source: {
+        workUrl: starter.workUrl, chapterUrl: starter.chapterUrl, author: starter.author, chapter: starter.chapter, fetchedAt: starter.fetchedAt, metrics: starter.metrics,
+      } });
+      accept(value); setSourceTitle(starter.workTitle); setAuthor(starter.author); setChapter(starter.chapter); setRights('public-excerpt'); setSourceMetrics(starter.metrics);
+      setMessage('已载入首批核实素材。原句仍需逐条核对，确认后才会进入全局库。');
+    } catch (failure) { setError(failure instanceof Error ? failure.message : '首批素材载入失败。'); }
+    finally { locked.current = false; setBusy(false); }
   }
   function update(id: string, patch: Partial<Review>) { setReviews(current => ({ ...current, [id]: { ...current[id], ...patch } })); }
   async function source(mode: 'static' | 'restricted-browser' = 'static') {
@@ -89,7 +104,7 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
   async function commit() {
     if (!preview || locked.current || !permission || !selected.length || pendingReceipt) return;
     const content = { token: preview.token, expectedRevision: library.revision, sourceTitle, sourceAuthor: author, chapter,
-      rightsBasis: rights, permissionConfirmed: true as const, items: selected.map(({ segmentId, body, categoryId, tagIds, annotation }) => ({ segmentId, body, categoryId, tagIds, annotation })) };
+      rightsBasis: rights, metrics: sourceMetrics, permissionConfirmed: true as const, items: selected.map(({ segmentId, body, categoryId, tagIds, annotation }) => ({ segmentId, body, categoryId, tagIds, annotation })) };
     const fingerprint = JSON.stringify(content);
     if (attempt.current?.fingerprint !== fingerprint) attempt.current = { fingerprint, id: crypto.randomUUID() };
     const request: GlobalBookExtractionConfirmation = { ...content, operationId: attempt.current.id };
@@ -120,6 +135,7 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
       <div className="book-extraction-source-tabs" role="group" aria-label="素材来源">{([['file', '本地文件'], ['web', '网页文章'], ['paste', '粘贴正文']] as const).map(([id, label]) => <button key={id} aria-pressed={kind === id} onClick={() => setKind(id)}>{label}</button>)}</div>
       <div className="book-extraction-toolbar">{kind === 'file' ? <><label>TXT 编码<SelectField value={encoding} onChange={event => setEncoding(event.target.value as typeof encoding)}><option value="utf-8">UTF-8</option><option value="gb18030">GB18030</option></SelectField></label><button className="primary" onClick={() => void source()}>选择 TXT / DOCX</button></> : kind === 'web' ? <><label className="book-extraction-address">公开网页地址<input type="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://" /></label><button disabled={!url.trim()} className="primary" onClick={() => void source()}>获取并预览</button><button disabled={!renderReady || !url.trim()} onClick={() => setConfirmRender(true)}>受限渲染</button></> : <div className="book-extraction-paste"><label>素材标题<input value={pasteTitle} maxLength={200} onChange={event => setPasteTitle(event.target.value)} /></label><label>粘贴原文<textarea value={paste} onChange={event => setPaste(event.target.value)} /></label><button disabled={!pasteTitle.trim() || !paste.trim()} className="primary" onClick={() => void source()}>预览粘贴内容</button></div>}</div>
     </fieldset>
+    {!preview && <GlobalSourceStarterPanel sources={globalSourceStarters} disabled={busy || blocked} onSelect={starter => void loadStarter(starter)} />}
     {busy && operation.current && <button onClick={() => void api.cancelGlobalWebExtraction(operation.current!)}>取消获取</button>}
     {!preview && <p className="book-extraction-empty">来源 → 选段 → 学习卡 → 审核入库。支持手工摘选与 AI 学习建议，所有候选逐条审核后才入库。</p>}
     {preview && <><div className="book-extraction-source"><p>{preview.filename} · {preview.segments.length} 段 · 来源全文仅存本机待审草稿</p>

@@ -4,21 +4,25 @@ import type { GlobalKnowledgePage } from './global-knowledge';
 import { bookExtractionConfirmationSchema } from './book-extraction';
 import { extractionDraftSchema } from './extraction-draft';
 import { globalExtractionCommitSchema, globalSourceMetadataSchema } from './global-knowledge-schema';
-import { frozenSourceDocumentSchema } from './source-document';
+import { frozenSourceDocumentSchema, sourceUrlSchema } from './source-document';
 
 export type GlobalExtractionPreview = Omit<BookExtractionPreview, 'workId'> & { target: { kind: 'global' } };
+const sourceMetricsSchema = globalSourceMetadataSchema.shape.metrics;
 export const globalBookExtractionConfirmationSchema = bookExtractionConfirmationSchema.omit({ workId: true }).extend({
   rightsBasis: globalSourceMetadataSchema.shape.rightsBasis,
   chapter: z.string().trim().max(200),
+  metrics: sourceMetricsSchema.default([]),
 }).strict();
 export type GlobalBookExtractionConfirmation = z.infer<typeof globalBookExtractionConfirmationSchema>;
 export const globalWebImportSchema = z.object({ operationId: z.uuid(), url: z.string().min(1).max(2048),
   mode: z.enum(['static', 'restricted-browser']).default('static'),
 }).strict();
 export const globalPasteImportSchema = z.object({ title: z.string().trim().min(1).max(200), text: z.string().min(1)
-  .refine(value => Array.from(value).length <= 200000) }).strict();
+  .refine(value => Array.from(value).length <= 200000), source: z.object({ workUrl: sourceUrlSchema, chapterUrl: sourceUrlSchema,
+    author: z.string().trim().max(200), chapter: z.string().trim().max(200), fetchedAt: z.iso.datetime({ offset: true }), metrics: sourceMetricsSchema,
+  }).strict().optional() }).strict();
 export const globalExtractionMetadataSchema = z.object({ sourceTitle: z.string().trim().max(200), sourceAuthor: z.string().trim().max(200),
-  chapter: z.string().trim().max(200), rightsBasis: globalSourceMetadataSchema.shape.rightsBasis,
+  chapter: z.string().trim().max(200), rightsBasis: globalSourceMetadataSchema.shape.rightsBasis, metrics: sourceMetricsSchema.default([]),
 }).strict();
 export const globalExtractionDraftSchema = z.object({
   schemaVersion: z.literal(1), target: z.object({ kind: z.literal('global') }).strict(), taskId: z.uuid(), previewToken: z.uuid(),
