@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { AiWorkspace } from '../../src/renderer/components/ai-workspace';
 import { AiSettingsPanel } from '../../src/renderer/components/ai-settings-panel';
 import App from '../../src/renderer/App';
+import { chooseSelect } from './select-field-helper';
 import { createStructureAdapter } from './renderer-structure-adapter';
 import { emptyDocument } from '../../src/shared/document';
 import type { WorkDetail } from '../../src/shared/contracts';
@@ -55,10 +56,10 @@ it('正文右键带入重复单句真实选区，预览发送目标偏移且不�
 it('切换章节清除旧选区，避免上一章偏移误用于新章', async () => {
   const { props, view } = setup();
   view.rerender(<AiWorkspace {...props} selectionRequest={{ operation: 'sentencePolish', token: 1, paragraphIds: [props.work.chapters[0].document.content[0].attrs.id], text: '原文', sentenceFrom: 0 }} />);
-  await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveValue('sentencePolish'));
+  await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveTextContent('单句润色'));
   const work = { ...props.work, chapters: [...props.work.chapters, { ...props.work.chapters[0], id: 'second', document: emptyDocument() }] };
   view.rerender(<AiWorkspace {...props} work={work} chapterId="second" />);
-  await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveValue('paragraphPolish'));
+  await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveTextContent('段落润色'));
   expect(screen.queryByLabelText('目标单句')).toBeNull();
 });
 it('同章前插重复句后从右上重开清除旧偏移，候选和原文仍配对保留', async () => {
@@ -71,7 +72,7 @@ it('同章前插重复句后从右上重开清除旧偏移，候选和原文仍�
   const work = structuredClone(props.work); work.revision++;
   work.chapters[0].document.content[0].content = [{ type: 'text', text: '雨落。雨落。雨落。' }];
   view.rerender(<AiWorkspace {...props} work={work} entryToken={2} />);
-  await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveValue('paragraphPolish'));
+  await waitFor(() => expect(screen.getByLabelText('AI 操作')).toHaveTextContent('段落润色'));
   expect(screen.queryByLabelText('目标单句')).toBeNull();
   expect(screen.getByText('润色候选', { selector: 'pre[aria-label="候选全文"]' })).toBeVisible();
   expect(screen.getByLabelText('原文对比')).toHaveTextContent('雨落。');
@@ -87,7 +88,7 @@ function setup() {
 }
 it('预览完整发送范围与计费后明确确认才执行，候选必须再次确认写入', async () => {
   const { props } = setup();
-  expect(screen.getByRole('option', { name: '当前章节' })).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: '上下文范围' })).toHaveTextContent('当前章节');
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   const dialog = await screen.findByRole('dialog');
   expect(dialog).toHaveTextContent('完整发送内容'); expect(dialog).toHaveTextContent('本次按服务计费');
@@ -208,7 +209,7 @@ it('可取消授权预览；失败保留正文且不自动重发', async () => {
 });
 it('知识提取逐项可编辑且未审核不可入库，分析结果不显示正文写入', async () => {
   const { props, candidate } = setup(); candidate.operation = 'extractKnowledge'; candidate.text = JSON.stringify({ items: [{ body: '第一条知识' }, { body: '第二条知识' }] });
-  fireEvent.change(screen.getByLabelText('AI 操作'), { target: { value: 'extractKnowledge' } });
+  await chooseSelect(screen.getByLabelText('AI 操作'), '正文回写知识');
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
   expect(await screen.findByLabelText('知识候选 1')).toHaveValue('第一条知识');
@@ -227,23 +228,25 @@ it('知识更新必须显式选目标并对比旧内容，改变目标撤销审�
   candidate.operation = 'extractKnowledge'; candidate.text = JSON.stringify({ items: [{ body: '修订角色资料' }] });
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
-  expect(await screen.findByLabelText('知识入库方式 1')).toHaveValue('create');
+  expect(await screen.findByLabelText('知识入库方式 1')).toHaveTextContent('新建知识条目');
   fireEvent.click(screen.getByRole('checkbox', { name: '审核通过条目 1' }));
-  fireEvent.change(screen.getByLabelText('知识入库方式 1'), { target: { value: 'update' } });
+  await chooseSelect(screen.getByLabelText('知识入库方式 1'), '更新已有知识条目');
   expect(screen.getByRole('checkbox', { name: '审核通过条目 1' })).not.toBeChecked();
   expect(screen.getByRole('checkbox', { name: '审核通过条目 1' })).toBeDisabled();
-  expect(within(screen.getByLabelText('更新知识目标 1')).queryByRole('option', { name: /已删除/ })).toBeNull();
-  fireEvent.change(screen.getByLabelText('更新知识目标 1'), { target: { value: 'existing' } });
+  fireEvent.keyDown(screen.getByLabelText('更新知识目标 1'), { key: 'ArrowDown' });
+  expect(screen.queryByRole('option', { name: /已删除/ })).toBeNull();
+  fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+  await chooseSelect(screen.getByLabelText('更新知识目标 1'), /^原有角色资料/);
   expect(screen.getByLabelText('更新前知识 1')).toHaveTextContent('原有角色资料');
   expect(screen.getByLabelText('更新前知识 1')).toHaveTextContent('旧出处');
   expect(screen.getByLabelText('知识候选 1')).toHaveValue('修订角色资料');
-  expect(screen.getByLabelText('知识分类 1')).toHaveValue('category');
+  expect(screen.getByLabelText('知识分类 1')).toHaveTextContent('人物');
   fireEvent.click(screen.getByRole('checkbox', { name: '审核通过条目 1' }));
   props.onExtract.mockResolvedValueOnce(false);
   fireEvent.click(screen.getByRole('button', { name: '确认入库已审核条目' }));
   await screen.findByRole('alert');
   expect(props.onExtract).toHaveBeenCalledWith('candidate', [{ body: '修订角色资料', source: '雨夜 / 第一章', categoryId: 'category', tagIds: ['tag'], mode: 'update', targetId: 'existing' }]);
-  expect(screen.getByLabelText('更新知识目标 1')).toHaveValue('existing');
+  expect(screen.getByLabelText('更新知识目标 1')).toHaveTextContent('原有角色资料');
   expect(screen.getByLabelText('知识候选 1')).toHaveValue('修订角色资料');
   fireEvent.click(screen.getByRole('checkbox', { name: /^角色$/ }));
   expect(screen.getByRole('checkbox', { name: '审核通过条目 1' })).not.toBeChecked();
@@ -256,8 +259,8 @@ it('更新模式切回新建撤销审核并移除旧目标', async () => {
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
   await screen.findByLabelText('知识入库方式 1');
-  fireEvent.change(screen.getByLabelText('知识入库方式 1'), { target: { value: 'update' } });
-  fireEvent.change(screen.getByLabelText('知识入库方式 1'), { target: { value: 'create' } });
+  await chooseSelect(screen.getByLabelText('知识入库方式 1'), '更新已有知识条目');
+  await chooseSelect(screen.getByLabelText('知识入库方式 1'), '新建知识条目');
   expect(screen.getByRole('checkbox', { name: '审核通过条目 1' })).not.toBeChecked();
   expect(screen.queryByLabelText('更新知识目标 1')).toBeNull();
 });
@@ -267,15 +270,15 @@ it('模型分类标签建议必须显式审核，改分类会撤销审核且仅�
     categories: [{ id: 'category', name: '人物描写', parentId: null, sortOrder: 0, systemKey: null, deletedAt: null }], tags: [{ id: 'tag', name: '雨夜', deletedAt: null }] } };
   view.rerender(<AiWorkspace {...props} work={work} />);
   candidate.operation = 'extractKnowledge'; candidate.text = JSON.stringify({ items: [{ body: '旅人', type: '角色', category: '人物描写', tags: ['雨夜'] }] });
-  fireEvent.change(screen.getByLabelText('AI 操作'), { target: { value: 'extractKnowledge' } });
+  await chooseSelect(screen.getByLabelText('AI 操作'), '正文回写知识');
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
-  expect(await screen.findByLabelText('知识分类 1')).toHaveValue('category');
+  expect(await screen.findByLabelText('知识分类 1')).toHaveTextContent('人物');
   expect(screen.getByRole('button', { name: '确认入库已审核条目' })).toBeDisabled();
   fireEvent.click(screen.getByRole('checkbox', { name: '审核通过条目 1' }));
-  fireEvent.change(screen.getByLabelText('知识分类 1'), { target: { value: '' } });
+  await chooseSelect(screen.getByLabelText('知识分类 1'), '未分类');
   expect(screen.getByRole('checkbox', { name: '审核通过条目 1' })).not.toBeChecked();
-  fireEvent.change(screen.getByLabelText('知识分类 1'), { target: { value: 'category' } });
+  await chooseSelect(screen.getByLabelText('知识分类 1'), '人物描写');
   fireEvent.click(screen.getByRole('checkbox', { name: '审核通过条目 1' }));
   fireEvent.click(screen.getByRole('button', { name: '确认入库已审核条目' }));
   await waitFor(() => expect(props.onExtract).toHaveBeenCalledWith('candidate', [{ body: '旅人', source: '雨夜 / 第一章', categoryId: 'category', tagIds: ['tag'] }]));
@@ -288,16 +291,18 @@ it('层级同名分类不自动选第一个，下拉展示完整路径供作者�
   ].map((item, sortOrder) => ({ ...item, sortOrder, systemKey: null, deletedAt: null }));
   view.rerender(<AiWorkspace {...props} work={{ ...props.work, assets: { outlines: [], foreshadows: [], evidence: [], knowledge: [], styleProfiles: [], chapterStyles: [], defaultStyleId: null, categories, tags: [] } }} />);
   candidate.operation = 'extractKnowledge'; candidate.text = JSON.stringify({ items: [{ body: '一段描写', category: '描写' }] });
-  fireEvent.change(screen.getByLabelText('AI 操作'), { target: { value: 'extractKnowledge' } });
+  await chooseSelect(screen.getByLabelText('AI 操作'), '正文回写知识');
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '确认发送' }));
-  expect(await screen.findByLabelText('知识分类 1')).toHaveValue('');
-  expect(screen.getByRole('option', { name: /^人物 \/ 描写$/ })).toHaveValue('people-text');
-  expect(screen.getByRole('option', { name: /^景物 \/ 描写$/ })).toHaveValue('landscape-text');
+  expect(await screen.findByLabelText('知识分类 1')).toHaveTextContent('未分类');
+  await chooseSelect(screen.getByLabelText('知识分类 1'), /^人物 \/ 描写$/);
+  expect(screen.getByLabelText('知识分类 1')).toHaveTextContent('人物 / 描写');
+  await chooseSelect(screen.getByLabelText('知识分类 1'), /^景物 \/ 描写$/);
+  expect(screen.getByLabelText('知识分类 1')).toHaveTextContent('景物 / 描写');
 });
 it('单句润色必须选择单个段落并填写唯一目标句才预览发送', async () => {
   const { props } = setup();
-  fireEvent.change(screen.getByLabelText('AI 操作'), { target: { value: 'sentencePolish' } });
+  await chooseSelect(screen.getByLabelText('AI 操作'), '单句润色');
   fireEvent.change(screen.getByLabelText('目标单句'), { target: { value: '雨夜' } });
   fireEvent.click(screen.getByRole('button', { name: '预览 AI 请求' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/单个段落/);

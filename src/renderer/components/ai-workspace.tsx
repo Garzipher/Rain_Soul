@@ -46,7 +46,7 @@ export function AiWorkspace(props: AiWorkspaceProps) {
   const reviewChange = useRef(props.onReviewChange); reviewChange.current = props.onReviewChange;
   useEffect(() => { reviewChange.current?.({ candidate, original, items }); }, [candidate, original, items]);
   const [pending, setPending] = useState(false), [sending, setSending] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
-  useEffect(() => { props.onActivityChange?.(pending || sending || !!prepared); }, [pending, sending, prepared, props.onActivityChange]);
+  useEffect(() => { props.onActivityChange?.(pending || sending || !!prepared || !!candidate); }, [pending, sending, prepared, candidate, props.onActivityChange]);
   const lock = useRef(false), token = useRef<string | null>(null), alive = useRef(true);
   const generation = useRef(0);
   const [elapsed, setElapsed] = useState(0);
