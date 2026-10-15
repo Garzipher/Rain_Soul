@@ -4,13 +4,15 @@ import { useMotionPreference } from './motion-provider';
 import { motionTokens } from './tokens';
 
 /** 原生 top layer 负责焦点约束，presence 仅延迟视觉卸载，不延迟业务关闭。 */
-export function useAnimatedDialog(ref: RefObject<HTMLDialogElement | null>, open = true, restoreFocusTo?: () => HTMLElement | null) {
+export function useAnimatedDialog(ref: RefObject<HTMLDialogElement | null>, open = true, restoreFocusTo?: () => HTMLElement | null, initialFocusTo?: () => HTMLElement | null) {
   const [present, remove] = usePresence();
   const { reduced } = useMotionPreference();
   const previous = useRef<HTMLElement | null>(null);
   const generation = useRef(0);
   const restore = useRef(restoreFocusTo);
+  const initialFocus = useRef(initialFocusTo);
   restore.current = restoreFocusTo;
+  initialFocus.current = initialFocusTo;
   useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
@@ -33,7 +35,7 @@ export function useAnimatedDialog(ref: RefObject<HTMLDialogElement | null>, open
         if (typeof node.showModal === 'function') node.showModal(); else node.setAttribute('open', '');
       }
       node.inert = false; node.dataset.motion = 'enter';
-      node.querySelector<HTMLElement>('input:not(:disabled), textarea:not(:disabled), button:not(:disabled), [tabindex="0"]')?.focus();
+      (initialFocus.current?.() ?? node.querySelector<HTMLElement>('input:not(:disabled), textarea:not(:disabled), button:not(:disabled), [tabindex="0"]'))?.focus();
       return () => { ++generation.current; };
     }
     node.inert = true; node.dataset.motion = 'exit';

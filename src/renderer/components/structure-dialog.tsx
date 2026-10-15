@@ -9,7 +9,7 @@ export function StructureDialog({ state, busy, onClose, children, submitDisabled
   const cancel = useRef<HTMLButtonElement>(null);
   const [value, setValue] = useState(state.initialValue ?? '');
   const submitTone = state.submitTone ?? (state.field ? 'primary' : 'danger');
-  useAnimatedDialog(dialog);
+  useAnimatedDialog(dialog, true, undefined, () => state.field ? initial.current : cancel.current);
   function key(event: KeyboardEvent<HTMLDialogElement>) {
     if (event.key === 'Escape' && !busy) { event.preventDefault(); onClose(); }
     if (event.key !== 'Tab') return;

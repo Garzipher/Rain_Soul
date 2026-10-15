@@ -7,6 +7,16 @@ import { StructureDialog } from '../../src/renderer/components/structure-dialog'
 describe('授权对话框键盘阅读', () => {
   afterEach(cleanup);
   const state = { heading: '确认云发送', submitLabel: '确认发送', onSubmit: vi.fn(async () => true) };
+  it('无输入字段时先聚焦取消，长材料和迁移选择不能抢走初始焦点', () => {
+    render(<StructureDialog state={state} busy={false} onClose={vi.fn()}>
+      <pre tabIndex={0}>待发送材料</pre><button>更改范围</button>
+    </StructureDialog>);
+    expect(screen.getByRole('button', { name: '取消' })).toHaveFocus();
+  });
+  it('有输入字段时先聚焦名称输入框', () => {
+    render(<StructureDialog state={{ ...state, field: '作品名称' }} busy={false} onClose={vi.fn()} />);
+    expect(screen.getByRole('textbox', { name: '作品名称' })).toHaveFocus();
+  });
   it('最后按钮继续Tab可进入完整材料折叠入口，反向Tab回到最后按钮', () => {
     render(<StructureDialog state={state} busy={false} onClose={vi.fn()}>
       <details><summary>完整材料</summary><pre tabIndex={0}>测试原文</pre></details>
