@@ -9,7 +9,9 @@ export interface CacheToken {generation:string;fingerprint:string;workId:string;
 export interface CachedChunk extends RetrievalChunk {workId:string;entryId:string;bodyHash:string;vector:Float32Array}
 export interface CacheEntry {entryId:string;bodyHash:string;chunks:(RetrievalChunk & {vector:Float32Array})[]}
 const identity=z.uuid(), hash=z.string().regex(/^[a-f0-9]{64}$/), fingerprint=z.string().min(1).max(20000);
-const tokenSchema=z.object({generation:identity,fingerprint,workId:identity,workGeneration:z.number().int().nonnegative()}).strict();
+// 全局库使用显式命名空间，不能与同 UUID 的作品共享派生缓存。
+const ownerIdentity=z.union([identity,z.string().startsWith('global:').refine(value=>identity.safeParse(value.slice(7)).success)]);
+const tokenSchema=z.object({generation:identity,fingerprint,workId:ownerIdentity,workGeneration:z.number().int().nonnegative()}).strict();
 const sourceSchema=z.object({entryId:identity,bodyHash:hash}).strict();
 const chunkSchema=z.object({index:z.number().int().nonnegative(),start:z.number().int().nonnegative(),end:z.number().int().positive(),
   text:z.string().min(1).max(400000),tokenCount:z.number().int().min(1).max(400),vector:z.instanceof(Float32Array)}).strict();
@@ -80,13 +82,13 @@ export class RetrievalCache {
     return generation;
   }
   getWorkToken(workId:string):CacheToken {
-    identity.parse(workId);const model=this.db.prepare('SELECT generation,fingerprint FROM cache_model').get() as {generation:string;fingerprint:string}|undefined;
+    ownerIdentity.parse(workId);const model=this.db.prepare('SELECT generation,fingerprint FROM cache_model').get() as {generation:string;fingerprint:string}|undefined;
     if(!model)throw new Error('检索缓存模型尚未初始化。');
     const work=this.db.prepare('SELECT generation FROM cache_work WHERE work_id=?').get(workId) as {generation:number}|undefined;
     return tokenSchema.parse({...model,workId,workGeneration:work?.generation??0});
   }
   invalidateWork(workId:string):void {
-    identity.parse(workId);this.db.transaction(()=> {
+    ownerIdentity.parse(workId);this.db.transaction(()=> {
       const current=this.getWorkToken(workId),counter=this.db.prepare('SELECT generation FROM cache_epoch WHERE work_id=?').get(workId) as {generation:number}|undefined;
       const next=Math.max(current.workGeneration,counter?.generation??0)+1;
       this.db.prepare('INSERT OR REPLACE INTO cache_work VALUES(?,?)').run(workId,next);
@@ -166,7 +168,7 @@ export class RetrievalCache {
     })();
   }
   readWork(workId:string,values:{entryId:string;bodyHash:string}[]):CachedChunk[] {
-    identity.parse(workId);return this.readToken(this.getWorkToken(workId),values);
+    ownerIdentity.parse(workId);return this.readToken(this.getWorkToken(workId),values);
   }
   private readToken(token:CacheToken,values:{entryId:string;bodyHash:string}[]):CachedChunk[] {
     const workId=token.workId,sources=z.array(sourceSchema).parse(values);

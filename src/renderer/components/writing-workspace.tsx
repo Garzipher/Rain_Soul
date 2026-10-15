@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { BookmarkNode, Chapter, WorkDetail, WritingDocument } from '../../shared/contracts';
-import type { AssetAction } from '../../shared/assets';
+import type { AssetAction, KnowledgeEntry } from '../../shared/assets';
 import { countDocumentWords } from '../../shared/document';
 import type { SaveStatus } from '../lib/save-coordinator';
 import { ChapterEditor } from './chapter-editor';
@@ -21,7 +21,11 @@ type WorkTab = 'body' | 'plot' | 'foreshadow';
 const SnapshotPanel = lazy(() => import('./snapshot-panel').then(module => ({ default: module.SnapshotPanel })));
 const AiWorkspace = lazy(() => import('./ai-workspace').then(module => ({ default: module.AiWorkspace })));
 const ConsistencyPanel = lazy(() => import('./consistency-panel').then(module => ({ default: module.ConsistencyPanel })));
+import type { KnowledgeCompletion } from '../lib/knowledge-completion';
+
 export interface WritingWorkspaceProps {
+  globalEntries?: KnowledgeEntry[];
+  onAcceptGlobal?: (candidate: KnowledgeCompletion) => Promise<boolean>;
   savedSelection?: SavedWritingRequest;
   onSelectionChange?: (value: SavedWritingRequest | undefined) => void;
   ai: Omit<AiWorkspaceProps, 'work' | 'chapterId' | 'busy'>;
@@ -151,7 +155,7 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
         {props.draft ? <LearningChapter key={props.work.id} textbook={props.textbook} workId={props.work.id} chapterId={props.draft.id} busy={props.busy} changeMode={props.changeTab}><div className="manuscript">
           <div className="manuscript-meta"><span>正文</span><span aria-live="polite">本章 {countDocumentWords(props.draft.document)} 字</span></div>
           <input className="chapter-title" aria-label="章节标题" value={props.draft.title} onChange={(event) => props.onTitleChange(event.target.value)} onCompositionStart={() => props.onCompositionChange(true)} onCompositionEnd={() => props.onCompositionChange(false)} disabled={props.busy} autoComplete="off" />
-          <ChapterEditor assets={props.work.assets} location={props.location?.chapterId === props.draft.id ? props.location : null} key={props.draft.id} document={props.draft.document} locked={props.busy} ghostPaused={tool === 'ai' || aiActive} onChange={props.onDocumentChange} onError={props.onError} onCompositionChange={props.onCompositionChange} onLocateAsset={locateAsset} onAiRequest={openSelection} />
+          <ChapterEditor globalEntries={props.globalEntries} onAcceptGlobal={props.onAcceptGlobal} assets={props.work.assets} location={props.location?.chapterId === props.draft.id ? props.location : null} key={props.draft.id} document={props.draft.document} locked={props.busy} ghostPaused={tool === 'ai' || aiActive} onChange={props.onDocumentChange} onError={props.onError} onCompositionChange={props.onCompositionChange} onLocateAsset={locateAsset} onAiRequest={openSelection} />
         </div></LearningChapter> : <div className="empty-state"><h2>尚无章节</h2><button className="primary" onClick={() => props.onAddChapter()} disabled={props.busy}>添加章节</button></div>}
       </section>
     </div>}

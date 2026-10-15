@@ -23,6 +23,19 @@ describe('全局知识设置读取边界', () => {
       await expect(readGlobalDictionary({ readGlobalKnowledge })).rejects.toThrow('分页不完整');
     }
   });
+  it('拒绝首屏和单页内部重复，不把重复条目算作完整关联', async () => {
+    const firstDuplicate = vi.fn().mockResolvedValueOnce({ ...page([entry('same'), entry('same')]), total: 2 });
+    await expect(readGlobalDictionary({ readGlobalKnowledge: firstDuplicate })).rejects.toThrow('分页不完整');
+    const nextDuplicate = vi.fn().mockResolvedValueOnce({ ...page([entry('first')]), total: 3 })
+      .mockResolvedValueOnce({ ...page([entry('same'), entry('same')], 1), total: 3 });
+    await expect(readGlobalDictionary({ readGlobalKnowledge: nextDuplicate })).rejects.toThrow('分页不完整');
+  });
+  it('拒绝错位分页与超过总数的结果', async () => {
+    const shifted = vi.fn().mockResolvedValueOnce(page([entry('first')])).mockResolvedValueOnce(page([entry('next')], 5));
+    await expect(readGlobalDictionary({ readGlobalKnowledge: shifted })).rejects.toThrow('分页不完整');
+    const overflow = vi.fn().mockResolvedValueOnce({ ...page([entry('first')]), total: 0 });
+    await expect(readGlobalDictionary({ readGlobalKnowledge: overflow })).rejects.toThrow('分页不完整');
+  });
   it('缺失任一归档接口时明确判定不可用', () => {
     expect(globalArchiveApi({})).toBeNull();
     expect(globalArchiveApi({ exportGlobalKnowledgeArchive: async () => true })).toBeNull();

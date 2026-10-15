@@ -27,6 +27,12 @@ import { RetrievalModelStore } from './retrieval-model-store';
 import { RetrievalClient } from './retrieval-client';
 import { RetrievalCommands } from './retrieval-commands';
 import { fixedManifest } from '../shared/retrieval-model';
+import { GlobalKnowledgeClient } from './global-knowledge-client';
+import { GlobalKnowledgeCommands } from './global-knowledge-commands';
+import { GlobalKnowledgeArchiveCommands } from './global-knowledge-archive';
+import { GlobalWorkCopyCommands } from './global-work-copy';
+import { GlobalBookExtractionCommands } from './global-book-extraction-commands';
+import { GlobalBookExtractionAiCommands } from './global-book-extraction-ai-commands';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'rainsoul', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const testDirectory = !app.isPackaged ? process.env.RAINSOUL_TEST_DIRECTORY : undefined;
@@ -35,9 +41,11 @@ const cleanupMode = process.argv.includes('--rainsoul-uninstall-cleanup');
 const hasLock = app.requestSingleInstanceLock({ cleanupMode });
 let window: BrowserWindow | null = null;
 let database: DatabaseClient | null = null;
+let globalDatabase: GlobalKnowledgeClient | null = null;
 let retrievalClient: RetrievalClient | null = null;
 let allowClose = false;
 let closeToken: string | null = null;
+let acceptingCommands = true;
 if (!hasLock) { if (cleanupMode) app.exit(2); else app.quit(); }
 else if (cleanupMode) {
   // 卸载模式不初始化数据库、窗口或教材；授权标志只允许清理当前用户固定本机目录。
@@ -60,11 +68,19 @@ else {
     const directory = testDirectory ?? join(process.env.LOCALAPPDATA ?? app.getPath('userData'), 'RainSoul');
     database = new DatabaseClient(directory);
     const store = new StoreService((command, payload) => database!.request(command, payload));
+    globalDatabase = new GlobalKnowledgeClient(join(directory, 'GlobalKnowledge'));
+    const globalKnowledge = new GlobalKnowledgeCommands(globalDatabase);
+    const globalCopy = new GlobalWorkCopyCommands(store, globalDatabase);
+    const globalArchives = new GlobalKnowledgeArchiveCommands(globalDatabase, {
+      choose: () => chooseLocalManuscript(() => dialog.showOpenDialog(window!, { title: '导入全局知识库', properties: ['openFile'], filters: [{ name: '全局知识归档', extensions: ['rainsoulknowledge'] }] }), 257 * 1024 * 1024),
+      save: (name, bytes) => saveLocalExport(() => dialog.showSaveDialog(window!, { title: '导出全局知识库', defaultPath: name, filters: [{ name: '全局知识归档', extensions: ['rainsoulknowledge'] }] }), bytes),
+    });
+    const globalBooks = new GlobalBookExtractionCommands({ choose: () => chooseLocalManuscript(() => dialog.showOpenDialog(window!, { title: '选择全局拆书素材', properties: ['openFile'], filters: [{ name: 'TXT / DOCX 素材', extensions: ['txt', 'docx'] }] })) }, globalDatabase, join(directory, 'GlobalExtractionDrafts'));
     retrievalClient = new RetrievalClient(join(directory, 'RetrievalCache'));
     const retrieval = new RetrievalCommands(store, new RetrievalModelStore(join(directory, 'RetrievalModels'), { bundledDirectory: join(process.resourcesPath, 'retrieval-model', fixedManifest.revision, 'weights') }), retrievalClient, async () => {
       const selection = await dialog.showOpenDialog(window!, { title: '选择固定本机模型目录', properties: ['openDirectory'] });
       return selection.canceled ? null : selection.filePaths[0] ?? null;
-    });
+    }, globalDatabase);
     const manuscripts = new ManuscriptCommands(store, {
       choose: () => chooseLocalManuscript(() => dialog.showOpenDialog(window!, { title: '导入手稿', properties: ['openFile'], filters: [{ name: 'TXT / DOCX 手稿', extensions: ['txt', 'docx'] }] })),
       save: (name, bytes) => saveLocalExport(() => dialog.showSaveDialog(window!, { title: '导出手稿', defaultPath: name, filters: [{ name: '手稿', extensions: [name.endsWith('.docx') ? 'docx' : 'txt'] }] }), bytes),
@@ -76,7 +92,8 @@ else {
     const authorService = new ProfileService(directory);
     const aiSettings = new AiSettingsStore(directory, safeStorage);
     const aiService = new AiService({ credentials: aiSettings });
-    const ai = new AiCommands(store, aiSettings, aiService);
+    const ai = new AiCommands(store, aiSettings, aiService, globalDatabase);
+    const globalBookAi = new GlobalBookExtractionAiCommands(globalDatabase, aiSettings, globalBooks, new BookExtractionAiService({ credentials: aiSettings }));
     const conversationAi = new ConversationAiCommands(store, aiSettings, new ConversationAiService({ credentials: aiSettings }), join(directory, 'ConversationRecovery'));
     const extractionDrafts = new ExtractionDraftCoordinator(new ExtractionDraftStore(join(directory, 'ExtractionDrafts')), store);
     const books = new BookExtractionCommands(store, { choose: () => chooseLocalManuscript(() => dialog.showOpenDialog(window!, { title: '选择拆书素材', properties: ['openFile'], filters: [{ name: 'TXT / DOCX 素材', extensions: ['txt', 'docx'] }] })) }, undefined, extractionDrafts);
@@ -99,10 +116,16 @@ else {
     const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => event.sender === window?.webContents && event.senderFrame === window.webContents.mainFrame;
     ipcMain.handle('rainsoul:command', async (event, command: unknown, payload: unknown) => {
       if (!trusted(event)) return { ok: false, message: '拒绝来源不明的命令' };
+      if (!acceptingCommands) return { ok: false, message: '应用正在完成本机保存并关闭。' };
       try {
         if (command === 'runtimeInfo') return { ok: true, data: { version: app.getVersion(), dataDirectory: join(directory, 'Projects') } };
         if (typeof command !== 'string') throw new Error('存储命令无效');
         assertPublicP1Command(command, payload);
+        if (globalKnowledge.accepts(command)) return { ok: true, data: await globalKnowledge.execute(command, payload) };
+        if (globalCopy.accepts(command)) return { ok: true, data: await globalCopy.execute(command, payload) };
+        if (globalArchives.accepts(command)) return { ok: true, data: await globalArchives.execute(command, payload) };
+        if (globalBookAi.accepts(command)) return { ok: true, data: await globalBookAi.execute(command, payload) };
+        if (globalBooks.accepts(command)) return { ok: true, data: await globalBooks.execute(command, payload) };
         if (retrieval.accepts(command)) return { ok: true, data: await retrieval.execute(command, payload) };
         if (profiles.accepts(command)) return { ok: true, data: await profiles.execute(command, payload) };
         if (manuscripts.accepts(command)) return { ok: true, data: await manuscripts.execute(command, payload) };
@@ -116,9 +139,13 @@ else {
     });
     ipcMain.on('rainsoul:close-confirm', (event, token: unknown) => {
       if (!trusted(event) || typeof token !== 'string' || token !== closeToken) return;
-      void Promise.all([store.drain(), profiles.drain(), manuscripts.drain(), archives.drain(), ai.drain(), conversationAi.drain(), books.drain(), bookAi.drain()])
+      acceptingCommands = false;
+      // 先等待会继续生产数据库请求的事务，再排空两个独立存储，防止漏掉晚到的冻结写入。
+      void Promise.all([profiles.drain(), manuscripts.drain(), archives.drain(), ai.drain(), conversationAi.drain(), bookAi.drain(), globalBookAi.drain(), globalCopy.drain(), globalArchives.drain()])
+        .then(() => Promise.all([books.drain(), globalBooks.drain()]))
+        .then(() => Promise.all([store.drain(), globalDatabase!.drain()]))
         .then(() => { if (token === closeToken) { allowClose = true; window?.close(); } })
-        .catch(() => { if (token === closeToken) window?.webContents.send('rainsoul:close-failed', '本机内容尚未保存，请保存或放弃未保存内容后再关闭。'); });
+        .catch(() => { acceptingCommands = true; if (token === closeToken) window?.webContents.send('rainsoul:close-failed', '本机内容尚未保存，请保存或放弃未保存内容后再关闭。'); });
     });
     window.on('close', event => {
       if (allowClose) return;
@@ -134,5 +161,5 @@ else {
     await window.loadURL('rainsoul://app/');
   }).catch(error => { console.error('桌面初始化失败', error instanceof Error ? error.name : 'Unknown'); app.exit(1); });
   app.on('window-all-closed', () => app.quit());
-  app.on('before-quit', () => { if (allowClose) { retrievalClient?.close(); database?.close(); } });
+  app.on('before-quit', () => { if (allowClose) { retrievalClient?.close(); database?.close(); globalDatabase?.close(); } });
 }

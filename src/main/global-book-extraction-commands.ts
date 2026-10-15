@@ -17,6 +17,7 @@ const sha = (value: string) => createHash('sha256').update(value).digest('hex');
 export class GlobalBookExtractionCommands {
   private preview: GlobalExtractionPreview | null = null;
   private queue: Promise<unknown> = Promise.resolve();
+  private readonly aiBusy = new Set<string>();
   private readonly web: WebExtractionCommands<GlobalExtractionPreview>;
   private readonly drafts: GlobalExtractionDraftStore;
   constructor(private readonly files: Files, private readonly global: GlobalClient, directory: string, dependencies?: WebExtractionDependencies) {
@@ -60,12 +61,17 @@ export class GlobalBookExtractionCommands {
       this.preview = { ...sourcePreview({ kind: 'global' }, current.source), token: current.previewToken };
       return { draft: current, preview: structuredClone(this.preview), ...(page ? { page } : {}) };
     }
-    if (command === 'cancelGlobalBookExtraction') { const { token } = tokenSchema.parse(payload); this.valid(token); this.web.reset(); this.preview = null; return; }
+    if (command === 'cancelGlobalBookExtraction') {
+      const { token } = tokenSchema.parse(payload); this.valid(token);
+      if (this.aiBusy.has(token)) throw new Error('AI 拆书仍在处理，请等待结果返回后再离开素材。');
+      this.web.reset(); this.preview = null; return;
+    }
     if (draft?.committing) throw new Error('上一批全局入库回执待核对，请先恢复草稿。');
     if (command === 'saveGlobalExtractionReview' || command === 'discardGlobalExtractionDraft') {
       const { token } = tokenSchema.parse({ token: (payload as { token?: unknown })?.token });
       this.valid(token);
       if (!draft || draft.previewToken !== token) throw new Error('全局拆书草稿已被替换。');
+      if (this.aiBusy.has(token)) throw new Error('AI 拆书仍在处理，请等待结果返回后再修改或放弃审核草稿。');
       if (command === 'saveGlobalExtractionReview') {
         const request = tokenSchema.extend({ reviews: globalExtractionDraftSchema.shape.reviews, metadata: globalExtractionMetadataSchema.optional() }).strict().parse(payload);
         const committed = draft.reviews.filter(item => item.status === 'committed');
@@ -75,6 +81,8 @@ export class GlobalBookExtractionCommands {
       } else { tokenSchema.parse(payload); await this.drafts.discard(); this.web.reset(); this.preview = null; }
       return;
     }
+    if (command === 'confirmGlobalBookExtraction' && this.aiBusy.has((payload as { token?: string })?.token ?? ''))
+      throw new Error('AI 拆书仍在处理，请等待结果返回后再确认入库。');
     if (command === 'fetchGlobalWebExtraction' || command === 'previewGlobalPastedExtraction') {
       if (draft) throw new Error('请先保存并返回，或明确更换现有全局拆书素材。');
       const request = command === 'previewGlobalPastedExtraction' ? globalPasteImportSchema.parse(payload) : null;
@@ -127,6 +135,22 @@ export class GlobalBookExtractionCommands {
     const preview = this.valid(token), draft = await this.drafts.read();
     if (!draft || draft.previewToken !== token || draft.committing) throw new Error('全局拆书草稿不可分析。');
     return { preview: structuredClone(preview), draft };
+  }
+  setAiBusy(token: string, busy: boolean): Promise<void> {
+    // 先同步占用令牌，再排队校验，避免审核 IPC 在 AI 启动的微小窗口抢先写入。
+    if (busy) this.aiBusy.add(token);
+    const operation = this.queue.then(async () => {
+      try {
+        this.valid(token);
+        const draft = await this.drafts.read();
+        if (!draft || draft.previewToken !== token || draft.committing) throw new Error('全局拆书草稿不可分析。');
+        if (!busy) this.aiBusy.delete(token);
+      } catch (error) {
+        if (busy) this.aiBusy.delete(token);
+        throw error;
+      }
+    });
+    this.queue = operation.catch(() => {}); return operation;
   }
   recordAiBatch(token: string, batch: GlobalExtractionDraft['batches'][number]): Promise<void> {
     const operation = this.queue.then(async () => {

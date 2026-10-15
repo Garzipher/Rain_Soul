@@ -85,6 +85,7 @@ export class GlobalBookExtractionAiCommands {
     if (!frozen || frozen.prepared.requestHash !== request.requestHash || !request.confirmed) throw new Error('请重新确认服务、发送原文和费用。');
     this.pending.delete(request.confirmationToken);
     if (this.attempted.has(request.requestHash) || this.active.has(request.requestHash)) throw new Error('此请求已发送，请核对本机结果；不会重复联网。');
+    await this.drafts.setAiBusy(frozen.request.token, true);
     let settle!: () => void;
     const active: Active = { frozen, controller: new AbortController(), done: new Promise<void>(resolve => { settle = resolve; }) };
     this.active.set(request.requestHash, active);
@@ -106,7 +107,12 @@ export class GlobalBookExtractionAiCommands {
     } catch (error) {
       if (recorded) await this.drafts.recordAiBatch(frozen.request.token, { ...batch, status: active.controller.signal.aborted ? 'cancelled' : 'failed' }).catch(() => {});
       throw error;
-    } finally { this.service.cancel(request.confirmationToken); if (!active.result) this.active.delete(request.requestHash); settle(); }
+    } finally {
+      this.service.cancel(request.confirmationToken);
+      if (!active.result) this.active.delete(request.requestHash);
+      await this.drafts.setAiBusy(frozen.request.token, false).catch(() => {});
+      settle();
+    }
   }
   async drain() {
     for (const item of this.active.values()) { item.controller.abort(); this.service.cancel(item.frozen.prepared.confirmationToken); }

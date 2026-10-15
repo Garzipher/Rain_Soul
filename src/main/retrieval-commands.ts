@@ -6,6 +6,8 @@ import type { KnowledgeScope, KnowledgeScopeResult } from '../shared/knowledge-s
 import type { WorkSummary } from '../shared/contracts';
 import type { EngineQuery, IndexEntry } from '../workers/retrieval/engine';
 import { rankKnowledge } from '../workers/retrieval/ranking';
+import type { GlobalKnowledgeTransport } from './global-knowledge-commands';
+import { exposeRetrievalIdentity, readGlobalRetrieval } from './global-knowledge-retrieval';
 
 interface Store { execute(command: string, payload: unknown): Promise<unknown> }
 interface Models {
@@ -26,7 +28,7 @@ export class RetrievalCommands {
   private changing = false;
   private installation: { operationId: string; controller: AbortController } | null = null;
   constructor(private readonly store: Store, private readonly models: Models, private readonly client: Client,
-    private readonly chooseDirectory: () => Promise<string | null>) {}
+    private readonly chooseDirectory: () => Promise<string | null>, private readonly global?: GlobalKnowledgeTransport) {}
   accepts(command: string) { return ['queryKnowledge', 'cancelKnowledgeQuery', 'getRetrievalModelStatus', 'importRetrievalModel', 'downloadRetrievalModel', 'cancelRetrievalModelInstall', 'setRetrievalModelEnabled', 'selectRetrievalModelSource', 'rebuildKnowledgeIndex'].includes(command); }
   private modelChanged() { this.modelGeneration++; this.client.close(); this.indexed.clear(); }
   private async changeModel(action: () => Promise<void>) {
@@ -103,23 +105,42 @@ export class RetrievalCommands {
     const ledger = JSON.stringify(works.filter(work => workId === null || work.id === workId));
     return { entries, scope, revisions, ledger,workIds };
   }
+  private async scopedSnapshot(request: RetrievalQuery) {
+    const scope = request.scope;
+    const workId = scope && scope.kind !== 'global' ? scope.workId : request.workId;
+    const work = scope?.kind === 'global' ? { entries: [] as IndexEntry[], scope: { knowledge: [], categories: [], tags: [], entryOwners: {} } as KnowledgeScope, revisions: {} as Record<string, number>, ledger: '', workIds: [] as string[] } : await this.snapshot(workId);
+    const categories: EngineQuery['categories'] = work.scope.categories.filter(category => !category.deletedAt).flatMap(category => [...new Set(work.entries.map(entry => entry.workId))].map(owner => ({ ...category, workId: owner })));
+    const globalOwners = new Map<string, string>(), globalKeywords: EngineQuery['keywords'] = [], entryRevisions = new Map<string, number>();
+    const result = { ...work, categories, globalOwners, globalKeywords, entryRevisions, globalFailed: false, workLedger: work.ledger, workEntries: JSON.stringify(work.entries), workRevisions: JSON.stringify(work.revisions), globalRevision: 0, workId: scope?.kind === 'global' ? null : workId };
+    if (scope?.kind !== 'global' && scope?.kind !== 'combined') return result;
+    try {
+      if (!this.global) throw new Error('全局库未初始化。');
+      const global = await readGlobalRetrieval(this.global, request);
+      result.entries = [...work.entries, ...global.entries]; result.categories.push(...global.categories); result.globalKeywords.push(...global.keywords);
+      result.globalOwners.set(global.ownerKey, global.libraryId); result.workIds = [...work.workIds, global.ownerKey];
+      for (const [key, value] of global.entryRevisions) result.entryRevisions.set(key, value);
+      result.revisions = { ...work.revisions, [global.ownerKey]: global.revision }; result.globalRevision = global.revision;
+      return result;
+    } catch {
+      if (scope.kind === 'global') throw new Error('全局知识库暂不可用，请切换到当前作品继续检索。');
+      result.globalFailed = true; return result;
+    }
+  }
   private async query(request: RetrievalQuery): Promise<RetrievalReply> {
     if (this.queries.has(request.queryId) || this.queries.size >= 100) throw new Error('检索请求重复或过多。');
     const identity = {}, modelGeneration = this.modelGeneration; this.queries.set(request.queryId, identity);
     const current = () => { if (this.queries.get(request.queryId) !== identity) throw new Error('检索已取消。'); };
     try {
-      const frozen = await this.snapshot(request.workId); current();
-      if (request.workId === null && (request.categoryId || request.tagIds.length)) throw new Error('跨作品检索请先选定作品再筛选分类与标签。');
+      const frozen = await this.scopedSnapshot(request); current();
+      if (!request.scope && request.workId === null && (request.categoryId || request.tagIds.length)) throw new Error('跨作品检索请先选定作品再筛选分类与标签。');
       const rows: KnowledgeScopeResult[] = [];
-      for (let offset = 0; offset <= frozen.entries.length; offset += 200) {
-        const page = await this.store.execute('searchKnowledgeScope', { scopeId: request.workId,
+      for (let offset = 0; request.scope?.kind !== 'global' && offset <= frozen.entries.length; offset += 200) {
+        const page = await this.store.execute('searchKnowledgeScope', { scopeId: frozen.workId,
           query: { text: request.query, mode: 'knowledge', ...(request.categoryId ? { categoryId: request.categoryId } : {}), tagIds: request.tagIds, offset, limit: 200 } }) as KnowledgeScopeResult[];
         current(); rows.push(...page); if (page.length < 200) break;
       }
-      const categories = frozen.scope.categories.filter(category => !category.deletedAt).flatMap(category =>
-        [...new Set(frozen.entries.map(entry => entry.workId))].map(workId => ({ ...category, workId })));
-      const input: EngineQuery = { entries: frozen.entries, categories, keywords: rows.map(row => ({ workId: row.workId, entryId: frozen.scope.entryOwners[row.id]?.sourceEntryId ?? row.id })),
-        text: request.query, mode: request.mode, filter: { workId: request.workId, categoryId: request.categoryId, tagIds: request.tagIds } };
+      const input: EngineQuery = { entries: frozen.entries, categories: frozen.categories, keywords: [...rows.map(row => ({ workId: row.workId, entryId: frozen.scope.entryOwners[row.id]?.sourceEntryId ?? row.id })), ...frozen.globalKeywords],
+        text: request.query, mode: request.mode, filter: { workId: request.scope?.kind === 'global' || request.scope?.kind === 'combined' ? null : frozen.workId, categoryId: request.categoryId, tagIds: request.tagIds } };
       const keyword = () => rankKnowledge({ ...input, mode: 'keyword', threshold: 1, queryVector: [], chunks: [] });
       let hits: RetrievalHit[] = keyword(), status: RetrievalReply['status'] = 'ready', fingerprint: string | null = null, selectedModel: RetrievalModelStatus | null = null, message: string | undefined;
       if (request.mode !== 'keyword') {
@@ -150,19 +171,26 @@ export class RetrievalCommands {
             ? '查询超过400 token，请缩小范围；当前显示关键词结果。' : '本机检索未完成，当前显示关键词结果。';
         }
       }
-      const verified = await this.snapshot(request.workId); current();
+      const verified = await this.scopedSnapshot(request); current();
       const finalModel = fingerprint ? await this.models.getStatus() : null; current();
       if (fingerprint && (!selectedModel || !finalModel || !this.sameModel(selectedModel, finalModel, modelGeneration))) {
         hits = keyword(); status = 'fallback'; fingerprint = null; message = '模型状态已变化，当前显示关键词结果。';
       }
-      if (frozen.ledger !== verified.ledger || JSON.stringify(frozen.revisions) !== JSON.stringify(verified.revisions) || JSON.stringify(frozen.entries) !== JSON.stringify(verified.entries)) {
+      if (frozen.workLedger !== verified.workLedger || frozen.workEntries !== verified.workEntries || frozen.workRevisions !== verified.workRevisions) {
         for (const id of Object.keys(frozen.revisions)) this.indexed.delete(id);
         throw new Error('知识来源已变化，请重新检索。');
       }
+      if (frozen.globalRevision !== verified.globalRevision) {
+        for (const id of frozen.globalOwners.keys()) this.indexed.delete(id);
+        if (request.scope?.kind === 'global') throw new Error('全局知识来源已变化，请重新检索。');
+        hits = hits.filter(hit => !hit.workId || !frozen.globalOwners.has(hit.workId));
+        status = 'fallback'; message = '全局知识来源已变化，当前仅显示作品结果，请重新检索。';
+      }
+      if (frozen.globalFailed || verified.globalFailed) { status = 'fallback'; message = '全局知识库暂不可用，当前显示作品结果。'; }
       hits = hits.filter(hit => verified.entries.some(entry => entry.entryId === hit.entryId && entry.workId === hit.workId
         && entry.bodyHash === hit.bodyHash && entry.body.includes(hit.excerpt)));
       const offset = (request.page - 1) * request.pageSize;
-      return { queryId: request.queryId, hits: hits.slice(offset, offset + request.pageSize), total: hits.length,
+      return { queryId: request.queryId, hits: hits.slice(offset, offset + request.pageSize).map(hit => exposeRetrievalIdentity(hit, verified.globalOwners, verified.entryRevisions)), total: hits.length,
         sourceRevisions: verified.revisions, modelFingerprint: fingerprint, status, ...(message ? { message } : {}) };
     } finally { if (this.queries.get(request.queryId) === identity) this.queries.delete(request.queryId); }
   }

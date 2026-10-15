@@ -80,6 +80,10 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
     if (currentDraft && chapter && currentDraft.volumeId !== chapter.volumeId) { const next = { ...currentDraft, volumeId: chapter.volumeId }; draftRef.current = next; setDraft(next); }
   }, []);
   const retry = useCallback(async () => { await coordinator.current?.retry(); }, []);
+  const withSavedState = useCallback(async <R,>(action: () => Promise<R>): Promise<R> => {
+    if (composing.current) throw new Error('输入法正在组词，请先确认输入后再操作');
+    return coordinator.current ? coordinator.current.withSavedState(action) : action();
+  }, []);
   useEffect(() => api.onCloseFailed?.(message => {
     closingRef.current = false; setClosing(false); setCloseError(message);
   }), [api]);
@@ -97,5 +101,8 @@ export function useWritingSession(api: DesktopApi, work: WorkDetail | null, chap
   }), [api]);
   const setComposing = (value: boolean) => { composing.current = value; if (!value) setCloseError(null); };
 
-  return { draft, status, flush, retry, acceptWork, closing, closeError, isClosing: () => closingRef.current, setComposing, updateTitle: (title: string) => update({ title }), updateDocument: (document: WritingDocument) => update({ document }) };
+  return { draft, status, flush, retry, acceptWork, withSavedState,
+    pauseForExternalOperation: (message: string) => coordinator.current?.pauseForExternalOperation(message),
+    resumeExternalOperation: () => coordinator.current?.resumeExternalOperation(),
+    closing, closeError, isClosing: () => closingRef.current, setComposing, updateTitle: (title: string) => update({ title }), updateDocument: (document: WritingDocument) => update({ document }) };
 }

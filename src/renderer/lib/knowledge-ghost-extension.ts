@@ -4,8 +4,8 @@ import { closeHistory } from '@tiptap/pm/history';
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 import type { KnowledgeEntry } from '../../shared/assets';
 import { readableKnowledgeSource } from '../../shared/knowledge-source';
-import { findKnowledgeCompletion, type KnowledgeCompletion } from './knowledge-completion';
-export interface KnowledgeGhostContext { entries: KnowledgeEntry[]; paused: boolean }
+import { findKnowledgeCompletion, findScopedKnowledgeCompletion, type KnowledgeCompletion } from './knowledge-completion';
+export interface KnowledgeGhostContext { entries: KnowledgeEntry[]; globalEntries?: KnowledgeEntry[]; paused: boolean; onAcceptGlobal?: (candidate: KnowledgeCompletion) => Promise<boolean>; onError?: (message: string) => void }
 interface Ghost { position: number; paragraphStart: number; candidate: KnowledgeCompletion }
 const ghostKey = new PluginKey<Ghost | null>('knowledgeGhost');
 function baseline(state: EditorState) {
@@ -18,10 +18,14 @@ function baseline(state: EditorState) {
 /** 灰字仅为DOM装饰；接受前不会进入JSON、字数、保存或撤销历史。 */
 export function createKnowledgeGhost(context: () => KnowledgeGhostContext) {
   return Extension.create({ name: 'knowledgeGhost', addProseMirrorPlugins() {
-    let timer: ReturnType<typeof setTimeout> | undefined, focused = false, composing = false, needsRefresh = false;
+    let timer: ReturnType<typeof setTimeout> | undefined, focused = false, composing = false, needsRefresh = false, accepting = false;
     let suppressed: { doc: EditorState['doc']; position: number } | null = null;
     function cancelTimer() { if (timer !== undefined) clearTimeout(timer); timer = undefined; }
     function allowed(view: EditorView) { return focused && !composing && !view.composing && view.editable && !context().paused; }
+    function match(prefix: string) {
+      const scope = context();
+      return scope.globalEntries ? findScopedKnowledgeCompletion(prefix, { workEntries: scope.entries, globalEntries: scope.globalEntries }) : findKnowledgeCompletion(prefix, scope.entries);
+    }
     function clear(view: EditorView, suppress = false) {
       cancelTimer();
       if (suppress) suppressed = { doc: view.state.doc, position: view.state.selection.from };
@@ -30,13 +34,13 @@ export function createKnowledgeGhost(context: () => KnowledgeGhostContext) {
     function schedule(view: EditorView) {
       cancelTimer();
       const current = baseline(view.state);
-      if (!allowed(view) || !current || (suppressed?.doc === view.state.doc && suppressed.position === current.position)) { clear(view); return; }
+      if (accepting || !allowed(view) || !current || (suppressed?.doc === view.state.doc && suppressed.position === current.position)) { clear(view); return; }
       const doc = view.state.doc;
       timer = setTimeout(() => {
         timer = undefined;
         const live = baseline(view.state);
         if (view.isDestroyed || !allowed(view) || view.state.doc !== doc || !live || live.position !== current.position || live.prefix !== current.prefix) return;
-        const candidate = findKnowledgeCompletion(live.prefix, context().entries);
+        const candidate = match(live.prefix);
         view.dispatch(view.state.tr.setMeta(ghostKey, candidate ? { position: live.position, paragraphStart: live.paragraphStart, candidate } : null).setMeta('addToHistory', false));
       }, 400);
     }
@@ -55,7 +59,7 @@ export function createKnowledgeGhost(context: () => KnowledgeGhostContext) {
             const span = document.createElement('span'); span.className = 'knowledge-ghost'; span.dataset.knowledgeGhost = ghost.candidate.knowledgeId;
             const suffix = document.createElement('span'); suffix.textContent = ghost.candidate.suffix; span.append(suffix); span.contentEditable = 'false';
             const source = readableKnowledgeSource(ghost.candidate.source) || '未注明';
-            const origin = document.createElement('small'); origin.className = 'knowledge-ghost-source'; origin.textContent = `〔${source.slice(0, 60)} · Tab接受〕`; origin.setAttribute('aria-hidden', 'true'); span.append(origin);
+            const origin = document.createElement('small'); origin.className = 'knowledge-ghost-source'; origin.textContent = `〔${ghost.candidate.library === 'global' ? '全局 · ' : ''}${source.slice(0, 60)} · Tab接受〕`; origin.setAttribute('aria-hidden', 'true'); span.append(origin);
             span.setAttribute('role', 'note'); span.setAttribute('aria-label', `知识原句参考，出处：${source}；Tab接受，Esc取消`);
             span.title = `出处：${source} · Tab 接受 / Esc 取消`;
             // 装饰不可选中，不提供可聚焦控件，不移动作者光标。
@@ -68,9 +72,23 @@ export function createKnowledgeGhost(context: () => KnowledgeGhostContext) {
           const ghost = ghostKey.getState(view.state); if (!ghost) return false;
           if (event.key === 'Escape') { clear(view, true); return true; }
           if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return false;
-          const current = baseline(view.state), live = current && findKnowledgeCompletion(current.prefix, context().entries);
+          const current = baseline(view.state), live = current && match(current.prefix);
           if (!allowed(view) || !current || current.position !== ghost.position || current.paragraphStart !== ghost.paragraphStart || JSON.stringify(live) !== JSON.stringify(ghost.candidate)) { clear(view); return false; }
           cancelTimer();
+          if (ghost.candidate.library === 'global') {
+            const accept = context().onAcceptGlobal;
+            clear(view, true);
+            if (!accept || accepting) return true;
+            const doc = view.state.doc, selection = view.state.selection;
+            accepting = true;
+            // 先冻结出处，等待期间作者仍可输入；正文或光标已变化就放弃过时候选。
+            void accept(ghost.candidate).then(saved => {
+              if (!saved || view.isDestroyed || !allowed(view) || view.state.doc !== doc || !view.state.selection.eq(selection)) return;
+              view.dispatch(closeHistory(view.state.tr).insertText(ghost.candidate.suffix, ghost.position).setMeta(ghostKey, null));
+              view.dispatch(closeHistory(view.state.tr).setMeta('addToHistory', false));
+            }).catch(() => context().onError?.('全局参考未保存，未插入原句，请重试。')).finally(() => { accepting = false; });
+            return true;
+          }
           view.dispatch(closeHistory(view.state.tr).insertText(ghost.candidate.suffix, ghost.position).setMeta(ghostKey, null));
           view.dispatch(closeHistory(view.state.tr).setMeta('addToHistory', false));
           return true;

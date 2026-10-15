@@ -1,7 +1,15 @@
 import type { KnowledgeEntry } from '../../shared/assets';
-export interface KnowledgeCompletion { knowledgeId: string; revision: number; prefix: string; suffix: string; source: string }
+export interface KnowledgeCompletion { knowledgeId: string; revision: number; prefix: string; suffix: string; source: string; library?: 'work' | 'global' }
 const MAX_SCAN = 200_000;
 const MAX_SUFFIX = 160;
+
+/** 两个库分别匹配，保持当前作品优先，避免全局库抢占更符合当前作品的参考。 */
+export function findScopedKnowledgeCompletion(prefix: string, scope: { workEntries: KnowledgeEntry[]; globalEntries: KnowledgeEntry[] }): KnowledgeCompletion | null {
+  const work = findKnowledgeCompletion(prefix, scope.workEntries);
+  if (work) return { ...work, library: 'work' };
+  const global = findKnowledgeCompletion(prefix, scope.globalEntries);
+  return global ? { ...global, library: 'global' } : null;
+}
 
 /** 只从已保存的知识原句生成确定性的前缀提示，不调用模型也不改正文。 */
 export function findKnowledgeCompletion(prefix: string, entries: KnowledgeEntry[]): KnowledgeCompletion | null {

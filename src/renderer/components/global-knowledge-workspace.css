@@ -1,0 +1,10 @@
+.knowledge-scope-tabs { display:flex; gap:6px; padding:0 28px 14px; flex-wrap:wrap; }
+.knowledge-scope-tabs button { border:0; background:transparent; color:var(--text-secondary,#667085); padding:8px 12px; border-radius:9px; }
+.knowledge-scope-tabs button[aria-pressed="true"] { background:#edf6ff; color:#1672b9; }
+.global-knowledge .knowledge-results { min-height:180px; }
+.global-knowledge .knowledge-entry-actions { opacity:0; transition:opacity var(--motion-fast,140ms); }
+.global-knowledge .knowledge-entry:hover .knowledge-entry-actions,.global-knowledge .knowledge-entry:focus-within .knowledge-entry-actions { opacity:1; }
+.global-knowledge-notes { border-top:1px solid #edf0f3; margin-top:12px; padding-top:12px; color:#667085; font-size:13px; }
+.global-knowledge-notes dl { line-height:1.8; }.global-knowledge-notes dd { margin:0 0 8px; }.global-knowledge-notes dt { color:#344054; }
+.global-tag { display:inline-block; margin-left:8px; }.global-inline-tag { display:flex; gap:8px; padding:12px 0; }
+@media (hover:none) { .global-knowledge .knowledge-entry-actions { opacity:1; } }

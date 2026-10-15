@@ -45,7 +45,10 @@ it('真实全局知识scope身份映射回源ID，分页、来源作品revision�
   const secondPage=await state.commands.execute('queryKnowledge',{...state.query,queryId:randomUUID(),workId:null,mode:'keyword',pageSize:1,page:2}) as RetrievalReply;
   const actual=[...reply.hits,...secondPage.hits];
   expect(new Set(actual.map(hit=>hit.workId))).toEqual(new Set([first.id,second.id]));
-  for(const hit of actual) expect(repository.openWork(hit.workId).assets!.knowledge.some(entry=>entry.id===hit.entryId)).toBe(true);
+  for(const hit of actual) {
+    expect(hit.workId).not.toBeNull();
+    if(hit.workId) expect(repository.openWork(hit.workId).assets!.knowledge.some(entry=>entry.id===hit.entryId)).toBe(true);
+  }
   expect(state.client.search).not.toHaveBeenCalled();
 });
 it('真实Store当前作品边界不阻断其他作品只读检索，跨作品分类筛选明确拒绝',async()=> {

@@ -1,4 +1,8 @@
 import type { AiKnowledgeApproval } from './ai-extraction';
+import type { GlobalKnowledgeApi } from './global-knowledge';
+import type { GlobalWorkCopyApi } from './global-work-copy';
+import type { GlobalExtractionApi } from './global-book-extraction';
+import type { GlobalBookExtractionAiApi } from './global-book-extraction-ai';
 export interface TextNode { type: 'text'; text: string }
 export interface HardBreakNode { type: 'hardBreak' }
 export interface BookmarkNode { type: 'bookmark'; attrs: { id: string; kind: 'knowledge' | 'foreshadow'; targetId: string } }
@@ -39,7 +43,7 @@ export type StructureAction =
 export interface StructureRequest { workId: string; expectedRevision: number; operationId: string; action: StructureAction }
 export interface SaveResult { revision: number; wordCount: number; assets?: AssetState }
 export interface RuntimeInfo { version: string; dataDirectory: string }
-export interface DesktopApi extends BookExtractionAiApi, RetrievalApi {
+export interface DesktopApi extends BookExtractionAiApi, RetrievalApi, Partial<GlobalKnowledgeApi>, Partial<GlobalWorkCopyApi>, Partial<GlobalExtractionApi>, Partial<GlobalBookExtractionAiApi> {
   readExtractionDraft?(workId: string): Promise<ExtractionDraftRecovery | null>;
   discardExtractionDraft?(workId: string, token: string): Promise<void>;
   saveExtractionReview?(request: ExtractionReviewRequest): Promise<ExtractionDraft>;
@@ -62,7 +66,7 @@ export interface DesktopApi extends BookExtractionAiApi, RetrievalApi {
   getAiSettings(): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
   saveAiSettings(provider: AiProvider, key?: string): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
   clearAiSettings(): Promise<{ provider: AiProvider | null; hasCredential: boolean }>;
-  prepareAi(request: { workId: string; chapterId: string; operation: AiOperation; scope: 'chapter' | 'previous' | 'volume' | 'custom'; chapterIds?: string[]; instruction?: string; targetParagraphIds?: string[]; sentenceText?: string; sentenceFrom?: number; referenceKnowledgeIds?: string[] }): Promise<AiPreparedRequest>;
+  prepareAi(request: { workId: string; chapterId: string; operation: AiOperation; scope: 'chapter' | 'previous' | 'volume' | 'custom'; chapterIds?: string[]; instruction?: string; targetParagraphIds?: string[]; sentenceText?: string; sentenceFrom?: number; referenceKnowledgeIds?: string[]; referenceGlobalKnowledge?: import('./global-knowledge').GlobalEntryRef[] }): Promise<AiPreparedRequest>;
   executeAi(request: AiExecuteRequest): Promise<AiCandidate>;
   cancelAi(confirmationToken: string): Promise<void>;
   applyAiCandidate(request: { workId: string; candidateId: string; operationId: string }): Promise<WorkDetail>;

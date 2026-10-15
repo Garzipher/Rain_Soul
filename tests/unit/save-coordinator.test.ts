@@ -4,6 +4,35 @@ import { SaveCoordinator, SaveValidationError } from '../../src/renderer/lib/sav
 describe('自动保存协调器', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
+  it('外部知识事务期间暂存新输入，版本核实后再保存', async () => {
+    const saved: string[] = [];
+    let finish!: () => void;
+    const coordinator = new SaveCoordinator<string>({ save: async value => { saved.push(value); }, onStatusChange: () => {} });
+    coordinator.update('事务前');
+    const task = coordinator.withSavedState(() => new Promise<void>(resolve => { finish = resolve; }));
+    await vi.advanceTimersByTimeAsync(0);
+    coordinator.update('事务期间的新输入');
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(saved).toEqual(['事务前']);
+    finish();
+    await task;
+    await coordinator.flush();
+    expect(saved).toEqual(['事务前', '事务期间的新输入']);
+    coordinator.dispose();
+  });
+  it('外部写入回执未知时暂停落盘，核实后保留并提交最新草稿', async () => {
+    const saved: string[] = [];
+    const coordinator = new SaveCoordinator<string>({ save: async value => { saved.push(value); }, onStatusChange: () => {} });
+    coordinator.pauseForExternalOperation('知识复制待核实');
+    coordinator.update('保留草稿');
+    await vi.advanceTimersByTimeAsync(6000);
+    await expect(coordinator.flush()).rejects.toThrow('知识复制待核实');
+    expect(saved).toEqual([]);
+    coordinator.resumeExternalOperation();
+    await coordinator.flush();
+    expect(saved).toEqual(['保留草稿']);
+    coordinator.dispose();
+  });
   it('停顿500ms才提交最新草稿', async () => {
     const saved: string[] = [];
     const coordinator = new SaveCoordinator<string>({ save: async value => { saved.push(value); }, onStatusChange: () => {} });

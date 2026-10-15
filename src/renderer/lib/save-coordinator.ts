@@ -17,6 +17,8 @@ export class SaveCoordinator<T> {
   private pending: Promise<void> | null = null;
   private failedFlight: { generation: number; snapshot: T } | null = null;
   private disposed = false;
+  private held = false;
+  private externalBlock: string | null = null;
   constructor(private readonly options: SaveOptions<T>) {}
   update(snapshot: T): void {
     if (this.disposed) throw new Error('保存协调器已释放');
@@ -30,6 +32,7 @@ export class SaveCoordinator<T> {
   async flush(): Promise<void> {
     this.clearTimer();
     if (this.disposed) throw new Error('保存协调器已释放');
+    if (this.externalBlock) throw new Error(this.externalBlock);
     while (this.committed < this.generation) {
       if (this.status.phase === 'failed') throw new Error(this.status.error ?? '保存失败');
       await this.submit();
@@ -44,6 +47,17 @@ export class SaveCoordinator<T> {
     }
     await this.flush();
   }
+  /** 外部资产事务短暂占用保存通道，输入仍可进入草稿，事务结束后继续落盘。 */
+  async withSavedState<R>(action: () => Promise<R>): Promise<R> {
+    await this.flush();
+    this.clearTimer();
+    this.held = true;
+    try { return await action(); }
+    finally { this.held = false; if (this.committed < this.generation) this.schedule(); }
+  }
+  /** 外部写入回执未知时暂停自动保存，核实版本后才可继续提交草稿。 */
+  pauseForExternalOperation(message: string): void { this.externalBlock = message; this.clearTimer(); }
+  resumeExternalOperation(): void { this.externalBlock = null; if (this.committed < this.generation) this.schedule(); }
   dispose(): void { this.disposed = true; this.clearTimer(); }
   private clearTimer(): void { if (this.timer !== null) clearTimeout(this.timer); this.timer = null; }
   private setStatus(phase: SaveStatus['phase'], error: string | null = null): void {
@@ -52,7 +66,7 @@ export class SaveCoordinator<T> {
   }
   private schedule(): void {
     this.clearTimer();
-    if (this.pending || this.disposed || this.status.phase === 'failed') return;
+    if (this.pending || this.held || this.externalBlock || this.disposed || this.status.phase === 'failed') return;
     const remaining = (this.options.maxWaitMs ?? 4500) - (Date.now() - (this.dirtySince ?? Date.now()));
     this.timer = setTimeout(() => { void this.submit().catch(() => {}); }, Math.max(0, Math.min(this.options.debounceMs ?? 500, remaining)));
   }

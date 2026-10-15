@@ -27,8 +27,26 @@ import type { AiCandidate, AiExecuteRequest } from '../shared/ai';
 import { isDefiniteRejection } from '../shared/operation-errors';
 import { ConversationWorkspace } from './components/conversation-workspace';
 import { BookExtractionWorkspace } from './components/book-extraction-workspace';
+import { GlobalKnowledgeWorkspace } from './components/global-knowledge-workspace';
+import { GlobalBookExtractionWorkspace } from './components/global-book-extraction-workspace';
+import { useGlobalKnowledge, useGlobalCompletionEntries } from './hooks/use-global-knowledge';
+import type { GlobalWorkCopyRequest } from '../shared/global-work-copy';
+import type { GlobalExtractionApi } from '../shared/global-book-extraction';
+import type { GlobalEntryRef, GlobalKnowledgeEntry } from '../shared/global-knowledge';
+import type { KnowledgeCompletion } from './lib/knowledge-completion';
 import type { AiReviewState } from './components/ai-workspace';
 import type { SavedWritingRequest } from './lib/writing-ai-selection';
+import { AnimatePresence } from 'motion/react';
+import { useMotionPreference } from './motion/motion-provider';
+import { transitionPage } from './motion/page-transition';
+
+function hasGlobalExtractionApi(api: DesktopApi): api is DesktopApi & GlobalExtractionApi {
+  return typeof api.chooseGlobalBookExtraction === 'function' && typeof api.fetchGlobalWebExtraction === 'function'
+    && typeof api.previewGlobalPastedExtraction === 'function' && typeof api.confirmGlobalBookExtraction === 'function'
+    && typeof api.readGlobalExtractionDraft === 'function' && typeof api.saveGlobalExtractionReview === 'function'
+    && typeof api.discardGlobalExtractionDraft === 'function' && typeof api.cancelGlobalBookExtraction === 'function'
+    && typeof api.cancelGlobalWebExtraction === 'function';
+}
 
 export interface AppProps { api: DesktopApi; textbook?: Textbook }
 type PendingOperation = { kind: 'structure'; request: StructureRequest } | { kind: 'addChapter'; workId: string; title: string; revision: number; operationId: string; volumeId: string | null; previousIds: string[] }
@@ -36,7 +54,8 @@ type PendingOperation = { kind: 'structure'; request: StructureRequest } | { kin
   | { kind: 'importManuscript'; request: { token: string; operationId: string; draft: ManuscriptDraft } }
   | { kind: 'importProjectArchive'; request: { token: string; operationId: string } }
   | { kind: 'applyAi'; request: { workId: string; candidateId: string; operationId: string } }
-  | { kind: 'approveAi'; request: { workId: string; candidateId: string; operationId: string; items: AiKnowledgeApproval[] } };
+  | { kind: 'approveAi'; request: { workId: string; candidateId: string; operationId: string; items: AiKnowledgeApproval[] } }
+  | { kind: 'freezeGlobal'; request: GlobalWorkCopyRequest };
 const pageTitles: Record<Exclude<Page, 'work'>, string> = { shelf: '作品集', knowledge: '知识库', sessions: '需求会话', settings: '设置' };
 const messageOf = (reason: unknown) => reason instanceof Error ? reason.message : '操作失败，请重试';
 const validWritingReferenceIds = (work: WorkDetail, ids: string[]) => {
@@ -45,6 +64,9 @@ const validWritingReferenceIds = (work: WorkDetail, ids: string[]) => {
 };
 
 export default function App({ api, textbook }: AppProps) {
+  const global = useGlobalKnowledge(api);
+  const globalEntries = useGlobalCompletionEntries(api, global.page?.revision);
+  const globalFlight = useRef<Promise<boolean> | null>(null);
   const author = useAuthorProfile(api);
   const [expanded, setExpanded] = useState(false);
   const [page, setPage] = useState<Page>('shelf');
@@ -83,7 +105,7 @@ export default function App({ api, textbook }: AppProps) {
   const pendingAssetRef = useRef<AssetRequest | null>(null);
   const [pendingAsset, setPendingAsset] = useState<AssetRequest | null>(null);
   const [assetRecovery, setAssetRecovery] = useState({ workspace: 0, dictionary: 0, style: 0 });
-  const [knowledgeScopeId, setKnowledgeScopeId] = useState<string>('');
+  const [knowledgeScopeId, setKnowledgeScopeId] = useState<string>('global');
   const [knowledgeScope, setKnowledgeScope] = useState<KnowledgeScope | null>(null);
   const [knowledgeError, setKnowledgeError] = useState<string | null>(null);
   const [knowledgeRetry, setKnowledgeRetry] = useState(0);
@@ -92,10 +114,13 @@ export default function App({ api, textbook }: AppProps) {
   knowledgeCopyRef.current = knowledgeCopyPreview;
   const [selectedKnowledgeId, setSelectedKnowledgeId] = useState<string | null>(null);
   const [bookExtraction, setBookExtraction] = useState(false);
+  const [globalExtraction, setGlobalExtraction] = useState(false);
+  const motion = useMotionPreference();
+  const composingRef = useRef(false);
   const notifyAssetDirty = useCallback((dirty: boolean) => { assetDirtyRef.current = dirty; }, []);
   const operationInProgress = useRef(false);
   const activeOperation = useRef<Promise<void>>(Promise.resolve());
-  const session = useWritingSession(api, work, chapterId, setWork, { beforeClose: async () => { await author.waitForPending(); await activeOperation.current; if (pendingRef.current) throw new Error('结构操作结果待确认，请先重试结构操作'); if (pendingAssetRef.current) throw new Error('资产操作结果待确认，请先重试资产操作'); if (knowledgeCopyRef.current) throw new Error('知识复制尚未确认，请先确认或取消'); if (assetDirtyRef.current) throw new Error('资产编辑尚未保存，请先保存或放弃当前更改'); }, isBlocked: () => operationInProgress.current || !!pendingRef.current || !!pendingAssetRef.current || !!knowledgeCopyRef.current || assetDirtyRef.current });
+  const session = useWritingSession(api, work, chapterId, setWork, { beforeClose: async () => { await author.waitForPending(); if (globalFlight.current) await globalFlight.current; await activeOperation.current; if (pendingRef.current) throw new Error('结构操作结果待确认，请先重试结构操作'); if (pendingAssetRef.current) throw new Error('资产操作结果待确认，请先重试资产操作'); if (knowledgeCopyRef.current) throw new Error('知识复制尚未确认，请先确认或取消'); if (assetDirtyRef.current) throw new Error('资产编辑尚未保存，请先保存或放弃当前更改'); }, isBlocked: () => operationInProgress.current || !!pendingRef.current || !!pendingAssetRef.current || !!knowledgeCopyRef.current || assetDirtyRef.current });
   const locked = busy || session.closing || !!pending || !!pendingAsset;
   const worksGeneration = useRef(0);
   const loadWorks = useCallback(async (propagateError = false) => {
@@ -108,7 +133,7 @@ export default function App({ api, textbook }: AppProps) {
   }, [api]);
   useEffect(() => { void loadWorks(); }, [loadWorks]);
   useEffect(() => {
-    if (page !== 'knowledge' || !work) return;
+    if (page !== 'knowledge' || !work || knowledgeScopeId === 'global') return;
     const scopeId = knowledgeScopeId || work.id;
     let active = true;
     setKnowledgeScope(null); setKnowledgeError(null);
@@ -117,6 +142,7 @@ export default function App({ api, textbook }: AppProps) {
   }, [api, page, work?.id, work?.revision, knowledgeScopeId, assetRecovery.workspace, knowledgeRetry]);
 
   async function guarded(action: () => Promise<void>, allowPending = false, allowAssetDirty = false): Promise<boolean> {
+    if (globalFlight.current) await globalFlight.current;
     if (operationInProgress.current || session.isClosing() || ((pendingRef.current || pendingAssetRef.current) && !allowPending) || ((assetDirtyRef.current || knowledgeCopyRef.current) && !allowAssetDirty)) {
       if (knowledgeCopyRef.current && !allowAssetDirty) setError('请先确认或取消当前知识复制。');
       if (assetDirtyRef.current && !allowAssetDirty) setError('请先保存或放弃当前资产编辑。');
@@ -126,7 +152,7 @@ export default function App({ api, textbook }: AppProps) {
     setBusy(true);
     setError(null);
     const operation = (async () => {
-      try { await session.flush(); await action(); return true; }
+      try { if (!(allowPending && pendingRef.current?.kind === 'freezeGlobal')) await session.flush(); await action(); return true; }
       catch (reason) { setError(messageOf(reason)); return false; }
       finally { operationInProgress.current = false; setBusy(false); }
     })();
@@ -136,17 +162,35 @@ export default function App({ api, textbook }: AppProps) {
   function navigate(next: Page) {
     void guarded(async () => {
       if (next === 'shelf') await loadWorks(true);
-      setPage(next);
+       transitionPage(() => setPage(next), { reduced: motion.reduced, composing: composingRef.current });
       if (next !== 'work') setChapterId(null);
       else if (work) setChapterId(lastWritingChapter.current[work.id] ?? work.chapters[0]?.id ?? null);
     });
+  }
+  async function freezeGlobalEntries(entries: GlobalEntryRef[]): Promise<boolean> {
+    if (!work || !api.freezeGlobalKnowledge || globalFlight.current || locked || pendingRef.current || assetDirtyRef.current) return false;
+    const owner = work.id;
+    const operation = session.withSavedState(async () => {
+      const fresh = await api.openWork(owner);
+      const request: GlobalWorkCopyRequest = { workId: owner, expectedRevision: fresh.revision, operationId: crypto.randomUUID(), entries };
+      try { const updated = await api.freezeGlobalKnowledge!(request); session.acceptWork(updated); setWork(updated); return true; }
+      catch (reason) { if (!isDefiniteRejection(reason)) { const retry: PendingOperation = { kind: 'freezeGlobal', request }; pendingRef.current = retry; setPending(retry); session.pauseForExternalOperation('知识复制结果待核实，请先重试知识复制再保存正文。'); } throw reason; }
+    }).catch(reason => { setError(messageOf(reason)); return false; }).finally(() => { globalFlight.current = null; });
+    globalFlight.current = operation;
+    return operation;
+  }
+  async function acceptGlobalCompletion(candidate: KnowledgeCompletion): Promise<boolean> {
+    return freezeGlobalEntries([{ entryId: candidate.knowledgeId, revision: candidate.revision }]);
+  }
+  async function useGlobalEntry(entry: GlobalKnowledgeEntry) {
+    return freezeGlobalEntries([{ entryId: entry.id, revision: entry.revision }]);
   }
   function enterWork(detail: WorkDetail) {
     // 已落盘的新作品立即合入目录；晚到的旧目录请求不能抹掉它。
     worksGeneration.current += 1;
     setWorks(items => [{ id: detail.id, title: detail.title, chapterCount: detail.chapters.length, wordCount: detail.chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0), updatedAt: new Date().toISOString() }, ...items.filter(item => item.id !== detail.id)]);
     setWork(detail);
-    setKnowledgeScopeId(detail.id); setKnowledgeScope(null);
+    setKnowledgeScope(null);
     setChapterId(detail.chapters[0]?.id ?? null);
     setSelectedVolumeId(detail.chapters[0]?.volumeId ?? null);
     setPage('work');
@@ -221,6 +265,11 @@ export default function App({ api, textbook }: AppProps) {
       else if (request.kind === 'importManuscript') await applyImport(request.request);
       else if (request.kind === 'importProjectArchive') await applyArchiveImport(request.request);
       else if (request.kind === 'applyAi' || request.kind === 'approveAi') await applyAiOperation(request);
+      else if (request.kind === 'freezeGlobal') {
+        if (!api.freezeGlobalKnowledge) throw new Error('全局知识复制接口不可用。');
+        try { const updated = await api.freezeGlobalKnowledge(request.request); session.acceptWork(updated); setWork(updated); pendingRef.current = null; setPending(null); session.resumeExternalOperation(); }
+        catch (reason) { if (isDefiniteRejection(reason)) { pendingRef.current = null; setPending(null); session.resumeExternalOperation(); } throw reason; }
+      }
       else if (request.kind === 'copyKnowledge') {
         try { await applyVersionOperation(request); }
         catch (reason) { if (isDefiniteRejection(reason)) { pendingRef.current = null; setPending(null); } throw reason; }
@@ -388,13 +437,13 @@ export default function App({ api, textbook }: AppProps) {
   }
 
   return <div className={`app ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
-    {knowledgeCopyPreview && <KnowledgeCopyDialog preview={knowledgeCopyPreview} busy={busy || session.closing} pending={pending?.kind === 'copyKnowledge'} onRetry={retryStructure} onConfirm={confirmKnowledgeCopy} onClose={() => setKnowledgeCopyPreview(null)} />}
+    <AnimatePresence>{knowledgeCopyPreview && <KnowledgeCopyDialog key="knowledge-copy" preview={knowledgeCopyPreview} busy={busy || session.closing} pending={pending?.kind === 'copyKnowledge'} onRetry={retryStructure} onConfirm={confirmKnowledgeCopy} onClose={() => setKnowledgeCopyPreview(null)} />}</AnimatePresence>
     <Sidebar author={author} locked={locked} expanded={expanded} page={page} onToggle={() => setExpanded((value) => !value)} onNavigate={navigate} />
     <main className="main">
       {session.closeError && !(page === 'work' && session.status.phase === 'failed') && <div className="page-error" role="alert">{session.closeError}</div>}
       {pendingAsset && <div className="page-error" role="alert"><span>资产操作结果待确认。请重试原请求，以免重复创建或覆盖。</span><button className="secondary" disabled={busy || session.closing} onClick={retryAsset}>重试资产操作</button></div>}
       {error && !(page === 'work' && session.status.phase === 'failed') && <div className="page-error" role="alert"><span>{error}</span>{pending ? <button className="secondary" disabled={busy || session.closing} onClick={retryStructure}>{pending.kind === 'createSnapshot' || pending.kind === 'restoreSnapshot' ? '重试快照操作' : pending.kind === 'applyAi' || pending.kind === 'approveAi' ? '重试 AI 写入' : pending.kind === 'copyKnowledge' ? '重试知识复制' : pending.kind === 'importManuscript' || pending.kind === 'importProjectArchive' ? '重试导入操作' : '重试结构操作'}</button> : page === 'shelf' && <button className="secondary" onClick={() => void loadWorks()}>重新加载</button>}</div>}
-      {page === 'work' && work ? <WritingWorkspace savedSelection={writingSelections[work.id]} onSelectionChange={value => setWritingSelections(previous => ({ ...previous, [work.id]: value }))} key={work.id} onLocateAsset={locateKnowledge} ai={{ initialReview: aiReviews[work.id], onReviewChange: review => setAiReviews(previous => ({ ...previous, [work.id]: review })), selectedReferenceIds, onRetrieve: api.queryKnowledge, onPrepare: prepareAi, onExecute: executeAi, onCancel: api.cancelAi, onApply: candidateId => acceptAi(candidateId), onExtract: (candidateId, items) => acceptAi(candidateId, items) }} onBackup={exportArchive} onExport={exportManuscript} snapshots={{ onExport: exportSnapshot, onList: listSnapshots, onPreview: id => api.previewSnapshot(work.id, id), onCreate: title => manageSnapshot('createSnapshot', title), onRestore: id => manageSnapshot('restoreSnapshot', id) }} location={location} assetRecovery={assetRecovery.workspace} textbook={textbook} work={work} draft={session.draft} status={session.status} busy={locked} closing={session.closing} onCompositionChange={session.setComposing} onSelectChapter={(id) => void guarded(async () => { setChapterId(id); setSelectedVolumeId(work.chapters.find((chapter) => chapter.id === id)?.volumeId ?? null); })} onAddChapter={addChapter} onAddVolume={structure.addVolume} onSelectVolume={setSelectedVolumeId} onMenu={(target, event) => { if (target.kind === 'volume') setSelectedVolumeId(target.id); structure.showMenu(target, event); }} onTitleChange={session.updateTitle} onDocumentChange={session.updateDocument} onRetry={retrySave} onReturn={() => navigate('shelf')} changeTab={(action) => guarded(async () => action())} onError={setError} onAssetAction={manageAsset} onAssetDirtyChange={notifyAssetDirty} onLocate={locateChapter} /> : <>
+      {page === 'work' && work ? <WritingWorkspace globalEntries={globalEntries} onAcceptGlobal={acceptGlobalCompletion} savedSelection={writingSelections[work.id]} onSelectionChange={value => setWritingSelections(previous => ({ ...previous, [work.id]: value }))} key={work.id} onLocateAsset={locateKnowledge} ai={{ initialReview: aiReviews[work.id], onReviewChange: review => setAiReviews(previous => ({ ...previous, [work.id]: review })), selectedReferenceIds, onRetrieve: api.queryKnowledge, onPrepare: prepareAi, onExecute: executeAi, onCancel: api.cancelAi, onApply: candidateId => acceptAi(candidateId), onExtract: (candidateId, items) => acceptAi(candidateId, items) }} onBackup={exportArchive} onExport={exportManuscript} snapshots={{ onExport: exportSnapshot, onList: listSnapshots, onPreview: id => api.previewSnapshot(work.id, id), onCreate: title => manageSnapshot('createSnapshot', title), onRestore: id => manageSnapshot('restoreSnapshot', id) }} location={location} assetRecovery={assetRecovery.workspace} textbook={textbook} work={work} draft={session.draft} status={session.status} busy={locked} closing={session.closing} onCompositionChange={value => { composingRef.current = value; session.setComposing(value); }} onSelectChapter={(id) => void guarded(async () => { setChapterId(id); setSelectedVolumeId(work.chapters.find((chapter) => chapter.id === id)?.volumeId ?? null); })} onAddChapter={addChapter} onAddVolume={structure.addVolume} onSelectVolume={setSelectedVolumeId} onMenu={(target, event) => { if (target.kind === 'volume') setSelectedVolumeId(target.id); structure.showMenu(target, event); }} onTitleChange={session.updateTitle} onDocumentChange={session.updateDocument} onRetry={retrySave} onReturn={() => navigate('shelf')} changeTab={(action) => guarded(async () => action())} onError={setError} onAssetAction={manageAsset} onAssetDirtyChange={notifyAssetDirty} onLocate={locateChapter} /> : <>
         {page !== 'sessions' && <header className="topbar"><h1>{page === 'work' ? '作品集' : pageTitles[page]}</h1>{page === 'shelf' && <div className="header-actions"><SelectField aria-label="TXT 导入编码" value={importEncoding} disabled={locked} onChange={event => setImportEncoding(event.target.value as 'utf-8' | 'gb18030')}><option value="utf-8">UTF-8</option><option value="gb18030">GB18030</option></SelectField><button className="secondary" disabled={locked} onClick={chooseManuscript}>导入手稿</button><button className="secondary" disabled={locked} onClick={chooseArchive}>导入项目</button><button className="primary" onClick={() => { setCreateError(null); setShowCreate(true); }} disabled={locked}><Icon name="plus" />新建作品</button></div>}</header>}
         {page === 'shelf' && <section className="shelf" aria-label="作品书架">
           {loading ? <p role="status">正在读取本机作品…</p> : !error && <>
@@ -404,15 +453,18 @@ export default function App({ api, textbook }: AppProps) {
             </button>)}</div>}
           </>}
         </section>}
-        {page === 'knowledge' && (bookExtraction && work ? <BookExtractionWorkspace key={work.id} work={work} api={api} onClose={() => setBookExtraction(false)} onDirtyChange={notifyAssetDirty} onCommitted={updated => { session.acceptWork(updated); setWork(updated); }} /> : work?.assets && knowledgeScope ? <KnowledgeWorkspace referenceIds={selectedReferenceIds} onToggleReference={toggleWritingReference} onReturnWriting={() => navigate('work')} onRetrieve={api.queryKnowledge} onBookExtraction={() => { void guarded(async () => setBookExtraction(true)); }} selectedEntryId={selectedKnowledgeId} key={`${assetRecovery.workspace}/${knowledgeScopeId}`} work={work} assets={{ ...work.assets, knowledge: knowledgeScope.knowledge, categories: knowledgeScope.categories, tags: knowledgeScope.tags }} busy={locked} onAction={manageAsset} onDirtyChange={notifyAssetDirty} onSearch={knowledgeScopeId && knowledgeScopeId !== work.id ? searchKnowledgeScope : searchWork} onLocate={(id, paragraph) => { void guarded(async () => locateChapter(id, paragraph)); }} scopeProps={{ works, scopeId: knowledgeScopeId || work.id, onScopeChange: setKnowledgeScopeId, canEdit: (knowledgeScopeId || work.id) === work.id, onCopy: copyKnowledge, entryOwners: knowledgeScope.entryOwners }} /> : work ? <section aria-label="知识库加载">{knowledgeError ? <><p role="alert">{knowledgeError}</p><button className="secondary" disabled={locked} onClick={() => setKnowledgeRetry(value => value + 1)}>重新加载知识库</button></> : <p role="status">正在读取本机知识库…</p>}</section> : <section className="placeholder" aria-label="选择知识库作品"><span className="placeholder-mark" aria-hidden="true">◇</span><h2>请先选择作品</h2><p>知识按作品保存。请从作品集中选择要查看或维护知识的作品。</p><button className="secondary" onClick={() => navigate('shelf')}>前往作品集选择作品</button></section>)}
+        {page === 'knowledge' && <>
+          {!bookExtraction && !globalExtraction && <nav className="knowledge-scope-tabs" aria-label="知识库范围"><button disabled={locked} aria-pressed={knowledgeScopeId === 'global'} onClick={() => void guarded(async () => setKnowledgeScopeId('global'))}>全局知识库</button><button disabled={locked || !work} aria-pressed={knowledgeScopeId !== 'global'} onClick={() => void guarded(async () => { if (work) setKnowledgeScopeId(work.id); })}>作品知识库{work ? ` · ${work.title}` : ''}</button></nav>}
+          {knowledgeScopeId === 'global' ? global.page ? globalExtraction && hasGlobalExtractionApi(api) ? <GlobalBookExtractionWorkspace page={global.page} api={api} onCommitted={global.accept} onClose={() => setGlobalExtraction(false)} onDirtyChange={notifyAssetDirty} /> : <GlobalKnowledgeWorkspace page={global.page} query={global.query} busy={global.busy || locked} loading={global.loading} error={global.error} onQuery={global.setQuery} onAction={global.mutate} onExtract={() => { void guarded(async () => { if (!hasGlobalExtractionApi(api)) throw new Error('当前版本未提供全局拆书接口。'); setGlobalExtraction(true); }); }} onSettings={() => navigate('settings')} onRetry={global.refresh} onDirtyChange={notifyAssetDirty} onUse={work ? useGlobalEntry : undefined} /> : <section className="placeholder"><h2>全局知识库</h2>{global.error ? <><p role="alert">{global.error}</p><button onClick={global.refresh}>重新加载</button></> : <p role="status">正在读取本机全局知识库…</p>}</section> : (bookExtraction && work ? <BookExtractionWorkspace key={work.id} work={work} api={api} onClose={() => setBookExtraction(false)} onDirtyChange={notifyAssetDirty} onCommitted={updated => { session.acceptWork(updated); setWork(updated); }} /> : work?.assets && knowledgeScope ? <KnowledgeWorkspace referenceIds={selectedReferenceIds} onToggleReference={toggleWritingReference} onReturnWriting={() => navigate('work')} onRetrieve={api.queryKnowledge} onBookExtraction={() => { void guarded(async () => setBookExtraction(true)); }} selectedEntryId={selectedKnowledgeId} key={`${assetRecovery.workspace}/${knowledgeScopeId}`} work={work} assets={{ ...work.assets, knowledge: knowledgeScope.knowledge, categories: knowledgeScope.categories, tags: knowledgeScope.tags }} busy={locked} onAction={manageAsset} onDirtyChange={notifyAssetDirty} onSearch={knowledgeScopeId && knowledgeScopeId !== work.id ? searchKnowledgeScope : searchWork} onLocate={(id, paragraph) => { void guarded(async () => locateChapter(id, paragraph)); }} scopeProps={{ works, scopeId: knowledgeScopeId || work.id, onScopeChange: setKnowledgeScopeId, canEdit: (knowledgeScopeId || work.id) === work.id, onCopy: copyKnowledge, entryOwners: knowledgeScope.entryOwners }} /> : work ? <section aria-label="知识库加载">{knowledgeError ? <><p role="alert">{knowledgeError}</p><button className="secondary" disabled={locked} onClick={() => setKnowledgeRetry(value => value + 1)}>重新加载知识库</button></> : <p role="status">正在读取本机知识库…</p>}</section> : <section className="placeholder" aria-label="选择知识库作品"><span className="placeholder-mark" aria-hidden="true">◇</span><h2>请先选择作品</h2><p>知识按作品保存。请从作品集中选择要查看或维护知识的作品。</p><button className="secondary" onClick={() => navigate('shelf')}>前往作品集选择作品</button></section>)}
+        </>}
         {page === 'sessions' && <ConversationWorkspace key={work?.id ?? 'no-work'} work={work} works={works} api={api} externalBusy={locked} onDirtyChange={notifyAssetDirty} onOpenSettings={() => navigate('settings')} onSelectWork={id => { void guarded(async () => { const detail = await api.openWork(id); session.acceptWork(detail); setWork(detail); setChapterId(null); }); }} />}
-        {page === 'settings' && <SettingsPage assetRecovery={assetRecovery} author={author} api={api} currentWork={work} busy={locked} reload={recoveryReload} onAssetAction={manageAsset} onAssetDirtyChange={notifyAssetDirty} onSelect={(id) => { void guarded(async () => { const detail = await api.openWork(id); session.acceptWork(detail); setWork(detail); setChapterId(null); }); }} onRestore={manage} />}
+        {page === 'settings' && <SettingsPage globalKnowledge={{ page: global.page, busy: global.busy, error: global.error, onAction: global.mutate, onAccept: global.accept }} assetRecovery={assetRecovery} author={author} api={api} currentWork={work} busy={locked} reload={recoveryReload} onAssetAction={manageAsset} onAssetDirtyChange={notifyAssetDirty} onSelect={(id) => { void guarded(async () => { const detail = await api.openWork(id); session.acceptWork(detail); setWork(detail); setChapterId(null); }); }} onRestore={manage} />}
       </>}
     </main>
-    {structure.menu && <ContextMenu state={structure.menu} onClose={structure.closeMenu} />}
-    {structure.dialog && <StructureDialog state={structure.dialog} busy={busy} onClose={structure.closeDialog} />}
-    {showCreate && <CreateDialog busy={busy} error={createError} onClose={() => setShowCreate(false)} onCreate={(title) => void create(title)} />}
-    {importPreview && <ManuscriptDialog draft={importPreview.draft} busy={locked} error={error} onConfirm={confirmManuscript} onClose={() => setImportPreview(null)} />}
-    {archivePreview && <StructureDialog busy={locked} onClose={() => setArchivePreview(null)} state={{ heading: '导入项目归档', description: `${archivePreview.filename} · 格式 ${archivePreview.schemaVersion}。确认后校验数据库并导入为新作品，现有作品全部保留。`, submitLabel: '导入为新作品', onSubmit: confirmArchive }} />}
+    <AnimatePresence>{structure.menu && <ContextMenu key="structure-menu" state={structure.menu} onClose={structure.closeMenu} />}</AnimatePresence>
+    <AnimatePresence>{structure.dialog && <StructureDialog key="structure-dialog" state={structure.dialog} busy={busy} onClose={structure.closeDialog} />}</AnimatePresence>
+    <AnimatePresence>{showCreate && <CreateDialog key="create-work" busy={busy} error={createError} onClose={() => setShowCreate(false)} onCreate={(title) => void create(title)} />}</AnimatePresence>
+    <AnimatePresence>{importPreview && <ManuscriptDialog key="import-manuscript" draft={importPreview.draft} busy={locked} error={error} onConfirm={confirmManuscript} onClose={() => setImportPreview(null)} />}</AnimatePresence>
+    <AnimatePresence>{archivePreview && <StructureDialog key="import-archive" busy={locked} onClose={() => setArchivePreview(null)} state={{ heading: '导入项目归档', description: `${archivePreview.filename} · 格式 ${archivePreview.schemaVersion}。确认后校验数据库并导入为新作品，现有作品全部保留。`, submitLabel: '导入为新作品', onSubmit: confirmArchive }} />}</AnimatePresence>
   </div>;
 }
