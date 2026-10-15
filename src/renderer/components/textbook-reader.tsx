@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -10,6 +10,8 @@ import 'highlight.js/styles/github.css';
 
 /** 教材为只读 Markdown；原始 HTML、外链和任意图片不会进入阅读界面。 */
 export function TextbookReader({ chapter }: { chapter: TextbookChapter }) {
+  const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
+  const tocExpanded = expandedChapter === chapter.id;
   const sections = useMemo(() => {
     const tree = unified().use(remarkParse).parse(chapter.markdown);
     return tree.children.filter((node) => node.type === 'heading' && node.depth > 1).map((node, index) => {
@@ -35,12 +37,16 @@ export function TextbookReader({ chapter }: { chapter: TextbookChapter }) {
     walk(tree);
   }, [sections]);
   function jump(id: string) {
+    setExpandedChapter(null);
     const target = document.getElementById(id);
-    target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    target?.scrollIntoView?.({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
     target?.focus({ preventScroll: true });
   }
   return <div className="textbook-layout">
-    {sections.length > 0 && <nav className="textbook-toc" aria-label="本章目录">{sections.map((section) => <button key={section.id} onClick={() => jump(section.id)}>{section.label}</button>)}</nav>}
+    {sections.length > 0 && <aside className="textbook-toc-panel" data-expanded={tocExpanded}>
+      <button className="textbook-toc-toggle" aria-expanded={tocExpanded} aria-controls={`toc-${chapter.id}`} onClick={() => setExpandedChapter(tocExpanded ? null : chapter.id)}><span>本章目录</span><span aria-hidden="true">{tocExpanded ? '−' : '+'}</span></button>
+      <nav id={`toc-${chapter.id}`} className="textbook-toc" aria-label="本章目录"><h2>本章目录</h2>{sections.map((section) => <button key={section.id} onClick={() => jump(section.id)}>{section.label}</button>)}</nav>
+    </aside>}
     <article className="textbook" aria-label="教材正文">
       <Markdown skipHtml remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight, headingIds]} components={{
         a: ({ children }) => <span>{children}</span>,
