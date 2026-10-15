@@ -13,6 +13,7 @@ import { readableKnowledgeSource } from '../../shared/knowledge-source';
 import { LocalReferencePanel } from './local-reference-panel';
 import type { RetrievalQuery, RetrievalReply } from '../../shared/retrieval';
 import { diffText } from '../../shared/text-diff';
+import type { GlobalEntryRef } from '../../shared/global-knowledge';
 export interface AiReviewState { candidate: AiCandidate | null; original: string; items: ExtractionReviewItem[] }
 export interface AiWorkspaceProps {
   onActivityChange?: (active: boolean) => void;
@@ -24,7 +25,7 @@ export interface AiWorkspaceProps {
   selectionRequest?: WritingAiRequest;
   onLocate?: (chapterId: string, paragraphId: string) => void;
   work: WorkDetail; chapterId: string | null; busy: boolean;
-  onPrepare: (request: { operation: AiOperation; scope: 'chapter' | 'previous' | 'volume' | 'custom'; chapterIds?: string[]; instruction?: string; targetParagraphIds?: string[]; sentenceText?: string; sentenceFrom?: number; referenceKnowledgeIds?: string[] }) => Promise<AiPreparedRequest>;
+  onPrepare: (request: { operation: AiOperation; scope: 'chapter' | 'previous' | 'volume' | 'custom'; chapterIds?: string[]; instruction?: string; targetParagraphIds?: string[]; sentenceText?: string; sentenceFrom?: number; referenceKnowledgeIds?: string[]; referenceGlobalKnowledge?: GlobalEntryRef[] }) => Promise<AiPreparedRequest>;
   onExecute: (request: AiExecuteRequest) => Promise<AiCandidate>; onCancel: (token: string) => void | Promise<void>;
   onApply: (candidateId: string) => Promise<boolean>; onExtract: (candidateId: string, items: AiKnowledgeApproval[]) => Promise<boolean>;
 }
@@ -38,6 +39,7 @@ export function AiWorkspace(props: AiWorkspaceProps) {
   const [sentenceText, setSentenceText] = useState('');
   const [sentenceFrom, setSentenceFrom] = useState<number>();
   const [referenceIds, setReferenceIds] = useState<string[]>([]);
+  const [globalReferences, setGlobalReferences] = useState<GlobalEntryRef[]>([]);
   const [candidate, setCandidate] = useState<AiCandidate | null>(props.initialReview?.candidate?.workId === props.work.id ? props.initialReview.candidate : null), [original, setOriginal] = useState(props.initialReview?.original ?? '');
   const pendingOriginal = useRef('');
   const [items, setItems] = useState<ExtractionReviewItem[]>(props.initialReview?.items ?? []);
@@ -94,8 +96,8 @@ export function AiWorkspace(props: AiWorkspaceProps) {
       }
       const baseline = operation === 'sentencePolish' ? sentenceText : selected.map(paragraphText).join('\n');
       const validReferenceIds = [...new Set([...(props.selectedReferenceIds ?? []), ...referenceIds])].filter(id => props.onRetrieve ? props.work.assets?.knowledge.some(entry => entry.id === id && !entry.deletedAt) : related.some(item => item.entry.id === id));
-      if (validReferenceIds.length > 5) throw new Error('最多选用五条参考，请先移除多余条目。');
-      const value = await props.onPrepare({ operation, scope, chapterIds: scope === 'custom' ? chapterIds : undefined, instruction: instruction || undefined, targetParagraphIds: selected.map(item => item.attrs.id), referenceKnowledgeIds: validReferenceIds, ...(operation === 'sentencePolish' ? { sentenceText, ...(sentenceFrom !== undefined ? { sentenceFrom } : {}) } : {}) });
+      if (validReferenceIds.length + globalReferences.length > 5) throw new Error('作品与全局合计最多选用五条参考，请先移除多余条目。');
+      const value = await props.onPrepare({ operation, scope, chapterIds: scope === 'custom' ? chapterIds : undefined, instruction: instruction || undefined, targetParagraphIds: selected.map(item => item.attrs.id), referenceKnowledgeIds: validReferenceIds, referenceGlobalKnowledge: globalReferences, ...(operation === 'sentencePolish' ? { sentenceText, ...(sentenceFrom !== undefined ? { sentenceFrom } : {}) } : {}) });
       if (!alive.current || generation.current !== operationId) { await props.onCancel(value.confirmationToken); return; }
       token.current = value.confirmationToken; pendingOriginal.current = baseline; setPrepared(value);
     });
@@ -137,13 +139,13 @@ export function AiWorkspace(props: AiWorkspaceProps) {
     {scope === 'previous' && chapterIndex === 0 && <p className="ai-muted">当前是首章，没有前章，仅发送当前章节。</p>}
     {scope === 'custom' && <fieldset disabled={disabled}><legend>自定义章节</legend>{props.work.chapters.map(item => <label key={item.id}><input type="checkbox" checked={chapterIds.includes(item.id)} onChange={event => setChapterIds(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} />{item.title}</label>)}</fieldset>}
     <details><summary>指定目标段落（默认当前章全部段落）</summary><fieldset disabled={disabled}>{chapter?.document.content.map((paragraph, index) => <label key={paragraph.attrs.id}><input type="checkbox" checked={targetIds.includes(paragraph.attrs.id)} onChange={event => setTargetIds(previous => event.target.checked ? [...previous, paragraph.attrs.id] : previous.filter(id => id !== paragraph.attrs.id))} />第 {index + 1} 段 · {paragraphText(paragraph).slice(0, 50) || '空段落'}</label>)}</fieldset></details>
-    <details><summary>知识参考 · 作者选用</summary>{props.onRetrieve ? <LocalReferencePanel workId={props.work.id} revision={props.work.revision} entries={props.work.assets?.knowledge ?? []} busy={disabled} onRetrieve={props.onRetrieve} onSelect={setReferenceIds} /> : <><p className="ai-muted">按本作品关键词推荐最多五条，勾选后加入发送预览，借鉴写法与表达。</p><fieldset disabled={disabled}><legend>可选知识参考</legend>{related.length ? related.map(({ entry }) => <div key={entry.id}><label><input type="checkbox" checked={referenceIds.includes(entry.id)} onChange={event => setReferenceIds(previous => event.target.checked ? [...previous, entry.id] : previous.filter(id => id !== entry.id))} /><span>{entry.body}</span></label><small>{readableKnowledgeSource(entry.source) || '未注明出处'}</small></div>) : <p>当前范围没有匹配的知识参考。</p>}</fieldset></>}</details>
+    <details><summary>知识参考 · 作者选用</summary>{props.onRetrieve ? <LocalReferencePanel workId={props.work.id} revision={props.work.revision} entries={props.work.assets?.knowledge ?? []} busy={disabled} onRetrieve={props.onRetrieve} onSelect={setReferenceIds} onGlobalSelect={setGlobalReferences} maxSelections={Math.max(0, 5 - (props.selectedReferenceIds?.length ?? 0))} /> : <><p className="ai-muted">按本作品关键词推荐最多五条，勾选后加入发送预览，借鉴写法与表达。</p><fieldset disabled={disabled}><legend>可选知识参考</legend>{related.length ? related.map(({ entry }) => <div key={entry.id}><label><input type="checkbox" checked={referenceIds.includes(entry.id)} onChange={event => setReferenceIds(previous => event.target.checked ? [...previous, entry.id] : previous.filter(id => id !== entry.id))} /><span>{entry.body}</span></label><small>{readableKnowledgeSource(entry.source) || '未注明出处'}</small></div>) : <p>当前范围没有匹配的知识参考。</p>}</fieldset></>}</details>
     {!!props.selectedReferenceIds?.length && <p role="status">知识库已选用 {props.selectedReferenceIds.length} 条参考；完整内容将在发送前预览。</p>}
     <label>作者补充要求<textarea aria-label="作者补充要求" value={instruction} disabled={disabled} onChange={event => setInstruction(event.target.value)} placeholder="可填写希望保留的语气与表达" /></label>
     <button className="primary" disabled={disabled || !chapter} onClick={preview}>预览 AI 请求</button>{sending && <button className="secondary" onClick={cancel}>取消 AI 请求</button>}
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}{pending && <p role="status">{sending ? `正在生成候选 · ${elapsed} 秒${elapsed >= 15 ? '，服务响应较慢，可随时停止' : ''}` : '正在整理发送范围…'}</p>}
   </div>
-  {candidate && <div className="ai-candidate"><h2>{isAnalysis ? 'AI 建议' : '待审核候选'}</h2><p className="ai-muted">基线版本 {candidate.baselineRevision} · 结果可能有误，请结合原文证据判断。</p>
+  {candidate && <div className="ai-candidate"><h2>{isAnalysis ? 'AI 建议' : '待审核候选'}</h2>{candidate.referenceNotice && <p role="status">{candidate.referenceNotice}</p>}<p className="ai-muted">基线版本 {candidate.baselineRevision} · 结果可能有误，请结合原文证据判断。</p>
     <p className="ai-muted">{candidate.operation === 'extractKnowledge' ? '授权上下文章节' : '目标章节'}：{props.work.chapters.filter(item => candidate.operation === 'extractKnowledge' && candidate.referenceChapterIds ? candidate.referenceChapterIds.includes(item.id) : item.document.content.some(paragraph => candidate.paragraphIds.includes(paragraph.attrs.id))).map(item => item.title).join('、') || '原来源章节已删除'}。关闭工具后候选仍保留，切换章节不会把候选改为新章正文。</p>
     {stale && <p role="status">结果已过期：原文或作品资料已经变化，请重新生成后再使用。</p>}
     {movedBookmarks > 0 && <p role="status">应用后 {movedBookmarks} 个书签会完整保留到替换首段末尾，原来的句内位置将变化，请确认后重新核对位置。</p>}
