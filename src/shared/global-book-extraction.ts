@@ -17,7 +17,7 @@ export type GlobalBookExtractionConfirmation = z.infer<typeof globalBookExtracti
 export const globalWebImportSchema = z.object({ operationId: z.uuid(), url: z.string().min(1).max(2048),
   mode: z.enum(['static', 'restricted-browser']).default('static'),
 }).strict();
-export const globalPasteImportSchema = z.object({ title: z.string().trim().min(1).max(200), text: z.string().min(1)
+export const globalPasteImportSchema = z.object({ starterId: z.string().min(1).max(200).optional(), title: z.string().trim().min(1).max(200), text: z.string().min(1)
   .refine(value => Array.from(value).length <= 200000), source: z.object({ workUrl: sourceUrlSchema, chapterUrl: sourceUrlSchema,
     author: z.string().trim().max(200), chapter: z.string().trim().max(200), fetchedAt: z.iso.datetime({ offset: true }), metrics: sourceMetricsSchema,
   }).strict().optional() }).strict();

@@ -8,6 +8,7 @@ import { parseDocxManuscript } from './manuscript-docx';
 import { freezeSource } from './freeze-source';
 import { sourcePreview, WebExtractionCommands, type WebExtractionDependencies } from './web-extraction-commands';
 import { GlobalExtractionDraftStore } from './global-extraction-draft-store';
+import { findGlobalSourceStarter, globalSourceStarterText } from '../shared/global-source-starter';
 
 interface Files { choose(): Promise<{ name: string; bytes: Buffer } | null> }
 interface GlobalClient { request(command: string, payload: unknown): Promise<unknown> }
@@ -86,6 +87,19 @@ export class GlobalBookExtractionCommands {
     if (command === 'fetchGlobalWebExtraction' || command === 'previewGlobalPastedExtraction') {
       if (draft) throw new Error('请先保存并返回，或明确更换现有全局拆书素材。');
       const request = command === 'previewGlobalPastedExtraction' ? globalPasteImportSchema.parse(payload) : null;
+      if (request?.starterId) {
+        const starter = findGlobalSourceStarter(request.starterId), source = request.source;
+        if (!starter || request.title !== `${starter.workTitle} · ${starter.chapter}` || request.text !== globalSourceStarterText(starter)
+          || !source || source.workUrl !== starter.workUrl || source.chapterUrl !== starter.chapterUrl
+          || source.author !== starter.author || source.chapter !== starter.chapter || source.fetchedAt !== starter.fetchedAt
+          || JSON.stringify(source.metrics) !== JSON.stringify(starter.metrics))
+          throw new Error('首批素材身份、原句或出处不一致，请重新载入预览。');
+        // 首批均来自已核对的第一章；原著段号取固定素材，不接受渲染层自报坐标。
+        return this.begin(sourcePreview({ kind: 'global' }, freezeSource({ kind: 'web', title: request.title,
+          rawBytes: Buffer.from(globalSourceStarterText(starter)), segments: starter.excerpts.map(excerpt => ({
+            text: excerpt.text, chapterTitle: starter.chapter, chapterIndex: 1, paragraphIndex: excerpt.paragraphIndex,
+          })), originalUrl: starter.workUrl, finalUrl: starter.chapterUrl, fetchedAt: starter.fetchedAt })));
+      }
       const preview = request?.source
         ? await this.begin(sourcePreview({ kind: 'global' }, freezeSource({ kind: 'web', title: request.title, rawBytes: Buffer.from(request.text), segments: request.text.replace(/\r\n?/g, '\n').split('\n').map((text: string) => ({ text })),
           originalUrl: request.source.workUrl, finalUrl: request.source.chapterUrl, fetchedAt: request.source.fetchedAt })))
