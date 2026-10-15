@@ -21,7 +21,7 @@ describe('教材图文阅读', () => {
     const nav = screen.getByRole('navigation', { name: '本章目录' });
     expect(nav.compareDocumentPosition(screen.getByRole('article', { name: '教材正文' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(nav.querySelectorAll('button')).toHaveLength(3);
-    const headings = [...container.querySelectorAll('h2')];
+    const headings = [...screen.getByRole('article', { name: '教材正文' }).querySelectorAll('h2')];
     expect(new Set(headings.map((heading) => heading.id)).size).toBe(3);
     fireEvent.click(nav.querySelector('button')!);
     expect(document.activeElement).toBe(headings[0]);

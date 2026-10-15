@@ -42,6 +42,7 @@ it('离开写作到知识库再返回保留候选，重新打开其他作品不�
   fireEvent.click(screen.getByRole('button', { name: '展开侧栏' }));
   await waitFor(() => expect(screen.getByRole('button', { name: '知识库' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: '知识库' }));
+  fireEvent.click(await screen.findByRole('button', { name: '作品知识库 · AI 保护验收' }));
   await screen.findByRole('searchbox', { name: '模糊搜索知识与正文' });
   fireEvent.click(screen.getByRole('button', { name: '返回写作' }));
   await screen.findByLabelText('章节标题');
@@ -98,5 +99,5 @@ it('AI跨章证据定位在一次保存门禁内关闭工具并打开目标章',
   fireEvent.click(within(await screen.findByRole('dialog', { name: '确认云端 AI 操作' })).getByRole('button', { name: '确认发送' }));
   fireEvent.click(await screen.findByRole('button', { name: '定位正文证据' }));
   await waitFor(() => expect(screen.getByRole('textbox', { name: '章节标题' })).toHaveValue('证据所在章'));
-  expect(screen.queryByRole('dialog', { name: 'AI工具' })).toBeNull();
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'AI工具' })).toBeNull());
 });
