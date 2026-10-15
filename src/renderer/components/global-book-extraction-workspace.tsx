@@ -28,8 +28,8 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
   const [renderReady, setRenderReady] = useState(false), [confirmRender, setConfirmRender] = useState(false);
   const [discard, setDiscard] = useState(false), [pendingReceipt, setPendingReceipt] = useState(false);
   const operation = useRef<string | null>(null), attempt = useRef<{ fingerprint: string; id: string } | null>(null), locked = useRef(false);
-  const latest = useRef({ preview, reviews });
-  latest.current = { preview, reviews };
+  const latest = useRef({ preview, reviews, sourceTitle, sourceAuthor: author, chapter, rightsBasis: rights });
+  latest.current = { preview, reviews, sourceTitle, sourceAuthor: author, chapter, rightsBasis: rights };
   const categories = library.categories.filter(item => !item.deletedAt), tags = library.tags.filter(item => !item.deletedAt);
   const accept = (value: GlobalExtractionPreview, saved: Review[] = [], savedBatches: GlobalExtractionDraft['batches'] = []) => {
     if (value.target.kind !== 'global') throw new Error('素材目标不属于全局知识库。');
@@ -40,11 +40,15 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
     }])));
     setSourceTitle(value.source?.title ?? value.filename); setAuthor(''); setChapter(''); setPermission(false); setPage(0);
   };
+  function restoreMetadata(metadata: GlobalExtractionDraft['metadata']) {
+    if (!metadata) return;
+    setSourceTitle(metadata.sourceTitle); setAuthor(metadata.sourceAuthor); setChapter(metadata.chapter); setRights(metadata.rightsBasis);
+  }
   useEffect(() => {
     let alive = true;
     void api.readGlobalExtractionDraft().then(recovered => {
       if (!alive || !recovered) return;
-      accept(recovered.preview, recovered.draft.reviews, recovered.draft.batches); if (recovered.page) onCommitted(recovered.page);
+      accept(recovered.preview, recovered.draft.reviews, recovered.draft.batches); restoreMetadata(recovered.draft.metadata); if (recovered.page) onCommitted(recovered.page);
     }).catch(failure => { if (alive) { setBlocked(true); setError(failure instanceof Error ? failure.message : '全局草稿恢复失败。'); } })
       .finally(() => { if (alive) setBusy(false); });
     void api.getWebRenderCapability?.().then(value => { if (alive) setRenderReady(value.enabled); }).catch(() => {});
@@ -54,7 +58,9 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
   useEffect(() => { onDirtyChange?.(busy || aiBusy || !!preview); }, [busy, aiBusy, preview, onDirtyChange]);
   async function persist() {
     const current = latest.current;
-    if (current.preview) await api.saveGlobalExtractionReview({ token: current.preview.token, reviews: Object.values(current.reviews) });
+    if (current.preview) await api.saveGlobalExtractionReview({ token: current.preview.token, reviews: Object.values(current.reviews), metadata: {
+      sourceTitle: current.sourceTitle, sourceAuthor: current.sourceAuthor, chapter: current.chapter, rightsBasis: current.rightsBasis,
+    } });
   }
   function update(id: string, patch: Partial<Review>) { setReviews(current => ({ ...current, [id]: { ...current[id], ...patch } })); }
   async function source(mode: 'static' | 'restricted-browser' = 'static') {
@@ -74,7 +80,7 @@ export function GlobalBookExtractionWorkspace({ page: library, api, onCommitted,
     locked.current = true; setBusy(true); setError('');
     try {
       const value = await api.readGlobalExtractionDraft();
-      if (value) { accept(value.preview, value.draft.reviews, value.draft.batches); if (value.page) onCommitted(value.page); }
+      if (value) { accept(value.preview, value.draft.reviews, value.draft.batches); restoreMetadata(value.draft.metadata); if (value.page) onCommitted(value.page); }
       setBlocked(false); setPendingReceipt(false); setMessage('本机入库状态已核对，未发送云端请求。');
     } catch (failure) { setError(failure instanceof Error ? failure.message : '回执核对失败。'); }
     finally { locked.current = false; setBusy(false); }

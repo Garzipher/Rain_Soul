@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { basename, extname } from 'node:path';
 import { z } from 'zod';
-import { globalBookExtractionConfirmationSchema, globalExtractionDraftSchema, type GlobalExtractionDraft, type GlobalExtractionPreview } from '../shared/global-book-extraction';
+import { globalBookExtractionConfirmationSchema, globalExtractionMetadataSchema, globalExtractionDraftSchema, type GlobalExtractionDraft, type GlobalExtractionPreview } from '../shared/global-book-extraction';
 import type { GlobalKnowledgePage, GlobalExtractionCommit } from '../shared/global-knowledge';
 import { parseTxtManuscript } from './manuscript-text';
 import { parseDocxManuscript } from './manuscript-docx';
@@ -67,11 +67,11 @@ export class GlobalBookExtractionCommands {
       this.valid(token);
       if (!draft || draft.previewToken !== token) throw new Error('全局拆书草稿已被替换。');
       if (command === 'saveGlobalExtractionReview') {
-        const request = tokenSchema.extend({ reviews: globalExtractionDraftSchema.shape.reviews }).parse(payload);
+        const request = tokenSchema.extend({ reviews: globalExtractionDraftSchema.shape.reviews, metadata: globalExtractionMetadataSchema.optional() }).strict().parse(payload);
         const committed = draft.reviews.filter(item => item.status === 'committed');
         if (request.reviews.some(item => item.status === 'committed' && !committed.some(prior => JSON.stringify(prior) === JSON.stringify(item))))
           throw new Error('不能伪造已入库状态。');
-        await this.drafts.save({ ...draft, reviews: [...committed, ...request.reviews.filter(item => !committed.some(prior => prior.segmentId === item.segmentId))] });
+        await this.drafts.save({ ...draft, ...(request.metadata ? { metadata: request.metadata } : {}), reviews: [...committed, ...request.reviews.filter(item => !committed.some(prior => prior.segmentId === item.segmentId))] });
       } else { tokenSchema.parse(payload); await this.drafts.discard(); this.web.reset(); this.preview = null; }
       return;
     }

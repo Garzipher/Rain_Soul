@@ -17,9 +17,13 @@ export const globalWebImportSchema = z.object({ operationId: z.uuid(), url: z.st
 }).strict();
 export const globalPasteImportSchema = z.object({ title: z.string().trim().min(1).max(200), text: z.string().min(1)
   .refine(value => Array.from(value).length <= 200000) }).strict();
+export const globalExtractionMetadataSchema = z.object({ sourceTitle: z.string().trim().max(200), sourceAuthor: z.string().trim().max(200),
+  chapter: z.string().trim().max(200), rightsBasis: globalSourceMetadataSchema.shape.rightsBasis,
+}).strict();
 export const globalExtractionDraftSchema = z.object({
   schemaVersion: z.literal(1), target: z.object({ kind: z.literal('global') }).strict(), taskId: z.uuid(), previewToken: z.uuid(),
   source: frozenSourceDocumentSchema, batches: extractionDraftSchema.shape.batches.default([]), reviews: extractionDraftSchema.shape.reviews,
+  metadata: globalExtractionMetadataSchema.optional(),
   committing: globalExtractionCommitSchema.nullable(),
 }).strict().superRefine((draft, ctx) => {
   if (new Set(draft.reviews.map(item => item.segmentId)).size !== draft.reviews.length
@@ -57,7 +61,7 @@ export interface GlobalExtractionApi {
   previewGlobalPastedExtraction(request: z.infer<typeof globalPasteImportSchema>): Promise<GlobalExtractionPreview>;
   confirmGlobalBookExtraction(request: GlobalBookExtractionConfirmation): Promise<GlobalKnowledgePage>;
   readGlobalExtractionDraft(): Promise<GlobalExtractionRecovery | null>;
-  saveGlobalExtractionReview(request: { token: string; reviews: GlobalExtractionDraft['reviews'] }): Promise<void>;
+  saveGlobalExtractionReview(request: { token: string; reviews: GlobalExtractionDraft['reviews']; metadata?: z.infer<typeof globalExtractionMetadataSchema> }): Promise<void>;
   discardGlobalExtractionDraft(token: string): Promise<void>;
   cancelGlobalBookExtraction(token: string): Promise<void>;
   cancelGlobalWebExtraction(operationId: string): Promise<void>;
