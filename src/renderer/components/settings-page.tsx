@@ -12,6 +12,7 @@ import type { RetrievalApi } from '../../shared/retrieval';
 import { RetrievalModelPanel } from './retrieval-model-panel';
 import './knowledge-workspace.css';
 import './assets-workspace.css';
+import './settings-page.css';
 
 export function SettingsPage(props: RecoveryPanelProps & { api: RecoveryPanelProps['api'] & RetrievalApi; assetRecovery: {dictionary: number; style: number}; author?: AuthorProfileController; onAssetAction: (action: AssetAction) => Promise<boolean>; onAssetDirtyChange: (dirty: boolean) => void }) {
   const { api } = props;
@@ -31,13 +32,40 @@ export function SettingsPage(props: RecoveryPanelProps & { api: RecoveryPanelPro
     return () => { active = false; };
   }, [api]);
   useEffect(() => { let active = true; void api.getAiSettings().then(value => { if (active) setAiSettings(value); }).catch(reason => { if (active) setError(reason instanceof Error ? reason.message : '无法读取模型配置'); }); return () => { active = false; }; }, [api]);
-  return <section className="settings-page">
-    {props.author && <ProfileSettings author={props.author} locked={props.busy} />}
-    <div className="settings-group"><h2>本机数据</h2><dl><div><dt>应用版本</dt><dd>{info?.version ?? '正在读取…'}</dd></div><div><dt>作品数据目录</dt><dd className="data-directory">{info?.dataDirectory ?? '正在读取…'}</dd></div></dl>{error && <p role="alert">{error}</p>}</div>
-    <div className="settings-group"><h2>写作保护</h2><p>自动保存始终开启：停止输入 500ms 后保存，持续输入最多 5 秒提交。保存失败时保留草稿并阻止离开或关闭。</p><p>正文固定为微软雅黑 12pt、1.5 倍行距；章节标题 16pt 加粗。</p></div>
-    <RecoveryPanel {...props} />
-    <RetrievalModelPanel api={api} busy={props.busy} workId={props.currentWork?.id ?? null} onBusyChange={retrievalDirty} />
-    {props.currentWork?.assets && <div className="settings-group"><p>当前作品：{props.currentWork.title}</p><KnowledgeDictionary key={`${props.currentWork.id}/${props.assetRecovery.dictionary}`} assets={props.currentWork.assets} busy={props.busy} onAction={props.onAssetAction} onDirtyChange={dictionaryDirty} /><StyleProfilePanel key={`style-${props.currentWork.id}/${props.assetRecovery.style}`} work={props.currentWork} assets={props.currentWork.assets} busy={props.busy} onAction={props.onAssetAction} onDirtyChange={styleDirty} onLocate={() => undefined} /></div>}
-    {aiSettings && <AiSettingsPanel value={aiSettings} busy={props.busy} onDirtyChange={aiDirty} onSave={async (provider, key) => { setAiSettings(await api.saveAiSettings(provider, key)); }} onClear={async () => { setAiSettings(await api.clearAiSettings()); }} />}
+  function jump(id: string) {
+    const target = document.getElementById(`settings-${id}`);
+    if (target instanceof HTMLDetailsElement) target.open = true;
+    target?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    target?.focus({ preventScroll: true });
+  }
+  return <section className="settings-page settings-layout">
+    <nav className="settings-index" aria-label="设置分组">
+      <div className="settings-index-group"><h2>全局设置</h2>
+        {props.author && <button onClick={() => jump('profile')}>个人资料</button>}
+        <button onClick={() => jump('data')}>本机数据</button>
+        <button onClick={() => jump('protection')}>写作保护</button>
+        <button onClick={() => jump('ai')}>云端模型</button>
+        <button onClick={() => jump('retrieval')}>本机知识检索</button>
+        <button onClick={() => jump('recovery')}>删除与恢复</button>
+      </div>
+      {props.currentWork?.assets && <div className="settings-index-group"><h2>当前作品</h2>
+        <button onClick={() => jump('dictionary')}>分类与标签</button>
+        <button onClick={() => jump('style')}>写作特点</button>
+      </div>}
+    </nav>
+    <div className="settings-content">
+      <header className="settings-section-heading"><h2>全局设置</h2><p>应用和个人偏好，适用于所有作品。</p></header>
+      {props.author && <div id="settings-profile" className="settings-anchor" tabIndex={-1}><ProfileSettings author={props.author} locked={props.busy} /></div>}
+      <div id="settings-data" className="settings-group settings-anchor" tabIndex={-1}><h2>本机数据</h2><dl><div><dt>应用版本</dt><dd>{info?.version ?? '正在读取…'}</dd></div><div><dt>作品数据目录</dt><dd className="data-directory">{info?.dataDirectory ?? '正在读取…'}</dd></div></dl>{error && <p role="alert">{error}</p>}</div>
+      <div id="settings-protection" className="settings-group settings-anchor" tabIndex={-1}><h2>写作保护</h2><p>自动保存始终开启：停止输入 500ms 后保存，持续输入最多 5 秒提交。保存失败时保留草稿并阻止离开或关闭。</p><p>正文固定为微软雅黑 12pt、1.5 倍行距；章节标题 16pt 加粗。</p></div>
+      <div id="settings-ai" className="settings-anchor" tabIndex={-1}>{aiSettings ? <AiSettingsPanel value={aiSettings} busy={props.busy} onDirtyChange={aiDirty} onSave={async (provider, key) => { setAiSettings(await api.saveAiSettings(provider, key)); }} onClear={async () => { setAiSettings(await api.clearAiSettings()); }} /> : <div className="settings-group"><h2>云端模型</h2><p>{error ?? '正在读取模型配置…'}</p></div>}</div>
+      <div id="settings-retrieval" className="settings-anchor" tabIndex={-1}><RetrievalModelPanel api={api} busy={props.busy} workId={props.currentWork?.id ?? null} onBusyChange={retrievalDirty} /></div>
+      <details id="settings-recovery" className="settings-recovery settings-anchor" tabIndex={-1}><summary><span>删除与恢复</span><small>已删除作品、分卷和章节</small></summary><RecoveryPanel {...props} /></details>
+      {props.currentWork?.assets && <>
+        <header className="settings-section-heading settings-work-heading"><h2>当前作品设置</h2><p>{props.currentWork.title}</p></header>
+        <div id="settings-dictionary" className="settings-group settings-anchor" tabIndex={-1}><KnowledgeDictionary key={`${props.currentWork.id}/${props.assetRecovery.dictionary}`} assets={props.currentWork.assets} busy={props.busy} onAction={props.onAssetAction} onDirtyChange={dictionaryDirty} /></div>
+        <div id="settings-style" className="settings-group settings-anchor" tabIndex={-1}><StyleProfilePanel key={`style-${props.currentWork.id}/${props.assetRecovery.style}`} work={props.currentWork} assets={props.currentWork.assets} busy={props.busy} onAction={props.onAssetAction} onDirtyChange={styleDirty} onLocate={() => undefined} /></div>
+      </>}
+    </div>
   </section>;
 }
