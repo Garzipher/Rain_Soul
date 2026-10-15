@@ -24,9 +24,12 @@ export class AiCommands {
   private readonly confirmations = new Map<string, Frozen>();
   private readonly candidates = new Map<string, AiCandidate>();
   private readonly running = new Set<Promise<unknown>>();
+  private readonly activeTokens = new Set<string>();
+  private closing = false;
   constructor(private readonly store: { execute: (command: string, payload: unknown) => Promise<unknown> }, private readonly settings: Settings, private readonly service: AiService) {}
   accepts(command: string) { return Object.hasOwn(schemas, command); }
   execute(command: string, payload: unknown): Promise<unknown> {
+    if (this.closing && command !== 'cancelAi') return Promise.reject(new Error('程序正在关闭，已停止新的 AI 操作。'));
     const operation = this.run(command, payload); this.running.add(operation);
     void operation.then(() => this.running.delete(operation), () => this.running.delete(operation)); return operation;
   }
@@ -41,6 +44,7 @@ export class AiCommands {
       if (!provider || !this.settings.get().hasCredential) throw new Error('请先在设置中配置云端模型及凭据。');
       if (request.operation === 'sentencePolish' && !request.sentenceText) throw new Error('单句润色请指定目标单句。');
       const work = await this.store.execute('freezeWork', { workId: request.workId }) as WorkDetail;
+      if (this.closing) throw new Error('程序正在关闭，已取消 AI 请求。');
       const context = buildAiContext(work, { chapterId: request.chapterId, scope: request.scope, ...(request.chapterIds ? { chapterIds: request.chapterIds } : {}), ...(request.targetParagraphIds ? { targetParagraphIds: request.targetParagraphIds } : {}), ...(request.sentenceText ? { sentenceText: request.sentenceText } : {}), ...(request.sentenceFrom !== undefined ? { sentenceFrom: request.sentenceFrom } : {}) });
       if (['paragraphPolish', 'continue', 'correct'].includes(request.operation)) {
         const paragraphs = work.chapters.find(chapter => chapter.id === request.chapterId)!.document.content;
@@ -60,16 +64,28 @@ export class AiCommands {
       if (!frozen || frozen.requestHash !== request.requestHash) throw new Error('AI 确认已失效，请重新预览。');
       if (frozen.providerHash !== JSON.stringify(this.settings.get().provider)) { this.service.cancel(request.confirmationToken); this.confirmations.delete(request.confirmationToken); throw new Error('模型配置已变化，请重新预览确认。'); }
       await this.store.execute('freezeWork', { workId: frozen.workId });
+      if (this.closing || !this.confirmations.has(request.confirmationToken)) { this.service.cancel(request.confirmationToken); throw new Error('AI 请求已取消。'); }
       this.confirmations.delete(request.confirmationToken);
-      const candidate = await this.service.execute(request);
-      if (this.candidates.size >= 100) { const oldest = this.candidates.keys().next().value; if (oldest) this.candidates.delete(oldest); }
-      this.candidates.set(candidate.id, structuredClone(candidate)); return candidate;
+      this.activeTokens.add(request.confirmationToken);
+      try {
+        const candidate = await this.service.execute(request);
+        if (this.candidates.size >= 100) { const oldest = this.candidates.keys().next().value; if (oldest) this.candidates.delete(oldest); }
+        this.candidates.set(candidate.id, structuredClone(candidate)); return candidate;
+      } finally { this.activeTokens.delete(request.confirmationToken); }
     }
     const request = command === 'applyAiCandidate' ? schemas.applyAiCandidate.parse(payload) : schemas.approveAiKnowledge.parse(payload);
     const candidate = this.candidates.get(request.candidateId);
     if (!candidate || candidate.workId !== request.workId) throw operationError('候选不存在或不属于当前作品，请重新生成。', 'NOT_FOUND');
     return this.store.execute(command, { workId: request.workId, operationId: request.operationId, candidate, ...('items' in request ? { items: request.items } : {}) });
   }
-  async drain() { await Promise.allSettled([...this.running]); }
+  async drain() {
+    this.closing = true;
+    try {
+      for (const token of this.confirmations.keys()) this.service.cancel(token);
+      this.confirmations.clear();
+      for (const token of this.activeTokens) this.service.cancel(token);
+      await Promise.allSettled([...this.running]);
+    } finally { this.closing = false; }
+  }
 }
 export type AiSettingsProvider = AiProvider;

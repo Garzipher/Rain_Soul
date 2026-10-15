@@ -42,7 +42,8 @@ export function aiCompletionEndpoint(baseUrl: string) {
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || !hostname ||
     hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local') || hostname.endsWith('.internal') ||
     !isIP(hostname) && !hostname.includes('.') || isIP(hostname) && !isPublicIp(hostname)) throw new Error('云端服务地址必须为 HTTPS 公开地址，不能包含凭据、查询参数或本机/私网地址。');
-  url.pathname = `${url.pathname.replace(/\/+$/, '')}/chat/completions`;
+  const path = url.pathname.replace(/\/+$/, '');
+  url.pathname = path.endsWith('/chat/completions') ? path : `${path}/chat/completions`;
   return { url: url.href, hostname };
 }
 /** 默认发送固定到已检查的公开 IP，TLS 仍验证原服务域名，阻止 DNS 重绑定。 */
@@ -51,7 +52,9 @@ export function responseFromPublicHttp(status: number, body: Buffer): Response {
 }
 async function publicHttpsFetch(url: string, options: RequestInit, addresses: string[]): Promise<Response> {
   return new Promise((resolve, reject) => {
-    const outgoing = httpsRequest(url, { method: 'POST', agent: false, headers: options.headers as Record<string, string>, signal: options.signal ?? undefined,
+    // HTTPS 将这些连接选项交给 net.connect；某些 IPv6 路线不可达时及时尝试 IPv4。
+    const connectionOptions = { autoSelectFamily: true, autoSelectFamilyAttemptTimeout: 300 };
+    const outgoing = httpsRequest(url, { ...connectionOptions, method: 'POST', agent: false, headers: options.headers as Record<string, string>, signal: options.signal ?? undefined,
       lookup: (_hostname, lookupOptions, callback) => {
         if (lookupOptions.all) callback(null, addresses.map(address => ({ address, family: isIP(address) })));
         else callback(null, addresses[0], isIP(addresses[0]));
@@ -73,11 +76,35 @@ async function publicHttpsFetch(url: string, options: RequestInit, addresses: st
   });
 }
 
+/** DNS 可能停在系统解析器内；取消与独立超时必须在凭据读取和发送之前生效。 */
+async function resolvePublicAddresses(hostname: string, dependencies: AiTransportDependencies, signal: AbortSignal): Promise<string[]> {
+  signal.throwIfAborted();
+  if (isIP(hostname)) return [hostname];
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  let abort: (() => void) | undefined;
+  const interrupted = new Promise<never>((_resolve, reject) => {
+    abort = () => reject(signal.reason ?? new Error('AI 请求已取消。'));
+    signal.addEventListener('abort', abort, { once: true });
+    timeout = setTimeout(() => reject(new Error('云端服务域名解析超过 8 秒，未发送内容；请检查网络或 DNS 后重试。')), 8_000);
+  });
+  try {
+    const resolve = dependencies.resolveHost ?? (async (host: string) => (await lookup(host, { all: true })).map(item => item.address));
+    const addresses = await Promise.race([resolve(hostname), interrupted]);
+    signal.throwIfAborted();
+    return addresses;
+  } catch (reason) {
+    signal.throwIfAborted();
+    if (reason instanceof Error && reason.message.includes('超过 8 秒')) throw reason;
+    throw new Error('无法解析云端服务域名，未发送内容；请检查服务地址、网络或 DNS 后重试。', { cause: reason });
+  } finally {
+    if (timeout) clearTimeout(timeout);
+    if (abort) signal.removeEventListener('abort', abort);
+  }
+}
+
 /** 仅发送已冻结的公开端点请求；失败不重发，完整响应才返回。 */
 export async function sendAiCompletion(request: AiTransportRequest, dependencies: AiTransportDependencies, signal: AbortSignal, beforeSend?: () => Promise<void>): Promise<string> {
-  let addresses: string[];
-  try { addresses = isIP(request.hostname) ? [request.hostname] : await (dependencies.resolveHost ?? (async hostname => (await lookup(hostname, { all: true })).map(item => item.address)))(request.hostname); }
-  catch { throw new Error('无法确认云端服务公开地址，请检查配置后手动重试。'); }
+  const addresses = await resolvePublicAddresses(request.hostname, dependencies, signal);
   signal.throwIfAborted();
   if (!addresses.length || !addresses.every(isPublicIp)) throw new Error('云端服务必须使用公开地址，拒绝本机或私网目标。');
   let key: string | null;
@@ -90,7 +117,10 @@ export async function sendAiCompletion(request: AiTransportRequest, dependencies
     const init: RequestInit = { method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: request.body, signal };
     response = await (dependencies.fetch ? dependencies.fetch(request.url, init) : publicHttpsFetch(request.url, init, addresses));
   }
-  catch { throw new Error('云端服务连接失败，请检查网络后手动重试。'); }
+  catch {
+    signal.throwIfAborted();
+    throw new Error('连接云端服务失败；请检查网络、代理或服务可用性后重试。');
+  }
   signal.throwIfAborted();
   if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? '云端服务认证失败，请检查凭据。' : response.status === 402 || response.status === 429 ? '云端服务额度不足或请求受限，请稍后手动重试。' : '云端服务请求失败，请稍后手动重试。');
   let payload: unknown;
