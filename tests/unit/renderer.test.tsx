@@ -103,7 +103,7 @@ describe('真实桌面写作界面', () => {
     const dialog = screen.getByRole('dialog', { name: '新建作品' });
     expect(document.activeElement).toBe(within(dialog).getByRole('textbox', { name: '作品名称' }));
     fireEvent.keyDown(dialog, { key: 'Escape' });
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(document.activeElement).toBe(trigger);
     expect(screen.queryByRole('button', { name: /打开作品：/ })).toBeNull();
   });

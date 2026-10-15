@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { chooseSelect } from './select-field-helper';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ChapterEditor } from '../../src/renderer/components/chapter-editor';
 import { emptyDocument, countDocumentWords, validateDocument } from '../../src/shared/document';
@@ -70,7 +71,8 @@ it('伏笔书签只关联目标，不制造埋设或回收证据；锁定时禁�
   const state = assets(), onChange = vi.fn();
   const props = { document: emptyDocument(), assets: state, locked: false, onChange, onError: vi.fn(), onCompositionChange: vi.fn() };
   const view = render(<ChapterEditor {...props} />);
-  fireEvent.change(screen.getByLabelText('书签类型'), { target: { value: 'foreshadow' } });
+  fireEvent.click(screen.getByText('引用与伏笔书签'));
+  await chooseSelect(screen.getByLabelText('书签类型'), '伏笔标记');
   fireEvent.click(screen.getByRole('button', { name: '插入书签' }));
   fireEvent.click(await screen.findByRole('button', { name: '伏笔书签：未寄出的信' }));
   expect(screen.getByRole('dialog')).toHaveTextContent('未埋设');

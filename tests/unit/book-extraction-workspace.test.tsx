@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { chooseSelect } from './select-field-helper';
 import { afterEach, expect, it, vi } from 'vitest';
 import { BookExtractionWorkspace } from '../../src/renderer/components/book-extraction-workspace';
 import type { WorkDetail, DesktopApi } from '../../src/shared/contracts';
@@ -323,7 +324,7 @@ it('取消退出令预览作废，不写库', async () => {
 it('取消文件选择不改状态；选择失败显示原因且可重试，未预览时可直接返回', async () => {
   const { api, onClose } = setup();
   vi.mocked(api.chooseBookExtraction).mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('文件无效'));
-  fireEvent.change(screen.getByRole('combobox', { name: 'TXT 编码' }), { target: { value: 'gb18030' } });
+  await chooseSelect(screen.getByRole('combobox', { name: 'TXT 编码' }), 'GB18030');
   fireEvent.click(screen.getByRole('button', { name: '选择 TXT / DOCX' }));
   await waitFor(() => expect(screen.getByRole('button', { name: '选择 TXT / DOCX' })).toHaveProperty('disabled', false));
   fireEvent.click(screen.getByRole('button', { name: '选择 TXT / DOCX' }));

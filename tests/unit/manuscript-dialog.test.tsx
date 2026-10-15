@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { chooseSelect } from './select-field-helper';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ManuscriptDialog } from '../../src/renderer/components/manuscript-dialog';
 afterEach(cleanup);
@@ -20,7 +21,7 @@ it('预览原正文与丢弃内容提示，修改标题后确认才创建，失�
 it('按段落边界拆章保留空段及全部原文，新章标题可修改后相邻合并', async () => {
   const original = { ...draft, chapters: [{ title: '原章', volumeTitle: '第一卷', paragraphs: ['第一段', '', '第三段', '第四段'] }] }, confirm = vi.fn(async () => false);
   render(<ManuscriptDialog draft={original} busy={false} onConfirm={confirm} onClose={() => {}} />);
-  fireEvent.change(screen.getByLabelText('第 1 章拆章位置'), { target: { value: '2' } });
+  await chooseSelect(screen.getByLabelText('第 1 章拆章位置'), /第 2 段之后/);
   fireEvent.click(screen.getByRole('button', { name: '拆分第 1 章' }));
   expect(screen.getByLabelText('导入章节 2 分卷')).toHaveValue('第一卷');
   fireEvent.change(screen.getByLabelText('导入章节 2 标题'), { target: { value: '作者指定新章' } });
