@@ -44,6 +44,7 @@ describe('作品与卷章结构管理', () => {
     expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: '取消' }));
     fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
     expect(adapter.works.values().next().value!.chapters).toHaveLength(1);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(document.activeElement).toBe(chapter);
   });
 

@@ -6,6 +6,11 @@ import { motionTokens } from '../motion/tokens';
 export interface MenuItem { label: string; action: () => void; disabled?: boolean; danger?: boolean }
 export interface MenuState { x: number; y: number; trigger: HTMLElement; items: MenuItem[] }
 
+function restoreTriggerFocus(trigger: HTMLElement) {
+  // 菜单动作可能已经打开模态框，退出动画与旧监听清理不能抢走其焦点。
+  if (trigger.isConnected && !document.activeElement?.closest('dialog[open], [role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]')) trigger.focus();
+}
+
 /** 鼠标和键盘共用菜单；选择动作前关闭菜单并归还触发器焦点。 */
 export function ContextMenu({ state, onClose }: { state: MenuState; onClose: () => void }) {
   const menu = useRef<HTMLDivElement>(null);
@@ -13,7 +18,7 @@ export function ContextMenu({ state, onClose }: { state: MenuState; onClose: () 
   const { reduced } = useMotionPreference();
   useEffect(() => {
     if (present) return;
-    if (state.trigger.isConnected) state.trigger.focus();
+    restoreTriggerFocus(state.trigger);
     if (reduced) { remove?.(); return; }
     const timer = window.setTimeout(() => remove?.(), motionTokens.menuExit + 32);
     return () => clearTimeout(timer);
@@ -29,7 +34,7 @@ export function ContextMenu({ state, onClose }: { state: MenuState; onClose: () 
     function outside(event: PointerEvent) { if (!element?.contains(event.target as Node)) onClose(); }
     document.addEventListener('pointerdown', outside);
     window.addEventListener('resize', onClose);
-    return () => { document.removeEventListener('pointerdown', outside); window.removeEventListener('resize', onClose); if (state.trigger.isConnected) state.trigger.focus(); };
+    return () => { document.removeEventListener('pointerdown', outside); window.removeEventListener('resize', onClose); restoreTriggerFocus(state.trigger); };
   }, [state, onClose, present]);
   function key(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape' || event.key === 'Tab') { event.preventDefault(); onClose(); return; }
