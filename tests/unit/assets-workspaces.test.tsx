@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { chooseSelect } from './select-field-helper';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { AssetState } from '../../src/shared/assets';
 import type { WorkDetail } from '../../src/shared/contracts';
@@ -83,11 +85,12 @@ it('失效伏笔证据保留原出处且禁止定位，重新关联使用明确�
   const onAction = vi.fn(async () => true);
   const onDirtyChange = vi.fn();
   const view = render(<ForeshadowWorkspace {...base} onAction={onAction} onDirtyChange={onDirtyChange} />);
-  expect(screen.getByText(/原出处：原来信/)).toBeTruthy();
+  fireEvent.click(screen.getByText('查看历史追溯'));
+  expect(screen.getByText(/原出处：原来信/)).toBeVisible();
   expect(screen.getByRole('button', { name: '定位证据：旧地址' })).toHaveProperty('disabled', true);
   fireEvent.click(screen.getByRole('button', { name: '重新关联证据：旧地址' }));
-  fireEvent.change(screen.getByRole('combobox', { name: '证据章节' }), { target: { value: 'chapter' } });
-  fireEvent.change(screen.getByRole('combobox', { name: '证据段落' }), { target: { value: 'paragraph' } });
+  await chooseSelect(screen.getByRole('combobox', { name: '证据章节' }), '雨夜来信');
+  await chooseSelect(screen.getByRole('combobox', { name: '证据段落' }), /第 1 段/);
   fireEvent.change(screen.getByRole('textbox', { name: '证据摘录' }), { target: { value: '来信' } });
   fireEvent.click(screen.getByRole('button', { name: '确认重新关联' }));
   await waitFor(() => expect(onAction).toHaveBeenCalledWith({ type: 'relinkEvidence', id: 'evidence', chapterId: 'chapter', paragraphId: 'paragraph', excerpt: '来信' }));
@@ -98,17 +101,21 @@ it('失效伏笔证据保留原出处且禁止定位，重新关联使用明确�
     { ...previous, id: 'new-evidence', chapterId: 'chapter', paragraphId: 'paragraph', excerpt: '来信', sourceRevision: 2, supersedesId: previous.id, valid: true, invalidReason: null },
   ] };
   view.rerender(<ForeshadowWorkspace {...base} assets={relinked} onAction={onAction} onDirtyChange={onDirtyChange} />);
-  expect(screen.getByText(/原出处：原来信.*gone-paragraph/)).toBeTruthy();
-  expect(screen.getByText('原出处摘录：旧地址')).toBeTruthy();
-  expect(screen.getByText(/当前来源：雨夜来信.*版本 2/)).toBeTruthy();
+  const history = screen.getByText('查看历史追溯').closest('details')!;
+  if (!history.open) fireEvent.click(within(history).getByText('查看历史追溯'));
+  expect(within(history).getByText(/原出处：原来信/)).toBeVisible();
+  expect(within(history).getByText(/段落 ID：gone-paragraph/)).toBeVisible();
+  expect(within(history).getByText('原出处摘录：旧地址')).toBeVisible();
+  expect(screen.getByText('雨夜来信 · 第 1 段')).toBeVisible();
+  expect(within(history).getByText('当前来源版本：2')).toBeVisible();
   expect(screen.getByRole('button', { name: '定位证据：来信' })).toHaveProperty('disabled', false);
 });
 
-it('证据表单未保存时向伏笔工作区报告脏状态并阻止切换', () => {
+it('证据表单未保存时向伏笔工作区报告脏状态并阻止切换', async () => {
   const onDirtyChange = vi.fn();
   const twoForeshadows = { ...assets, foreshadows: [...assets.foreshadows, { id: 'second', name: '迟来的信', status: '未埋设' as const, description: '', outlineId: null, deletedAt: null }] };
   render(<ForeshadowWorkspace {...base} assets={twoForeshadows} onAction={vi.fn(async () => true)} onDirtyChange={onDirtyChange} />);
-  fireEvent.change(screen.getByRole('combobox', { name: '证据章节' }), { target: { value: 'chapter' } });
+  await chooseSelect(screen.getByRole('combobox', { name: '证据章节' }), '雨夜来信');
   expect(onDirtyChange).toHaveBeenLastCalledWith(true);
   fireEvent.click(screen.getByRole('button', { name: '选择伏笔：迟来的信' }));
   expect(screen.getByRole('button', { name: '添加证据' })).toBeTruthy();
@@ -118,7 +125,7 @@ it('证据表单未保存时向伏笔工作区报告脏状态并阻止切换', (
 it('伏笔详情与证据脏状态统一汇总，放弃其中一份表单仍保留另一份保护', async () => {
   const onDirtyChange = vi.fn();
   render(<ForeshadowWorkspace {...base} onAction={vi.fn(async () => true)} onDirtyChange={onDirtyChange} />);
-  fireEvent.change(screen.getByRole('combobox', { name: '证据章节' }), { target: { value: 'chapter' } });
+  await chooseSelect(screen.getByRole('combobox', { name: '证据章节' }), '雨夜来信');
   fireEvent.change(screen.getByRole('textbox', { name: '伏笔说明' }), { target: { value: '待保存说明' } });
   fireEvent.click(screen.getByRole('button', { name: '放弃更改' }));
   expect(onDirtyChange).toHaveBeenLastCalledWith(true);
@@ -132,13 +139,13 @@ it('证据重关联待处理时持续保护父层，失败后保留输入直到�
   const onAction = vi.fn(() => new Promise<boolean>((resolve) => { finish = resolve; }));
   render(<ForeshadowWorkspace {...base} onAction={onAction} onDirtyChange={onDirtyChange} />);
   fireEvent.click(screen.getByRole('button', { name: '重新关联证据：旧地址' }));
-  fireEvent.change(screen.getByRole('combobox', { name: '证据章节' }), { target: { value: 'chapter' } });
+  await chooseSelect(screen.getByRole('combobox', { name: '证据章节' }), '雨夜来信');
   fireEvent.click(screen.getByRole('button', { name: '确认重新关联' }));
   expect(screen.getByRole('button', { name: '确认重新关联' })).toHaveProperty('disabled', true);
   expect(onDirtyChange).toHaveBeenLastCalledWith(true);
   finish(false);
   await waitFor(() => expect(screen.getByRole('button', { name: '确认重新关联' })).toHaveProperty('disabled', false));
-  expect(screen.getByRole('combobox', { name: '证据章节' })).toHaveProperty('value', 'chapter');
+  expect(screen.getByRole('combobox', { name: '证据章节' })).toHaveTextContent('雨夜来信');
   expect(onDirtyChange).toHaveBeenLastCalledWith(true);
   fireEvent.click(screen.getByRole('button', { name: '放弃证据更改' }));
   await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
@@ -147,7 +154,9 @@ it('证据重关联待处理时持续保护父层，失败后保留输入直到�
 it('章节级原出处明确标注证据粒度', () => {
   const chapterSource = { ...assets, evidence: [{ ...assets.evidence[0], originalSource: { ...assets.evidence[0].originalSource, paragraphId: null } }] };
   render(<ForeshadowWorkspace {...base} assets={chapterSource} onAction={vi.fn(async () => true)} />);
-  expect(screen.getByText(/原出处：原来信.*章节证据/)).toBeTruthy();
+  fireEvent.click(screen.getByText('查看历史追溯'));
+  expect(screen.getByText(/原出处：原来信/)).toBeVisible();
+  expect(screen.getByText(/段落 ID：章节证据（无段落定位）/)).toBeVisible();
 });
 
 it('伏笔归属可定位同作品剧情节点，dirty表单不触发跳转，父层可见dirty状态', async () => {
@@ -177,7 +186,7 @@ it('写作特点发布失败保留表单，章节可以明确恢复作品默认'
   fireEvent.click(screen.getByRole('button', { name: '放弃更改' }));
   expect(screen.getByRole('textbox', { name: '节奏' })).toHaveProperty('value', '缓慢');
   expect(screen.getByRole('combobox', { name: '雨夜来信写作特点' })).toHaveProperty('disabled', false);
-  fireEvent.change(screen.getByRole('combobox', { name: '雨夜来信写作特点' }), { target: { value: '' } });
+  await chooseSelect(screen.getByRole('combobox', { name: '雨夜来信写作特点' }), /^作品默认/);
   await waitFor(() => expect(onAction).toHaveBeenCalledWith({ type: 'setChapterStyle', chapterId: 'chapter', profileId: null }));
 });
 
