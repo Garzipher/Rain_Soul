@@ -24,8 +24,9 @@ export function ChapterEditor({ document, assets, locked, ghostPaused = false, o
   const aiEntry = useRef({ locked, onAiRequest });
   useEffect(() => { aiEntry.current = { locked, onAiRequest }; }, [locked, onAiRequest]);
   const knowledgeEntries = useRef(assets?.knowledge ?? []);
+  const [completionEnabled, setCompletionEnabled] = useState(true);
   const ghostState = useRef({ locked, paused: ghostPaused });
-  useEffect(() => { knowledgeEntries.current = assets?.knowledge ?? []; ghostState.current = { locked, paused: ghostPaused }; if (editorRef.current) refreshKnowledgeGhost(editorRef.current); }, [assets, locked, ghostPaused]);
+  useEffect(() => { knowledgeEntries.current = assets?.knowledge ?? []; ghostState.current = { locked, paused: ghostPaused || !completionEnabled }; if (editorRef.current) refreshKnowledgeGhost(editorRef.current); }, [assets, locked, ghostPaused, completionEnabled]);
   const editorRef = useRef<Editor | null>(null);
   const [kind, setKind] = useState<BookmarkNode['attrs']['kind']>('knowledge');
   const [target, setTarget] = useState('');
@@ -129,6 +130,7 @@ export function ChapterEditor({ document, assets, locked, ghostPaused = false, o
       <SelectField aria-label="书签目标" value={targetId} disabled={locked || !options?.length} onChange={event => setTarget(event.target.value)}>{!options?.length && <option value="">暂无可关联条目</option>}{options?.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
       <button className="secondary" disabled={locked || !targetId} onMouseDown={event => event.preventDefault()} onClick={insertBookmark}>插入书签</button></div></details>}
     <EditorContent editor={editor} />
+    <div className="knowledge-completion-hint"><button type="button" className="knowledge-completion-toggle" aria-pressed={completionEnabled} onClick={() => setCompletionEnabled(value => !value)}>知识原句提示{completionEnabled ? '已开启' : '已关闭'}</button><span>{!completionEnabled ? '开启后从本作品知识库提示原句' : ghostPaused ? 'AI 操作期间暂停原句提示' : !assets?.knowledge.some(item => !item.deletedAt) ? '在知识库添加摘录后，输入原句前两个字即可提示' : '输入知识原句前两个字 · Tab 接受 · Esc 忽略'}</span></div>
     {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
     {detail && <BookmarkDetails bookmark={detail} assets={assets} onClose={() => setDetail(null)} onLocateAsset={onLocateAsset} locked={locked} />}
   </>;
