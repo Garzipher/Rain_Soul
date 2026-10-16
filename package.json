@@ -1,6 +1,6 @@
 {
   "name": "soulrain",
-  "version": "1.3.5",
+  "version": "1.3.6",
   "description": "本地优先的中文写作工作台",
   "main": "dist/desktop/main.cjs",
   "scripts": {
