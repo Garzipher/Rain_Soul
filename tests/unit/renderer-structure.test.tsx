@@ -9,16 +9,18 @@ function createAdapter() { const adapter = createStructureAdapter(); adapters.pu
 async function createWork(title = '雨落之后') {
   fireEvent.click(await screen.findByRole('button', { name: '新建作品' }));
   const dialog = screen.getByRole('dialog', { name: '新建作品' });
-  fireEvent.change(within(dialog).getByRole('textbox', { name: '作品名称' }), { target: { value: title } });
+  fireEvent.change(within(dialog).getByLabelText('作品名称'), { target: { value: title } });
   fireEvent.click(within(dialog).getByRole('button', { name: '创建作品' }));
-  await screen.findByRole('textbox', { name: '章节标题' });
+  await screen.findByLabelText('章节标题');
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '新建作品' })).toBeNull());
 }
 async function createVolume(title = '雨季') {
   fireEvent.click(screen.getByRole('button', { name: '添加分卷' }));
   const dialog = screen.getByRole('dialog', { name: '新建分卷' });
-  fireEvent.change(within(dialog).getByRole('textbox', { name: '分卷名称' }), { target: { value: title } });
+  fireEvent.change(within(dialog).getByLabelText('分卷名称'), { target: { value: title } });
   fireEvent.click(within(dialog).getByRole('button', { name: '创建分卷' }));
   await screen.findByRole('button', { name: `收起分卷：${title}` });
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '新建分卷' })).toBeNull());
 }
 async function chooseMenu(trigger: HTMLElement, name: string) {
   fireEvent.contextMenu(trigger, { clientX: 40, clientY: 90 });
@@ -55,23 +57,23 @@ describe('作品与卷章结构管理', () => {
     await createVolume();
     await chooseMenu(screen.getByRole('button', { name: '打开章节：第一章' }), '移至分卷：雨季');
     await waitFor(() => expect(adapter.works.values().next().value!.chapters[0].volumeId).not.toBeNull());
-    fireEvent.change(screen.getByRole('textbox', { name: '章节标题' }), { target: { value: '卷内开篇' } });
-    fireEvent.paste(screen.getByRole('textbox', { name: '章节正文' }), { clipboardData: { getData: () => '雨落A1', types: ['text/plain'], files: [] } });
+    fireEvent.change(screen.getByLabelText('章节标题'), { target: { value: '卷内开篇' } });
+    fireEvent.paste(screen.getByLabelText('章节正文'), { clipboardData: { getData: () => '雨落A1', types: ['text/plain'], files: [] } });
     await screen.findByText('本章 4 字');
     fireEvent.click(screen.getByRole('button', { name: '收起分卷：雨季' }));
     expect(screen.queryByRole('button', { name: '打开章节：第一章' })).toBeNull();
     expect(screen.getByRole('button', { name: '展开分卷：雨季' }).textContent).toContain('4');
     fireEvent.click(screen.getByRole('button', { name: '返回作品集' }));
     fireEvent.click(await screen.findByRole('button', { name: '打开作品：雨落之后' }));
-    await waitFor(() => expect((screen.getByRole('textbox', { name: '章节标题' }) as HTMLInputElement).value).toBe('卷内开篇'));
-    expect(screen.getByRole('textbox', { name: '章节正文' }).textContent).toBe('雨落A1');
+    await waitFor(() => expect((screen.getByLabelText('章节标题') as HTMLInputElement).value).toBe('卷内开篇'));
+    expect(screen.getByLabelText('章节正文').textContent).toBe('雨落A1');
   });
 
   it('删除最后章节进入空态，设置恢复后原正文与同名 ID 一并保留', async () => {
     const adapter = createAdapter();
     render(<App api={adapter.api} />);
     await createWork();
-    fireEvent.paste(screen.getByRole('textbox', { name: '章节正文' }), { clipboardData: { getData: () => '必须保留的段落', types: ['text/plain'], files: [] } });
+    fireEvent.paste(screen.getByLabelText('章节正文'), { clipboardData: { getData: () => '必须保留的段落', types: ['text/plain'], files: [] } });
     await chooseMenu(screen.getByRole('button', { name: '打开章节：第一章' }), '删除章节');
     fireEvent.click(within(screen.getByRole('dialog', { name: '删除章节' })).getByRole('button', { name: '确认删除' }));
     await screen.findByRole('heading', { name: '尚无章节' });
@@ -81,7 +83,7 @@ describe('作品与卷章结构管理', () => {
     await waitFor(() => expect(screen.queryByRole('group', { name: '已删除章节：第一章' })).toBeNull());
     fireEvent.click(screen.getByRole('button', { name: '作品集' }));
     fireEvent.click(await screen.findByRole('button', { name: '打开作品：雨落之后' }));
-    await waitFor(() => expect(screen.getByRole('textbox', { name: '章节正文' }).textContent).toBe('必须保留的段落'));
+    await waitFor(() => expect(screen.getByLabelText('章节正文').textContent).toBe('必须保留的段落'));
   });
 
   it('保存失败时确认删除不改结构并保留草稿，重试后可以删除', async () => {
@@ -89,11 +91,11 @@ describe('作品与卷章结构管理', () => {
     render(<App api={adapter.api} />);
     await createWork();
     adapter.failSave(true);
-    fireEvent.change(screen.getByRole('textbox', { name: '章节标题' }), { target: { value: '不能丢稿' } });
+    fireEvent.change(screen.getByLabelText('章节标题'), { target: { value: '不能丢稿' } });
     await chooseMenu(screen.getByRole('button', { name: '打开章节：第一章' }), '删除章节');
     fireEvent.click(within(screen.getByRole('dialog', { name: '删除章节' })).getByRole('button', { name: '确认删除' }));
     await screen.findByRole('alert');
-    expect((screen.getByRole('textbox', { name: '章节标题' }) as HTMLInputElement).value).toBe('不能丢稿');
+    expect((screen.getByLabelText('章节标题') as HTMLInputElement).value).toBe('不能丢稿');
     expect(adapter.works.values().next().value!.chapters).toHaveLength(1);
   });
 
@@ -124,9 +126,9 @@ describe('作品与卷章结构管理', () => {
     adapter.api.manageStructure = async (request) => { await new Promise<void>((resolve) => { finish = resolve; }); return manage(request); };
     fireEvent.click(screen.getByRole('button', { name: '添加分卷' }));
     const dialog = screen.getByRole('dialog', { name: '新建分卷' });
-    fireEvent.change(within(dialog).getByRole('textbox', { name: '分卷名称' }), { target: { value: '等待卷' } });
+    fireEvent.change(within(dialog).getByLabelText('分卷名称'), { target: { value: '等待卷' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '创建分卷' }));
-    await waitFor(() => expect((screen.getByRole('textbox', { name: '章节标题' }) as HTMLInputElement).disabled).toBe(true));
+    await waitFor(() => expect((screen.getByLabelText('章节标题') as HTMLInputElement).disabled).toBe(true));
     let closed = false;
     let closing = Promise.resolve();
     await act(async () => { closing = adapter.close().then(() => { closed = true; }); });
@@ -153,11 +155,11 @@ describe('作品与卷章结构管理', () => {
     const adapter = createAdapter();
     render(<App api={adapter.api} />);
     await createWork();
-    const title = screen.getByRole('textbox', { name: '章节标题' });
+    const title = screen.getByLabelText('章节标题');
     fireEvent.compositionStart(title);
     fireEvent.click(screen.getByRole('button', { name: '返回作品集' }));
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('输入法'));
-    expect(screen.getByRole('textbox', { name: '章节标题' })).toBe(title);
+    expect(screen.getByLabelText('章节标题')).toBe(title);
     fireEvent.compositionEnd(title);
     fireEvent.click(screen.getByRole('button', { name: '返回作品集' }));
     await screen.findByRole('heading', { name: '作品集' });
@@ -176,12 +178,12 @@ describe('作品与卷章结构管理', () => {
     await createWork();
     fireEvent.click(screen.getByRole('button', { name: '添加分卷' }));
     const dialog = screen.getByRole('dialog', { name: '新建分卷' });
-    fireEvent.change(within(dialog).getByRole('textbox', { name: '分卷名称' }), { target: { value: '唯一分卷' } });
+    fireEvent.change(within(dialog).getByLabelText('分卷名称'), { target: { value: '唯一分卷' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '创建分卷' }));
     fireEvent.click(await screen.findByRole('button', { name: '重试结构操作' }));
     await screen.findByRole('button', { name: '收起分卷：唯一分卷' });
     expect(adapter.works.values().next().value!.volumes).toHaveLength(1);
-    fireEvent.change(screen.getByRole('textbox', { name: '章节标题' }), { target: { value: '继续写作' } });
+    fireEvent.change(screen.getByLabelText('章节标题'), { target: { value: '继续写作' } });
     fireEvent.click(screen.getByRole('button', { name: '返回作品集' }));
     await screen.findByRole('heading', { name: '作品集' });
     expect(adapter.works.values().next().value!.chapters[0].title).toBe('继续写作');
@@ -200,9 +202,9 @@ describe('作品与卷章结构管理', () => {
     await createWork();
     fireEvent.click(screen.getByRole('button', { name: '添加章节' }));
     fireEvent.click(await screen.findByRole('button', { name: '重试结构操作' }));
-    await waitFor(() => expect((screen.getByRole('textbox', { name: '章节标题' }) as HTMLInputElement).value).toBe('第2章'));
+    await waitFor(() => expect((screen.getByLabelText('章节标题') as HTMLInputElement).value).toBe('第2章'));
     expect(adapter.works.values().next().value!.chapters).toHaveLength(2);
-    fireEvent.change(screen.getByRole('textbox', { name: '章节标题' }), { target: { value: '回执补齐后' } });
+    fireEvent.change(screen.getByLabelText('章节标题'), { target: { value: '回执补齐后' } });
     fireEvent.click(screen.getByRole('button', { name: '返回作品集' }));
     await screen.findByRole('heading', { name: '作品集' });
     expect(adapter.works.values().next().value!.chapters[1].title).toBe('回执补齐后');
@@ -237,15 +239,15 @@ describe('作品与卷章结构管理', () => {
     await createWork();
     await createVolume('受影响的卷');
     fireEvent.click(screen.getByRole('button', { name: '添加章节' }));
-    await waitFor(() => expect((screen.getByRole('textbox', { name: '章节标题' }) as HTMLInputElement).value).toBe('第2章'));
+    await waitFor(() => expect((screen.getByLabelText('章节标题') as HTMLInputElement).value).toBe('第2章'));
     adapter.failSave(true);
-    fireEvent.change(screen.getByRole('textbox', { name: '章节标题' }), { target: { value: '第二份原稿' } });
+    fireEvent.change(screen.getByLabelText('章节标题'), { target: { value: '第二份原稿' } });
     await chooseMenu(screen.getByRole('button', { name: '收起分卷：受影响的卷' }), '删除分卷');
     const dialog = screen.getByRole('dialog', { name: '删除卷及章节' });
     expect(dialog.textContent).toContain('第二份原稿');
     expect(dialog.textContent).not.toContain('第2章');
     expect(adapter.works.values().next().value!.chapters.find((chapter) => chapter.volumeId !== null)!.title).toBe('第2章');
     fireEvent.click(within(dialog).getByRole('button', { name: '取消' }));
-    expect((screen.getByRole('textbox', { name: '章节标题' }) as HTMLInputElement).value).toBe('第二份原稿');
+    expect((screen.getByLabelText('章节标题') as HTMLInputElement).value).toBe('第二份原稿');
   });
 });
