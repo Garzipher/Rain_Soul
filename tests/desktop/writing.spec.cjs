@@ -61,6 +61,7 @@ test('真实 Electron 创建、离线写作、关闭保存和重启恢复', asyn
     await page.getByRole('button', { name: '新建作品' }).click();
     await page.getByRole('textbox', { name: '作品名称' }).fill('离线写作验收');
     await page.getByRole('button', { name: '创建作品', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: '新建作品', exact: true })).toHaveCount(0);
     await page.getByRole('textbox', { name: '章节标题' }).fill('雨落时分');
     const editor = page.getByRole('textbox', { name: '章节正文' });
     await editor.fill('雨A1， B2');
@@ -113,6 +114,7 @@ test('未保存稿件不能通过菜单或快捷键重载窗口', async () => {
     await page.getByRole('button', { name: '新建作品' }).click();
     await page.getByRole('textbox', { name: '作品名称' }).fill('快捷键保护');
     await page.getByRole('button', { name: '创建作品', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: '新建作品', exact: true })).toHaveCount(0);
     const editor = page.getByRole('textbox', { name: '章节正文' });
     await application.evaluate(({ BrowserWindow }) => {
       globalThis.rainsoulReloads = [];

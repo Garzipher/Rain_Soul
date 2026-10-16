@@ -4,7 +4,7 @@ const { writeFile } = require('node:fs/promises');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
-const { activate, temporaryDirectory, offlineWindow, closeNormally, cleanup, createWork, writeChapter } = require('./structure-helper.cjs');
+const { chooseSelect, activate, temporaryDirectory, offlineWindow, closeNormally, cleanup, createWork, writeChapter } = require('./structure-helper.cjs');
 
 test.setTimeout(180000);
 test.skip(!process.env.RAINSOUL_TEST_MODEL_EXECUTABLE, '须显式指定已经通过底层资格实测的含模型RainSoul目录包。');
@@ -26,7 +26,7 @@ async function addKnowledge(page, body, category) {
   const form = page.getByRole('form', { name: '新添知识', exact: true });
   await form.getByLabel('知识内容', { exact: true }).fill(body);
   await form.getByLabel('出处', { exact: true }).fill('原创含模型验收夹具');
-  await form.getByRole('combobox').selectOption({ label: category });
+  await chooseSelect(form.getByRole('combobox'), category);
   await activate(form.getByRole('button', { name: '保存知识', exact: true }));
   await expect(form).not.toBeVisible();
 }
@@ -51,6 +51,7 @@ test('真实含模型包离线启用、知识改写检索与停用回退重启�
     if (!report.initial.enabled) await activate(panel.getByRole('button', { name: '启用语义检索', exact: true }));
     await expect(panel).toContainText('语义检索可用'); report.evidence.enabled = true;
     await navigate(page, '知识库');
+    await activate(page.getByRole('button', { name: /^作品知识库/ }));
     const target = '环境烘托：人物独坐空房，窗外冷雨打在玻璃上，用阴冷景物映照寂寞心情。';
     await addKnowledge(page, target, '景物描写');
     await addKnowledge(page, '人物弧光：曾经逃避责任的人在高潮主动保护同伴，以行动完成价值选择的变化。', '人物描写');
@@ -61,7 +62,8 @@ test('真实含模型包离线启用、知识改写检索与停用回退重启�
     report.semantic = await page.evaluate(({ workId, query }) => window.rainSoul.queryKnowledge({ workId, queryId: crypto.randomUUID(), query, mode: 'semantic', tagIds: [], page: 1, pageSize: 20 }), { workId, query });
     expect(report.semantic.status).toBe('ready'); expect(report.semantic.modelFingerprint).not.toBeNull();
     expect(report.semantic.hits.some(hit => hit.excerpt === target && hit.reliable && hit.matchedBy.includes('semantic'))).toBe(true);
-    await navigate(page, '知识库'); await page.getByRole('combobox', { name: '检索方式', exact: true }).selectOption('semantic');
+    await navigate(page, '知识库');
+    await activate(page.getByRole('button', { name: /^作品知识库/ })); await chooseSelect(page.getByRole('combobox', { name: '检索方式', exact: true }), '语义');
     await page.getByRole('searchbox', { name: '模糊搜索知识与正文', exact: true }).fill(query);
     const card = page.getByRole('article', { name: /^知识：环境烘托/ });
     await expect(card).toContainText('语义相关', { timeout: 60000 }); await card.scrollIntoViewIfNeeded();

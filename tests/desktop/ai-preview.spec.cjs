@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { mkdir } = require('node:fs/promises');
 const path = require('node:path');
-const { activate, temporaryDirectory, launch, offlineWindow, cleanup, createWork, writeChapter } = require('./structure-helper.cjs');
+const { chooseSelect, activate, temporaryDirectory, launch, offlineWindow, cleanup, createWork, writeChapter } = require('./structure-helper.cjs');
 
 test.setTimeout(120000);
 
@@ -34,7 +34,7 @@ test('真实窗口保护写作特点草稿，离线预览授权材料并取消�
       return { work: await window.rainSoul.openWork(item.id), snapshots: await window.rainSoul.listSnapshots(item.id) };
     });
     await activate(page.getByRole('button', { name: 'AI 工具', exact: true }));
-    await page.getByRole('combobox', { name: 'AI 操作', exact: true }).selectOption('extractKnowledge');
+    await chooseSelect(page.getByRole('combobox', { name: 'AI 操作', exact: true }), '正文回写知识');
     await activate(page.getByRole('button', { name: '预览 AI 请求', exact: true }));
     const dialog = page.getByRole('dialog', { name: '确认云端 AI 操作', exact: true });
     await expect(dialog).toContainText('教材测试服务');

@@ -6,6 +6,7 @@ async function openBook(page) {
   const expand = page.getByRole('button', { name: '展开侧栏', exact: true });
   if (await expand.isVisible()) await activate(expand);
   await activate(page.getByRole('button', { name: '知识库', exact: true }));
+  await activate(page.getByRole('button', { name: /^作品知识库/ }));
   await activate(page.getByRole('button', { name: '拆书工具', exact: true }));
 }
 async function returnSaved(page) {
@@ -54,6 +55,7 @@ test('粘贴来源真实IPC、双栏独立滚动与20段分页、重启恢复及
     await page.screenshot({ path: test.info().outputPath('source-draft-recovered.png'), fullPage: true });
     await activate(page.getByRole('button', { name: '更换素材', exact: true }));
     await activate(page.getByRole('button', { name: '放弃草稿并更换', exact: true }));
+    await expect(page.getByRole('dialog', { name: '更换拆书素材？', exact: true })).toHaveCount(0);
     await expect(page.getByRole('region', { name: '原文阅读', exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);
     await activate(page.getByRole('button', { name: '返回知识库', exact: true })); await closeNormally(application);

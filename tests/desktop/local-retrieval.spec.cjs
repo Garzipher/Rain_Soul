@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup } = require('./structure-helper.cjs');
+const { chooseSelect, activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup } = require('./structure-helper.cjs');
 test.setTimeout(120000);
 async function navigate(page, name) {
   const expand = page.getByRole('button', { name: '展开侧栏', exact: true });
@@ -20,12 +20,14 @@ test('未安装模型时关键词及混合回退真实IPC可用，全局卡片�
     await closeNormally(application); application = await launch(directory); page = await offlineWindow(application);
     await activate(page.getByRole('button', { name: '打开作品：本机检索验收', exact: true }));
     await navigate(page, '知识库');
-    await page.getByRole('combobox', { name: '作品范围', exact: true }).selectOption('all');
+    await activate(page.getByRole('button', { name: /^作品知识库/ }));
+    await chooseSelect(page.getByRole('combobox', { name: '作品范围', exact: true }), '全部作品（只读）');
     await page.getByRole('searchbox', { name: '模糊搜索知识与正文', exact: true }).fill('雨');
     const card = page.getByRole('article', { name: /知识：雨敲窗沿/ });
+    await activate(card.getByRole('button', { name: /^展开知识：/ }));
     await expect(card).toContainText('检索来源作品');
     await expect(card).toContainText('关键词命中');
-    await page.getByRole('combobox', { name: '检索方式', exact: true }).selectOption('hybrid');
+    await chooseSelect(page.getByRole('combobox', { name: '检索方式', exact: true }), '混合');
     await expect(card).toBeVisible();
     await expect(page.getByRole('region', { name: '知识工作区' })).toContainText(/回退|关键词/);
     await page.screenshot({ path: test.info().outputPath('knowledge-local-fallback.png'), fullPage: true });
@@ -33,7 +35,7 @@ test('未安装模型时关键词及混合回退真实IPC可用，全局卡片�
     await expect(page.getByRole('dialog', { name: '复制知识到当前作品', exact: true })).toContainText('检索来源作品');
     await activate(page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }));
     await navigate(page, '设置');
-    const panel = page.getByLabel('本机知识检索模型', { exact: true });
+    const panel = page.locator('[aria-label="本机知识检索模型"]');
     await expect(panel).toContainText('未安装');
     await expect(panel).toContainText('偏好开启');
     await expect(panel).toContainText('当前使用关键词');

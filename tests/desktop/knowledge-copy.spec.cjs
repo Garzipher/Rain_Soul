@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup } = require('./structure-helper.cjs');
+const { chooseSelect, activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup } = require('./structure-helper.cjs');
 
 test.setTimeout(120000);
 const reference = '雨滴敲在窗沿，像逐渐密集的鼓点。';
@@ -35,15 +35,17 @@ test('离线跨作品复制预览映射目标字典，取消不写入，分类�
     const pageErrors = [];
     page.on('pageerror', error => pageErrors.push(error.message));
     await sidebar(page, '知识库');
-    const empty = page.getByRole('region', { name: '选择知识库作品', exact: true });
-    await expect(empty).toContainText('知识按作品保存');
+    await expect(page.getByRole('button', { name: '全局知识库', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /^作品知识库/ })).toBeDisabled();
     await expect(page.getByText(/本功能尚未交付/)).toHaveCount(0);
-    await activate(empty.getByRole('button', { name: '前往作品集选择作品', exact: true }));
+    await sidebar(page, '作品集');
     await activate(page.getByRole('button', { name: '打开作品：复制目标作品', exact: true }));
     await sidebar(page, '知识库');
+    await activate(page.getByRole('button', { name: /^作品知识库/ }));
     const scope = page.getByRole('combobox', { name: '作品范围', exact: true });
-    await scope.selectOption('all');
+    await chooseSelect(scope, '全部作品（只读）');
     const card = page.getByRole('article', { name: `知识：${reference.slice(0, 20)}`, exact: true });
+    await activate(card.getByRole('button', { name: /^展开知识：/ }));
     await expect(card).toContainText('素材来源作品');
     await activate(card.getByRole('button', { name: '复制到当前作品', exact: true }));
     let dialog = page.getByRole('dialog', { name: '复制知识到当前作品', exact: true });
@@ -51,7 +53,7 @@ test('离线跨作品复制预览映射目标字典，取消不写入，分类�
     await expect(dialog).toContainText('未匹配标签：仅在来源');
     await expect(dialog.getByRole('checkbox', { name: '雨夜', exact: true })).toBeChecked();
     const categoryId = seed.target.assets.categories.find(item => item.name === '景物描写').id;
-    await dialog.getByRole('combobox', { name: '目标主分类', exact: true }).selectOption(categoryId);
+    await chooseSelect(dialog.getByRole('combobox', { name: '目标主分类', exact: true }), '景物描写');
     await dialog.getByRole('checkbox', { name: '写作参考', exact: true }).check();
     await activate(dialog.getByRole('button', { name: '取消', exact: true }));
     await expect(dialog).toHaveCount(0);
@@ -61,12 +63,13 @@ test('离线跨作品复制预览映射目标字典，取消不写入，分类�
 
     await activate(card.getByRole('button', { name: '复制到当前作品', exact: true }));
     dialog = page.getByRole('dialog', { name: '复制知识到当前作品', exact: true });
-    await dialog.getByRole('combobox', { name: '目标主分类', exact: true }).selectOption(categoryId);
+    await chooseSelect(dialog.getByRole('combobox', { name: '目标主分类', exact: true }), '景物描写');
     await dialog.getByRole('checkbox', { name: '写作参考', exact: true }).check();
     await page.screenshot({ path: test.info().outputPath('knowledge-copy.png'), fullPage: true });
     await activate(dialog.getByRole('button', { name: '确认复制', exact: true }));
     await expect(dialog).toHaveCount(0);
-    await expect(scope).toHaveValue(seed.target.id);
+    await expect(scope).toHaveText('当前作品：复制目标作品');
+    await activate(card.getByRole('button', { name: /^展开知识：/ }));
     await expect(card).toContainText('来源作品：素材来源作品');
     const copied = await page.evaluate(id => window.rainSoul.openWork(id), seed.target.id);
     expect(copied.assets.knowledge).toHaveLength(1);
@@ -80,7 +83,7 @@ test('离线跨作品复制预览映射目标字典，取消不写入，分类�
     expect(sourceScope.entryOwners[seed.source.assets.knowledge[0].id].sourceRevision).toBe(seed.source.revision);
 
     await sidebar(page, '设置');
-    const dictionary = page.getByRole('region', { name: '知识分类与标签维护', exact: true });
+    const dictionary = page.locator('#settings-dictionary').getByRole('region', { name: '知识分类与标签维护', exact: true });
     const otherEditor = dictionary.getByRole('button', { name: '编辑分类：人物描写', exact: true });
     const otherDelete = dictionary.getByRole('button', { name: '删除分类：人物描写', exact: true });
     const tagDelete = dictionary.getByRole('button', { name: '删除标签：雨夜', exact: true });

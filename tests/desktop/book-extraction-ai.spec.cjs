@@ -67,6 +67,7 @@ async function configure(page) {
 }
 async function openSource(page, application, filename) {
   await sidebar(page, '知识库');
+  await activate(page.getByRole('button', { name: /^作品知识库/ }));
   await application.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, filename);
   await activate(page.getByRole('button', { name: '拆书工具', exact: true }));
   await activate(page.getByRole('button', { name: '选择 TXT / DOCX', exact: true }));
@@ -164,6 +165,7 @@ test('AI拆书真实IPC逐次授权、独立原文范围、审核后原子入库
     await expect(review).toHaveValue('作者手工整理的学习笔记。');
     await activate(results.getByRole('button', { name: '带入审核', exact: true }));
     await activate(replacement.getByRole('button', { name: '替换并重新审核', exact: true }));
+    await expect(review).toHaveValue(original);
     await expect(approved).not.toBeChecked(); await approved.check();
     await expect(page.getByRole('checkbox', { name: '审核通过段落 2', exact: true })).not.toBeChecked();
     await activate(page.getByRole('button', { name: '确认入库（1）', exact: true }));
@@ -184,6 +186,7 @@ test('AI拆书真实IPC逐次授权、独立原文范围、审核后原子入库
     await closeNormally(application); application = await launch(directory); page = await offlineWindow(application);
     await installTransport(application);
     await activate(page.getByRole('button', { name: '打开作品：AI拆书学习练习', exact: true })); await sidebar(page, '知识库');
+    await activate(page.getByRole('button', { name: /^作品知识库/ }));
     await expect(page.getByRole('article', { name: /^知识：/ })).toHaveCount(1);
     expect((await readWork(page, id)).assets.knowledge).toEqual(committed.assets.knowledge);
     expect(await count(application)).toBe(0);
@@ -243,6 +246,7 @@ test('已完成但未采用的AI拆书批次重启可恢复，零云重发且须
     await configure(page); await openSource(page, application, filename);
     await page.getByRole('checkbox', { name: 'AI 分析段落 2', exact: true }).check();
     const dialog = await prepare(page); await activate(dialog.getByRole('button', { name: '确认发送', exact: true }));
+    await expect(page.locator('dialog[aria-label="确认 AI 辅助拆书"]')).toHaveCount(0);
     await expect(page.locator('[aria-label="AI 推荐结果"]')).toContainText('用具体光影和比喻营造场景。');
     expect(await count(application)).toBe(1); expect((await readWork(page, id)).assets.knowledge).toHaveLength(0);
     await activate(page.getByRole('button', { name: '返回知识库', exact: true }));
@@ -252,7 +256,8 @@ test('已完成但未采用的AI拆书批次重启可恢复，零云重发且须
     await closeNormally(application); application = await launch(directory); page = await offlineWindow(application);
     await installTransport(application);
     await activate(page.getByRole('button', { name: '打开作品：AI批次重启恢复', exact: true }));
-    await sidebar(page, '知识库'); await activate(page.getByRole('button', { name: '拆书工具', exact: true }));
+    await sidebar(page, '知识库');
+    await activate(page.getByRole('button', { name: /^作品知识库/ })); await activate(page.getByRole('button', { name: '拆书工具', exact: true }));
     await activate(page.getByRole('button', { name: '查看已保存 AI 批次 1', exact: true }));
     const results = page.locator('[aria-label="AI 推荐结果"]');
     await expect(results).toContainText('用具体光影和比喻营造场景。');

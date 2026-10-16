@@ -12,6 +12,7 @@ async function openBook(page) {
   const expand = page.getByRole('button', { name: '展开侧栏', exact: true });
   if (await expand.isVisible()) await activate(expand);
   await activate(page.getByRole('button', { name: '知识库', exact: true }));
+  await activate(page.getByRole('button', { name: /^作品知识库/ }));
   await activate(page.getByRole('button', { name: '拆书工具', exact: true }));
 }
 async function captureDisabled(page) {

@@ -8,6 +8,7 @@ test('真实窗口灰字不落盘，Tab接受可撤销，AI打开时暂停', asy
     await createWork(page, '灰字参考验收');
     await activate(page.getByRole('button', { name: '展开侧栏', exact: true }));
     await activate(page.getByRole('button', { name: '知识库', exact: true }));
+    await activate(page.getByRole('button', { name: /^作品知识库/ }));
     await activate(page.getByRole('button', { name: '新增知识', exact: true }));
     await page.getByLabel('知识内容', { exact: true }).fill('雨夜里，灯光像一枚孤独的星。');
     await page.getByLabel('出处', { exact: true }).fill('原创练习');

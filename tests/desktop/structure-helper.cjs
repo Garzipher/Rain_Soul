@@ -10,9 +10,28 @@ const processes = new WeakMap();
 const runFile = promisify(execFile);
 
 async function activate(button) {
+  await expect(button.page().locator('dialog[open][inert]')).toHaveCount(0);
   await expect(button).toBeVisible();
   await expect(button).toBeEnabled();
   await button.press('Enter');
+  // 角色查询会提前排除 inert 的退出弹窗，原生 top layer 仍可能吞掉后续按键。
+  // 等待真实关闭，不关闭动画、不用固定延迟代替界面条件。
+  await expect(button.page().locator('dialog[open][inert]')).toHaveCount(0);
+}
+
+/** 通过真实可访问选项和键盘选择，兼容统一 Radix 下拉；不写组件状态。 */
+async function chooseSelect(trigger, choice) {
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toBeEnabled();
+  await trigger.press('ArrowDown');
+  const page = trigger.page();
+  const option = typeof choice === 'object'
+    ? page.getByRole('option').nth(choice.index)
+    : page.getByRole('option', { name: choice, exact: true });
+  await expect(option).toBeVisible();
+  await expect(option).toBeEnabled();
+  await option.press('Enter');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
 }
 
 async function temporaryDirectory() {
@@ -100,4 +119,4 @@ async function writeChapter(page, title, body) {
   // 结构操作自身也必须 flush；此处刻意不等 500ms 自动保存。
 }
 
-module.exports = { activate, temporaryDirectory, dataDirectory, launch, offlineWindow, closeNormally, cleanup, createWork, writeChapter };
+module.exports = { chooseSelect, activate, temporaryDirectory, dataDirectory, launch, offlineWindow, closeNormally, cleanup, createWork, writeChapter };

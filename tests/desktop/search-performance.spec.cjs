@@ -6,7 +6,7 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { seedSearchProject, expectedResults, queries } = require('../fixtures/search-performance.cjs');
 const { restoreSearchWindow, readSearchWindow, isSearchDisplayValid, assertSearchDisplayValid } = require('../fixtures/search-display-state.cjs');
-const { activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup, createWork } = require('./structure-helper.cjs');
+const { chooseSelect, activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup, createWork } = require('./structure-helper.cjs');
 
 // 总预算包含种库、400次准备/正式输入和200次真实渲染；单次P95门槛仍为1秒。
 test.setTimeout(900000);
@@ -41,7 +41,8 @@ async function measureInput(page, text, expected, mode) {
       });
       const searching = () => [...workspace.querySelectorAll('[role="status"]')].some(node => node.textContent === '正在搜索本机内容…');
       const isComplete = () => start !== undefined && sawMutation && !searching() && JSON.stringify(rendered()) === JSON.stringify(expected)
-        && (total === null || workspace.querySelector('.knowledge-pagination span')?.textContent === `第 1 页 · 共 ${total} 条`);
+        && (total === null || workspace.querySelector('.knowledge-pagination span')?.textContent === `共 ${total} 条`
+          && workspace.querySelector('.knowledge-pagination span:nth-of-type(2)')?.textContent === `第 1 / ${Math.max(1, Math.ceil(total / 20))} 页`);
       const observer = new MutationObserver(records => {
         if (start === undefined || finished) return;
         sawMutation = true;
@@ -113,6 +114,7 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
     const expand = page.getByRole('button', { name: '展开侧栏', exact: true });
     if (await expand.isVisible()) await activate(expand);
     await activate(page.getByRole('button', { name: '知识库', exact: true }));
+    await activate(page.getByRole('button', { name: /^作品知识库/ }));
     await expect(page.getByRole('searchbox', { name: '模糊搜索知识与正文', exact: true })).toBeVisible({ timeout: 20000 });
     await expect(page.getByRole('article', { name: /^知识：/ })).toHaveCount(1000);
     const expected = queries.map(query => expectedResults(fixture, query));
@@ -130,7 +132,7 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
     async function sample(index) {
       await page.bringToFront();
       const query = queries[index];
-      await page.getByRole('combobox', { name: '搜索范围', exact: true }).selectOption(query.mode);
+      await chooseSelect(page.getByRole('combobox', { name: '搜索范围', exact: true }), query.mode === 'knowledge' ? '知识内容' : '正文与知识');
       const group = page.getByRole('group', { name: '标签筛选', exact: true });
       for (const name of fixture.tagNames) {
         const button = group.getByRole('button', { name, exact: true });
@@ -171,7 +173,8 @@ test('百万字/千条知识真实Electron输入至结果渲染200样本P95不�
       body: card.querySelector('.knowledge-snippet').textContent,
       source: card.querySelector('.knowledge-source span:last-of-type').textContent,
     })).sort((left, right) => left.source.localeCompare(right.source)))).toEqual(secondPage);
-    await expect(page.getByRole('navigation', { name: '检索结果分页', exact: true })).toContainText(`第 2 页 · 共 ${expected[paginatedIndex].knowledge.length} 条`);
+    await expect(page.getByRole('navigation', { name: '检索结果分页', exact: true })).toContainText(`共 ${expected[paginatedIndex].knowledge.length} 条`);
+    await expect(page.getByRole('navigation', { name: '检索结果分页', exact: true })).toContainText(`第 2 / ${Math.ceil(expected[paginatedIndex].knowledge.length / 20)} 页`);
     const sorted = samples.map(sample => sample.durationMs).sort((left, right) => left - right);
     const rank = Math.ceil(0.95 * sorted.length), p95Ms = sorted[rank - 1];
     const report = { measuredAt: new Date().toISOString(), environment,

@@ -3,9 +3,14 @@ const { writeFile, readFile, mkdir } = require('node:fs/promises');
 const path = require('node:path');
 const { Document, Packer, Paragraph, HeadingLevel } = require('docx');
 const yauzl = require('yauzl');
-const { activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup, createWork, writeChapter } = require('./structure-helper.cjs');
+const { chooseSelect, activate, temporaryDirectory, launch, offlineWindow, closeNormally, cleanup, createWork, writeChapter } = require('./structure-helper.cjs');
 
 test.setTimeout(120000);
+async function openWorkActions(page) {
+  const menu = page.locator('details.work-more');
+  if (!await menu.evaluate(node => node.open)) await activate(menu.locator('summary'));
+  await expect(page.getByRole('group', { name: '作品操作', exact: true })).toBeVisible();
+}
 const reference = '雨滴敲在窗沿，像逐渐密集的鼓点。';
 const prose = '雨落在旧车站。她从口袋里取出一把旧钥匙。';
 async function capture(page, name) {
@@ -64,11 +69,12 @@ test('离线知识、剧情、伏笔书签与整部作品恢复通过真实 IPC 
     await createWork(page, '雨落之后');
     await writeChapter(page, '第一章 旧车站', prose);
     await sidebar(page, '知识库');
+    await activate(page.getByRole('button', { name: /^作品知识库/ }));
     await activate(page.getByRole('button', { name: '新增知识', exact: true }));
     const form = page.getByRole('form', { name: '新添知识', exact: true });
     await form.getByRole('textbox', { name: '知识内容', exact: true }).fill(reference);
     await form.getByRole('textbox', { name: '出处', exact: true }).fill('自写练习句');
-    await form.getByRole('combobox', { name: '主分类', exact: true }).selectOption({ label: '景物描写' });
+    await chooseSelect(form.getByRole('combobox', { name: '主分类', exact: true }), '景物描写');
     await activate(form.getByRole('button', { name: '保存知识', exact: true }));
     await expect(form).toHaveCount(0);
     const card = page.getByRole('article', { name: `知识：${reference.slice(0, 20)}`, exact: true });
@@ -84,18 +90,18 @@ test('离线知识、剧情、伏笔书签与整部作品恢复通过真实 IPC 
     await page.getByRole('textbox', { name: '节点名称', exact: true }).fill('车站发现旧钥匙');
     await activate(page.getByRole('button', { name: '创建节点', exact: true }));
     await page.getByRole('textbox', { name: '剧情摘要', exact: true }).fill('在雨夜让人物找到旧钥匙，留下身份谜团。');
-    await page.getByRole('combobox', { name: '关联正文章节', exact: true }).selectOption({ label: '第一章 旧车站' });
+    await chooseSelect(page.getByRole('combobox', { name: '关联正文章节', exact: true }), '第一章 旧车站');
     await activate(page.getByRole('button', { name: '保存剧情', exact: true }));
     await capture(page, 'plot');
     await activate(page.getByRole('tab', { name: '伏笔架构', exact: true }));
     await page.getByRole('textbox', { name: '新伏笔名称', exact: true }).fill('旧钥匙');
     await activate(page.getByRole('button', { name: '添加伏笔', exact: true }));
-    await page.getByRole('combobox', { name: '伏笔状态', exact: true }).selectOption('已埋设');
-    await page.getByRole('combobox', { name: '归属剧情节点', exact: true }).selectOption({ label: '车站发现旧钥匙' });
+    await chooseSelect(page.getByRole('combobox', { name: '伏笔状态', exact: true }), '已埋设');
+    await chooseSelect(page.getByRole('combobox', { name: '归属剧情节点', exact: true }), '车站发现旧钥匙');
     await page.getByRole('textbox', { name: '伏笔说明', exact: true }).fill('钥匙纹样与后续人物身份相关。');
     await activate(page.getByRole('button', { name: '保存伏笔', exact: true }));
-    await page.getByRole('combobox', { name: '证据章节', exact: true }).selectOption({ label: '第一章 旧车站' });
-    await page.getByRole('combobox', { name: '证据段落', exact: true }).selectOption({ index: 1 });
+    await chooseSelect(page.getByRole('combobox', { name: '证据章节', exact: true }), '第一章 旧车站');
+    await chooseSelect(page.getByRole('combobox', { name: '证据段落', exact: true }), { index: 1 });
     await page.getByRole('textbox', { name: '证据摘录', exact: true }).fill('她从口袋里取出一把旧钥匙。');
     await activate(page.getByRole('button', { name: '添加证据', exact: true }));
     await expect(page.getByRole('region', { name: '埋设、触发与回收证据', exact: true })).toContainText('原出处：第一章 旧车站');
@@ -103,12 +109,14 @@ test('离线知识、剧情、伏笔书签与整部作品恢复通过真实 IPC 
     await activate(page.getByRole('tab', { name: '正文', exact: true }));
     const editor = page.getByRole('textbox', { name: '章节正文', exact: true });
     await editor.press('Control+End');
+    await page.getByText('引用与伏笔书签', { exact: true }).press('Enter');
     await activate(page.getByRole('button', { name: '插入书签', exact: true }));
-    await page.getByRole('combobox', { name: '书签类型', exact: true }).selectOption('foreshadow');
+    await chooseSelect(page.getByRole('combobox', { name: '书签类型', exact: true }), '伏笔标记');
     await activate(page.getByRole('button', { name: '插入书签', exact: true }));
     await editor.getByRole('button', { name: '伏笔书签：旧钥匙', exact: true }).click();
     await expect(page.getByRole('dialog', { name: '旧钥匙', exact: true })).toContainText('钥匙纹样');
     await activate(page.getByRole('button', { name: '关闭书签详情', exact: true }));
+    await openWorkActions(page);
     await activate(page.getByRole('button', { name: '版本历史', exact: true }));
     await page.getByRole('textbox', { name: '快照名称', exact: true }).fill('第一稿');
     await activate(page.getByRole('button', { name: '创建快照', exact: true }));
@@ -117,6 +125,7 @@ test('离线知识、剧情、伏笔书签与整部作品恢复通过真实 IPC 
     expect(original.chapters[0].document.content.flatMap(item => item.content ?? []).filter(item => item.type === 'bookmark')).toHaveLength(2);
     await activate(page.getByRole('button', { name: '关闭版本历史', exact: true }));
     await writeChapter(page, '修改稿章节', '这是恢复前必须保留的修改稿。');
+    await openWorkActions(page);
     await activate(page.getByRole('button', { name: '版本历史', exact: true }));
     const beforeHistoricalExport = await currentWork(page, '雨落之后');
     const beforeHistory = await page.evaluate(id => window.rainSoul.listSnapshots(id), original.id);
@@ -150,6 +159,7 @@ test('离线知识、剧情、伏笔书签与整部作品恢复通过真实 IPC 
     await activate(page.getByRole('button', { name: '关闭版本历史', exact: true }));
     const archive = path.join(directory, '完整关系.rainsoul');
     await setDialogFile(application, archive, true);
+    await openWorkActions(page);
     await activate(page.getByRole('button', { name: '备份项目', exact: true }));
     await expect.poll(async () => (await readFile(archive).catch(() => Buffer.alloc(0))).length).toBeGreaterThan(100);
     await activate(page.getByRole('button', { name: '返回作品集', exact: true }));
@@ -192,14 +202,18 @@ test('手稿预览、TXT与DOCX导出和归档导入为新作品在离线重启�
     await capture(page, 'manuscript-import');
     await activate(preview.getByRole('button', { name: '创建新作品', exact: true }));
     await expect(page.getByRole('heading', { name: '雨落之后', exact: true })).toBeVisible();
+    await expect(page.locator('dialog[aria-label="导入预览"]')).toHaveCount(0);
     await setDialogFile(application, txtExport, true);
+    await openWorkActions(page);
     await activate(page.getByRole('button', { name: '导出 TXT', exact: true }));
     await expect.poll(async () => readFile(txtExport, 'utf8').catch(() => '')).toContain(prose);
     await setDialogFile(application, docxExport, true);
+    await openWorkActions(page);
     await activate(page.getByRole('button', { name: '导出 DOCX', exact: true }));
     await expect.poll(async () => (await readFile(docxExport).catch(() => Buffer.alloc(0))).subarray(0, 2).toString()).toBe('PK');
     const original = await currentWork(page, '雨落之后');
     await setDialogFile(application, archive, true);
+    await openWorkActions(page);
     await activate(page.getByRole('button', { name: '备份项目', exact: true }));
     await expect.poll(async () => (await readFile(archive).catch(() => Buffer.alloc(0))).length).toBeGreaterThan(100);
     await activate(page.getByRole('button', { name: '返回作品集', exact: true }));
@@ -283,15 +297,17 @@ test('云端设置与发送范围预览可离线取消且不修改原稿', async
     await editor.dispatchEvent('contextmenu', { clientX: 360, clientY: 230 });
     await activate(page.getByRole('menuitem', { name: 'AI 单句润色', exact: true }));
     await expect(page.getByRole('textbox', { name: '目标单句', exact: true })).toHaveValue(prose.slice(0, 3));
-    await expect(page.getByRole('combobox', { name: 'AI 操作', exact: true })).toHaveValue('sentencePolish');
+    await expect(page.getByRole('combobox', { name: 'AI 操作', exact: true })).toHaveText('单句润色');
     // 从写作进入知识页选参考，再返回时保留同正文版本的单句目标。
     await activate(page.getByRole('button', { name: '关闭AI工具', exact: true }));
     await sidebar(page, '知识库');
-    await activate(page.getByRole('button', { name: '用于写作参考', exact: true }));
+    await activate(page.getByRole('button', { name: /^作品知识库/ }));
+    await activate(page.getByRole('article', { name: '知识：雨落在旧车站，路灯把人影拉长。', exact: true }).getByRole('button', { name: /^展开知识：/ }));
+    await activate(page.getByRole('button', { name: '选作参考', exact: true }));
     await activate(page.getByRole('button', { name: '返回写作', exact: true }));
     await activate(page.getByRole('button', { name: 'AI 工具', exact: true }));
     await expect(page.getByRole('textbox', { name: '目标单句', exact: true })).toHaveValue(prose.slice(0, 3));
-    await expect(page.getByRole('combobox', { name: 'AI 操作', exact: true })).toHaveValue('sentencePolish');
+    await expect(page.getByRole('combobox', { name: 'AI 操作', exact: true })).toHaveText('单句润色');
     await activate(page.getByRole('button', { name: '预览 AI 请求', exact: true }));
     await expect(confirmation).toContainText(prose.slice(0, 3));
     await expect(confirmation).toContainText('自写参考句');
