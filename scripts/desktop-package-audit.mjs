@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { extractFile, listPackage, statFile, uncache } from '@electron/asar';
 import { assertSafeLocalPath } from './prepare-bundled-retrieval-model.mjs';
 
-const desktop = new Set(['main.cjs', 'preload.cjs', 'database-worker.cjs', 'web-article-worker.cjs', 'retrieval-runtime.cjs', 'retrieval-worker.cjs', 'retrieval-ort-wasm.cjs', 'rainsoul.png', 'learning-course.json', 'THIRD_PARTY_NOTICES.txt', 'retrieval-wasm/ort-wasm-simd-threaded.mjs', 'retrieval-wasm/ort-wasm-simd-threaded.wasm']);
-const asset = /^renderer\/assets\/(?:index|react|editor|textbook|textbook-content|snapshot-panel|consistency-panel|ai-workspace|rolldown-runtime)-[A-Za-z0-9_-]{8}\.(?:js|css)$/;
+const desktop = new Set(['main.cjs', 'preload.cjs', 'database-worker.cjs', 'global-knowledge-worker.cjs', 'web-article-worker.cjs', 'retrieval-runtime.cjs', 'retrieval-worker.cjs', 'retrieval-ort-wasm.cjs', 'rainsoul.png', 'learning-course.json', 'THIRD_PARTY_NOTICES.txt', 'retrieval-wasm/ort-wasm-simd-threaded.mjs', 'retrieval-wasm/ort-wasm-simd-threaded.wasm']);
+const asset = /^renderer\/assets\/(?:index|react|editor|textbook|textbook-content|snapshot-panel|consistency-panel|ai-workspace|motion-features|rolldown-runtime)-[A-Za-z0-9_-]{8}\.(?:js|css)$/;
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const recordsDigest = records => digest(JSON.stringify(records));
 function safeMember(path) {

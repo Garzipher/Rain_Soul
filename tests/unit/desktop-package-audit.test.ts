@@ -27,6 +27,19 @@ it('只接受已知构建成员，摘要稳定且记录每个文件内容', asyn
   expect(first.membersSha256).toMatch(/^[a-f0-9]{64}$/); expect(await checkDesktopBuild(root)).toEqual(first);
   put(root, 'desktop/main.cjs', '改动'); expect((await checkDesktopBuild(root)).membersSha256).not.toBe(first.membersSha256);
 });
+it('动效懒加载分包必须通过构建与真实ASAR审计，仍拒绝未知相似前缀', async () => {
+  const root = build(); put(root, 'renderer/assets/motion-features-A1b2c3d4.js', '经过构建的动效功能');
+  const expected = await checkDesktopBuild(root), resources = await pack(root);
+  expect(expected.files.some(file => file.path === 'renderer/assets/motion-features-A1b2c3d4.js')).toBe(true);
+  await expect(auditDesktopPackage(resources, expected)).resolves.toMatchObject({ buildMembersSha256: expected.membersSha256 });
+  put(root, 'renderer/assets/motion-private-A1b2c3d4.js');
+  await expect(checkDesktopBuild(root)).rejects.toThrow(/未授权/);
+});
+it('独立全局知识库worker参与构建与ASAR摘要校验', async () => {
+  const root = build(); put(root, 'desktop/global-knowledge-worker.cjs', '全局知识库工作线程');
+  const expected = await checkDesktopBuild(root), resources = await pack(root);
+  await expect(auditDesktopPackage(resources, expected)).resolves.toMatchObject({ buildMembersSha256: expected.membersSha256 });
+});
 it.each(['Projects/project.sqlite', 'research.log', 'desktop/project.db', 'desktop/research.log', 'desktop/作者素材.txt', 'renderer/作者.docx', 'renderer/assets/author.js', 'renderer/learning/作者.png', 'renderer/assets/index-A1b2c3d4.js/正文.txt'])('拒绝构建输入中的意外成员 %s', async path => {
   const root = build(); if (path.includes('.js/')) rmSync(join(root, 'renderer/assets/index-A1b2c3d4.js'));
   put(root, path); await expect(checkDesktopBuild(root)).rejects.toThrow(/构建|成员|目录/);
