@@ -68,7 +68,8 @@ it('知识页从真实 SQLite 搜索、保存失败保留草稿，取消后才�
   adapter.api.manageAssets = manage;
   fireEvent.click(screen.getByRole('button', { name: '重试资产操作' }));
   await waitFor(() => expect(screen.queryByLabelText('知识内容')).not.toBeInTheDocument());
-  fireEvent.change(screen.getByRole('searchbox'), { target: { value: '站' } });
+  // 提交后会重新读取知识作用域；表单消失时搜索页可能仍处于加载态。
+  fireEvent.change(await screen.findByRole('searchbox'), { target: { value: '站' } });
   expect(await screen.findByRole('button', { name: /展开知识：雨水/ })).toBeInTheDocument();
 });
 
