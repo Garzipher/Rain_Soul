@@ -35,4 +35,35 @@
 
 按 review/checklist 复审 `edfb1c6..38ac74f` 未发现问题，材料为 `final-code-review.md`。1179 个当前跟踪文件的限定凭据扫描未发现 OpenRouter Key 文本或常见敏感文件路径，材料为 `tracked-secret-scan.json`；不等于完整 Git 历史秘密审计。
 
-实际包两项云复验及新版入口在执行后补录；不得以本地测试或提示词变化直接将真实云失败改成通过。Windows 干净安装矩阵沿用待验状态，不在本轮冒充完成。
+桌面全套在非输入 Windows 桌面运行，36 项中 34 通过、2 项原有条件跳过、零失败，退出码 0，用时 12.8 分钟。条件跳过分别要求显式指定无模型研究包和含模型正式包，不计为通过。后台进程和隔离数据已清理，`switched=false`。百万字/千条知识的 200 个正式搜索样本 P95 为 347.70ms，预热 20 次另计，满足 1 秒门槛。
+
+原型首轮默认并发为 71 通过、3 失败，三项均在 `beforeEach` 的本地文件 `page.goto` 等待 load 超时，尚未进入业务步骤。保留 `demo.log` 和 `demo-first-output/`；改以 `--workers=1` 执行原有全部用例，未放宽超时、重试或业务断言，最终 74 项全部通过，证据 `demo-final.log`。正式构建/打包在回归结束后串行执行，退出码 0，ASAR 审计通过，随包模型资源保留。构建器的重复依赖引用提示不等于新增依赖，资源白名单审计未放宽。
+
+## 新实际包真实云复验
+
+使用 OpenRouter `dots-studio/dots-3-note-preview:free`，当轮公开目录核实输入输出零标价，未切换收费模型。测试仅发送原创短样稿，按正式 UI 预览范围、模型、计费提示及输出预算后确认。报告绑定实际 EXE、ASAR 和运行版本 1.3.7，原始材料为 `real-cloud-fixes-report.json`、`real-cloud-fixes.log` 和两张操作截图。
+
+| 原失败 | 本轮实际结果 |
+| --- | --- |
+| 单句润色 | 通过；单行候选精确替换首句，其余正文保持；确认前不改稿，确认后生成保护快照，重载持久化一致；耗时 16.292 秒（含 UI 步骤） |
+| 剧情感受 | 通过；预览与发送预算 8192 token，完整返回两条建议；两处证据核对、零未验证证据、可定位原文；正文与快照不变；耗时 14.664 秒（含 UI 步骤） |
+
+实测每项各一次 prepare IPC、一次 execute IPC、一次 OpenRouter HTTPS POST；冻结授权 token/hash 与预览一致，无自动重发。诊断只透传包装真实主进程 handler 和 HTTPS request，未修改包文件，不收集请求头、请求体或 Key。报告中的候选来自生产解析后的 IPC 返回，不宣称保留未经解析的厂商响应；没有取得完整账户账单，零标价不等于已核对账单。
+
+剧情建议识别了“昨天刚满二十二岁”和“十年前二十二岁”的年龄矛盾，并指出素材没有实际写出犹豫拆信的铺垫；同时给出上下文局限。该单次样本证明原失败链路可完成，不代表文学评价或免费模型长期稳定性已获保证。
+
+诊断包装已恢复，隔离进程树已回收，两类调试端口均关闭，临时作品与配置副本已删除，日常云配置哈希不变。关停记录中的 259 是回收前仍在运行的 Windows 状态，不是正常退出码。云复验和桌面测试均未切换用户输入桌面。
+
+## 最新入口与剩余门禁
+
+| 文件 | SHA-256 |
+| --- | --- |
+| `release/current/RainSoul Setup 1.3.7.exe` | `61ba50084a98628195e8dde24071a3155d295bde572074e65d58dde807d1042b` |
+| `release/current/win-unpacked/RainSoul.exe` | `890a20b321ab7606eb0e503bbde9e3317b8f9287875951afb3dc74ee2ff993b7` |
+| `win-unpacked/resources/app.asar` | `4ab2ba368c72adb323d8ff2b1e910a60a812ea14ea92ee79c00e4ad636a8d239` |
+
+安装器 151,164,519 字节，签名 `NotSigned`，证据 `installer-authenticode.json`。已验证发布目录边界与链接、确认无旧包运行进程，再替换 `release/current`，复核新包哈希后物理删除旧 1.3.6 安装器及目录包。`release` 仅保留 current，其中只有上述两个 EXE；不保留旧 EXE 副本。审计材料归档到 `.artifacts/archive/release-evidence-20261019-137/`，清理台账为 `release-cleanup-137.json`，没有删除真实作品、日常安装或凭据，也未推送远端。
+
+本轮仅复验两项失败，不能把旧版其余五项云通过改标到 1.3.7。`release-evidence.pending.json` 如实记录新版两项通过、五项未重验；Windows 10/11 十四格仍 pending。新版 `windows-matrix.pending.json` 已绑定安装器哈希，`release-gate.mjs` 退出 2（blocked），不把修复成功等同最终发布门禁全部放行。Windows 仍需可管理的独立来宾或无作者数据的专用测试机。
+
+本轮没有重试清理历史两处被自动审批拒绝的临时目录；它们的原始阻断说明保留在 1.3.6 报告。本轮新建的后台测试数据均已按台账清理。

@@ -2,7 +2,7 @@
 
 RainSoul 是面向 Windows 的本地写作工作台。把正文、剧情大纲、伏笔和写作素材放在同一部作品中，离线完成写作、保存、搜索和导出；需要 AI 时再配置自己的云服务。
 
-采用 Electron、React/TypeScript、Tiptap 和 SQLite。当前版本 **1.3.6**，面向 **Windows 10/11 64 位**；干净系统兼容性矩阵仍待独立环境验收。
+采用 Electron、React/TypeScript、Tiptap 和 SQLite。当前版本 **1.3.7**，面向 **Windows 10/11 64 位**；干净系统兼容性矩阵仍待独立环境验收。
 
 ## 选择使用方式
 
@@ -15,9 +15,9 @@ RainSoul 是面向 Windows 的本地写作工作台。把正文、剧情大纲�
 
 在 [GitHub Releases](https://github.com/Garzipher/Rain_Soul/releases) 查找安装器；只有发布者上传后才会出现，源码仓库不包含 EXE。
 
-本机当前安装器位于 `release/current/RainSoul Setup 1.3.6.exe`；也可直接运行 `release/current/win-unpacked/RainSoul.exe`。使用目录包时须保留整个 `win-unpacked`，不能只复制 EXE。先退出旧实例，再打开新版；旧程序不会随着源码更新自动升级。
+本机当前安装器位于 `release/current/RainSoul Setup 1.3.7.exe`；也可直接运行 `release/current/win-unpacked/RainSoul.exe`。使用目录包时须保留整个 `win-unpacked`，不能只复制 EXE。先退出旧实例，再打开新版；旧程序不会随着源码更新自动升级。
 
-1.3.6 包含独立全局知识库、待审素材预览和统一动效，并修复快速切换页面时浏览器跳过动效产生的未处理错误。会话支持直接发送和停止生成；云请求与本地编辑分别管理。新版验证结果与剩余发布门禁见[本轮发布验收](tasks/release-acceptance-2026-10-16.md)。
+1.3.7 保留独立全局知识库、待审素材预览和统一动效，修复单句候选外缘空行、剧情感受输出预算及会话草稿保存后的导航竞态。两项原失败操作已在实际包使用免费云模型复验通过；其余五项云操作本轮未重新执行，Windows 安装矩阵仍待验。会话支持直接发送和停止生成；云请求与本地编辑分别管理。详见[本轮修复与验收](tasks/ai-cloud-fixes-2026-10-19.md)，旧版本记录保留在[1.3.6 发布验收](tasks/release-acceptance-2026-10-16.md)。
 
 当前安装器未签名，Windows 可能提示未知发布者。首次安装后的写作不需要网络；云端 AI 需要用户自己的服务配置。
 
