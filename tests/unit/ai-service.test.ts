@@ -13,6 +13,48 @@ function setup(response: unknown = { choices: [{ message: { content: '雨丝拂�
   return { service, fetcher, credentials, resolveHost, advance: (ms: number) => { now += ms; } };
 }
 describe('云端 AI 冻结、授权和候选保护', () => {
+  it('单句候选只移除首尾空白，预览与写入使用同一个不跨行候选', async () => {
+    const { service, fetcher } = setup({ choices: [{ finish_reason: 'stop', message: { content: '\r\n  雨夜的旧车站里，林澄攥着信。\n\n' } }] });
+    const input = request(); input.operation = 'sentencePolish';
+    const prepared = service.prepare(input);
+    expect(prepared.previewText).toContain('仅返回一个单行候选');
+    expect(prepared.previewText).toContain('不要返回多个版本');
+    const candidate = await service.execute({ ...prepared, confirmed: true });
+    expect(candidate.text).toBe('雨夜的旧车站里，林澄攥着信。');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it.each(['第一种写法。\n第二种写法。', '新句子。\r解释原因。', '新句子。\u2028另一行。', '新句子。\u2029另一段。'])('单句内部换行不拼接或取第一条，不产生可写入候选：%s', async content => {
+    const { service, fetcher } = setup({ choices: [{ finish_reason: 'stop', message: { content } }] });
+    const input = request(); input.operation = 'sentencePolish';
+    const prepared = service.prepare(input);
+    await expect(service.execute({ ...prepared, confirmed: true })).rejects.toThrow(/单句.*单行/);
+    await expect(service.execute({ ...prepared, confirmed: true })).rejects.toThrow(/使用|过期|取消/);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('段落候选首尾和内部换行保持原样', async () => {
+    const text = '\n第一段。\n第二段。\n';
+    const { service } = setup({ choices: [{ finish_reason: 'stop', message: { content: text } }] });
+    const prepared = service.prepare(request());
+    await expect(service.execute({ ...prepared, confirmed: true })).resolves.toMatchObject({ text });
+  });
+  it('剧情分析使用独立输出预算和有限建议，冻结预览与实际发送一致', async () => {
+    const { service, fetcher } = setup(); const input = request(); input.operation = 'plotFeel';
+    const prepared = service.prepare(input);
+    expect(prepared.maxOutputTokens).toBe(8192);
+    expect(prepared.previewText).toContain('最多3条');
+    expect(prepared.previewText).toContain('每条最多2条证据');
+    expect(prepared.previewText).toContain('不输出思考过程');
+    await service.execute({ ...prepared, confirmed: true });
+    expect(JSON.parse(fetcher.mock.calls[0][1]!.body as string).max_tokens).toBe(prepared.maxOutputTokens);
+  });
+  it('剧情分析显式输出预算优先，容量不足不静默缩减或联网', () => {
+    const { service, fetcher } = setup(); const input = request(); input.operation = 'plotFeel';
+    input.maxOutputTokens = 4096;
+    expect(service.prepare(input).maxOutputTokens).toBe(4096);
+    input.provider.contextWindowTokens = 4096;
+    expect(() => service.prepare(input)).toThrow(/超过模型容量/);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it('云端总开关关闭时保留配置但不能准备发送、读取密钥或联网', () => {
     const { service, fetcher, credentials } = setup(), input = request();
     input.provider = { ...input.provider, enabled: false };

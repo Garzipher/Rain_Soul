@@ -9,10 +9,10 @@ export interface AiServiceDependencies {
 }
 interface FrozenRequest { prepared: AiPreparedRequest; request: AiPrepareRequest; url: string; hostname: string; body: string }
 const operationPrompts: Record<AiOperation, string> = {
-  sentencePolish: '润色指定单句，保留原意，返回待作者确认的候选。', paragraphPolish: '润色指定段落，保留原意和事实，返回待作者确认的候选。',
+  sentencePolish: '润色指定单句，保留原意。仅返回一个单行候选，不要返回多个版本、换行、解释或 Markdown 包装，供作者确认。', paragraphPolish: '润色指定段落，保留原意和事实，返回待作者确认的候选。',
   continue: '依据上下文给出续写候选，结合已授权上下文、剧情大纲、伏笔状态、人物关系、节奏与写作特点，先保持剧情因果和人物动机，再生成与原文衔接自然的新内容；知识内容只能参考描写手法，不得直接拼贴或复述原句；不声称已经修改正文。', correct: '检查错字和病句，保留原意，返回纠错候选。',
   consistency: '检查角色、时间、地点、伏笔、大纲和写作特点一致性。只给建议，引用上下文证据并标明不确定性。',
-  plotFeel: '评估剧情衔接、合理性及大纲偏离。只给建议，引用上下文证据并标明不确定性，不自动改稿。',
+  plotFeel: '评估剧情衔接、合理性及大纲偏离。只给建议，引用上下文证据并标明不确定性，不自动改稿。优先报告最重要的问题，最多3条，每条原因不超过180字、不确定性不超过80字，每条最多2条证据，每条摘录不超过80字；直接输出最终 JSON，不输出思考过程。',
   extractKnowledge: '从正文提取摘要、角色、事件和伏笔候选，逐项给出原文依据；必须由作者审核后入库。',
 };
 /** 请求预览与发送分离；仅使用冻结请求，凭据只在主进程发送阶段读取。 */
@@ -24,7 +24,9 @@ export class AiService {
   prepare(value: AiPrepareRequest): AiPreparedRequest {
     const parsed = aiPrepareRequestSchema.safeParse(value);
     if (!parsed.success) throw new Error('AI 请求内容或上下文无效，请缩小范围并检查所选段落。');
-    const request = parsed.data, address = aiCompletionEndpoint(request.provider.baseUrl), maxOutputTokens = request.maxOutputTokens ?? 2048;
+    const request = parsed.data, address = aiCompletionEndpoint(request.provider.baseUrl);
+    // 分析还需容纳证据ID和结构字段；预算在授权预览中展示并与发送内容一同冻结。
+    const maxOutputTokens = request.maxOutputTokens ?? (request.operation === 'plotFeel' ? 8192 : 2048);
     if (request.provider.enabled === false) throw new Error('云端 AI 已关闭，配置已保留；需要时请在设置中开启。');
     const analysisFormat = ['consistency', 'plotFeel'].includes(request.operation)
       ? '\n只返回 JSON：{"findings":[{"dimension":"角色|时间|地点|伏笔|大纲偏离|写作特点漂移|剧情衔接|合理性中的一个","message":"具体原因","uncertainty":"不确定性与资料局限","evidence":[{"chapterId":"上下文实际章节ID","paragraphId":"上下文实际段落ID","excerpt":"该段逐字摘录"}]}]}。没有证据时 evidence 为空，不能编造身份或摘录。' : request.operation === 'extractKnowledge' ? '\n只返回 JSON：{"items":[{"type":"摘要|角色|事件|伏笔","body":"提取内容与原文依据","category":"建议分类名称","tags":["建议标签名称"],"source":"正文出处"}]}。每项仅为待审核建议，最多100项，不能声称已入库。' : '\n只返回目标范围的正文候选，不返回解释、编号、章节或段落ID。';
@@ -66,8 +68,11 @@ export class AiService {
   }
   cancel(confirmationToken: string): void { this.pending.delete(confirmationToken); this.active.get(confirmationToken)?.abort(); }
   private async send(frozen: FrozenRequest, signal: AbortSignal): Promise<AiCandidate> {
-    const content = await sendAiCompletion({ provider: frozen.request.provider, url: frozen.url, hostname: frozen.hostname, body: frozen.body }, this.dependencies, signal);
+    const response = await sendAiCompletion({ provider: frozen.request.provider, url: frozen.url, hostname: frozen.hostname, body: frozen.body }, this.dependencies, signal);
     const { context, operation } = frozen.request;
+    // 只去掉单句的包装空白；内部换行可能代表多个版本，不能擅自拼接或取首条。
+    const content = operation === 'sentencePolish' ? response.trim() : response;
+    if (operation === 'sentencePolish' && /[\r\n\u2028\u2029]/u.test(content)) throw new Error('单句润色需要一个单行候选；模型返回了多行内容，未生成可写入候选。请调整要求后重新预览确认。');
     return { id: randomUUID(), operation, workId: context.workId, baselineRevision: context.baselineRevision, paragraphIds: [...context.paragraphIds], text: content, requestHash: frozen.prepared.requestHash, createdAt: new Date(this.now()).toISOString(), ...(context.selection ? { selection: structuredClone(context.selection) } : {}), ...(context.referenceChapterIds ? { referenceChapterIds: [...context.referenceChapterIds] } : {}) };
   }
 }
