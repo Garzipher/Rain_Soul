@@ -1,7 +1,7 @@
 import { AnimatePresence, m } from 'motion/react';
 import { motionTokens, seconds } from '../motion/tokens';
 import { SelectField } from './select-field';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { DesktopApi, WorkDetail, WorkSummary } from '../../shared/contracts';
 import type { ConversationDetail, ConversationRequest, ConversationSummary } from '../../shared/conversations';
 import type { AiPreparedRequest } from '../../shared/ai';
@@ -47,7 +47,7 @@ export function ConversationWorkspace({ work, works, api, externalBusy = false, 
     narrowWindow.addEventListener('change', syncList);
     return () => narrowWindow.removeEventListener('change', syncList);
   }, []);
-  useEffect(() => { onDirtyChange(changed || !!pending || localBusy || renaming || rejected || replyUnsaved); }, [changed, pending, localBusy, renaming, rejected, replyUnsaved, onDirtyChange]);
+  useLayoutEffect(() => { onDirtyChange(changed || !!pending || localBusy || renaming || rejected || replyUnsaved); }, [changed, pending, localBusy, renaming, rejected, replyUnsaved, onDirtyChange]);
   useEffect(() => {
     mounted.current = true;
     if (work) void api.listConversations(work.id).then(setList).catch(reason => setError(messageOf(reason)));

@@ -1,13 +1,34 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
+import { Profiler } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../../src/renderer/App';
 import { createStructureAdapter } from './renderer-structure-adapter';
 import { chooseSelect } from './select-field-helper';
+import { ConversationWorkspace } from '../../src/renderer/components/conversation-workspace';
 
 afterEach(cleanup);
 describe('正式会话接线', () => {
+  it('草稿已保存的界面提交时同步解除父级导航保护', async () => {
+    const adapter = createStructureAdapter();
+    try {
+      const work = await adapter.api.createWork('会话门禁作品');
+      let blocked = false;
+      const savedCommitProtection: boolean[] = [];
+      render(<Profiler id="conversation-save" onRender={() => {
+        const input = screen.queryByRole('textbox', { name: '会话输入' }) as HTMLTextAreaElement | null;
+        if (input?.value === '保存完成即可离开' && !input.disabled && screen.queryByRole('status')?.textContent === 'Enter 发送 · Shift+Enter 换行') savedCommitProtection.push(blocked);
+      }}><ConversationWorkspace work={work} works={[]} api={adapter.api} onSelectWork={() => {}} onDirtyChange={value => { blocked = value; }} /></Profiler>);
+      fireEvent.click(screen.getByRole('button', { name: '新建会话' }));
+      const input = await screen.findByRole('textbox', { name: '会话输入' });
+      await waitFor(() => expect(input).toBeEnabled());
+      fireEvent.change(input, { target: { value: '保存完成即可离开' } });
+      expect(blocked).toBe(true);
+      await waitFor(() => expect(savedCommitProtection.length).toBeGreaterThan(0));
+      expect(savedCommitProtection).not.toContain(true);
+    } finally { cleanup(); adapter.dispose(); }
+  });
   it('新建作品立即进入会话目录，异步切换期间不能在旧作品创建会话', async () => {
     const adapter = createStructureAdapter();
     try {
@@ -27,7 +48,7 @@ describe('正式会话接线', () => {
       await waitFor(() => expect(screen.getByRole('button', { name: '新建会话' })).toBeDisabled());
       release();
       await waitFor(() => expect(screen.getByRole('button', { name: '新建会话' })).toBeEnabled());
-    } finally { cleanup(); adapter.close(); }
+    } finally { cleanup(); adapter.dispose(); }
   });
   it('作品下创建会话、保存草稿、重进仍在，并保护未保存草稿切换', async () => {
     const adapter = createStructureAdapter();
@@ -39,6 +60,7 @@ describe('正式会话接线', () => {
       fireEvent.click(screen.getByRole('button', { name: '需求会话' }));
       fireEvent.click(await screen.findByRole('button', { name: '新建会话' }));
       const input = await screen.findByRole('textbox', { name: '会话输入' });
+      await waitFor(() => expect(input).toBeEnabled());
       fireEvent.change(input, { target: { value: '第一章以雨声开场' } });
       fireEvent.click(screen.getByRole('button', { name: '作品集' }));
       expect(screen.getByRole('textbox', { name: '会话输入' })).toHaveValue('第一章以雨声开场');
@@ -48,6 +70,6 @@ describe('正式会话接线', () => {
       fireEvent.click(screen.getByRole('button', { name: '需求会话' }));
       fireEvent.click(await screen.findByRole('button', { name: '打开会话：新会话' }));
       expect(await screen.findByRole('textbox', { name: '会话输入' })).toHaveValue('第一章以雨声开场');
-    } finally { cleanup(); adapter.close(); }
+    } finally { cleanup(); adapter.dispose(); }
   });
 });
