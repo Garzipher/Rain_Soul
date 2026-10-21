@@ -1,11 +1,12 @@
 import { SelectField } from './select-field';
 import { useEffect, useRef, useState } from 'react';
-import type { AssetAction, AssetQuery, AssetState, KnowledgeEntry, SearchResult } from '../../shared/assets';
+import type { AssetAction, AssetQuery, AssetState, KnowledgeEntry, LearningNote, SearchResult } from '../../shared/assets';
 import type { WorkDetail, WorkSummary } from '../../shared/contracts';
 import type { RetrievalQuery, RetrievalReply } from '../../shared/retrieval';
 import { StructureDialog, type StructureDialogState } from './structure-dialog';
-import { readableKnowledgeSource, replaceKnowledgeSource, splitKnowledgeSource } from '../../shared/knowledge-source';
-import { KnowledgeSourceAudit } from './knowledge-source-audit';
+import { conciseKnowledgeSource, readableKnowledgeSource, replaceKnowledgeSource, splitKnowledgeSource } from '../../shared/knowledge-source';
+import { KnowledgeSourceAudit, KnowledgeSourceVerification } from './knowledge-source-audit';
+import { KnowledgeLearningEditor, KnowledgeLearningNotes } from './knowledge-learning-notes';
 import './knowledge-workspace.css';
 export interface KnowledgeWorkspaceProps {
   referenceIds?: string[];
@@ -20,7 +21,7 @@ export interface KnowledgeWorkspaceProps {
   scopeProps?: { works: WorkSummary[]; scopeId: string; onScopeChange: (id: string) => void; canEdit: boolean;
     onCopy?: (entryId: string) => Promise<boolean>; entryOwners?: Record<string, { workId: string; workTitle: string; sourceEntryId?: string }> };
 }
-interface KnowledgeDraft { id: string | null; body: string; source: string; originalSource: string; categoryId: string; tagIds: string[] }
+interface KnowledgeDraft { id: string | null; body: string; source: string; originalSource: string; categoryId: string; tagIds: string[]; learningNotes: LearningNote[] }
 export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
   const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width: 760px)').matches);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -143,14 +144,17 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
   function openForm(entry?: KnowledgeEntry) {
     if (!canEdit || disabled || form) return;
     trigger.current = document.activeElement as HTMLElement;
-    const draft: KnowledgeDraft = entry ? { id: entry.id, body: entry.body, source: readableKnowledgeSource(entry.source), originalSource: entry.source, categoryId: entry.categoryId, tagIds: [...entry.tagIds] }
-      : { id: null, body: '', source: '', originalSource: '', categoryId: categoryId ?? categories.find(item => item.systemKey === 'uncategorized')?.id ?? categories[0]?.id ?? '', tagIds: [] };
+    const draft: KnowledgeDraft = entry ? { id: entry.id, body: entry.body, source: readableKnowledgeSource(entry.source), originalSource: entry.source, categoryId: entry.categoryId, tagIds: [...entry.tagIds], learningNotes: (entry.learningNotes ?? []).map(note => ({ ...note })) }
+      : { id: null, body: '', source: '', originalSource: '', categoryId: categoryId ?? categories.find(item => item.systemKey === 'uncategorized')?.id ?? categories[0]?.id ?? '', tagIds: [], learningNotes: [] };
     setForm(draft); setBaseline(JSON.stringify(draft)); setError(null);
   }
   function closeForm() { setForm(null); setError(null); trigger.current?.focus(); }
   async function save() {
     if (!form || !canEdit || !form.body.trim() || !categories.some(item => item.id === form.categoryId)) return;
-    const payload = { body: form.body, source: replaceKnowledgeSource(form.originalSource, form.source), categoryId: form.categoryId, tagIds: form.tagIds };
+    const learningNotes = form.learningNotes.filter(note => note.technique.trim() || note.usage.trim() || note.exercise.trim());
+    const hadNotes = props.assets.knowledge.find(entry => entry.id === form.id)?.learningNotes?.length;
+    const payload = { body: form.body, source: replaceKnowledgeSource(form.originalSource, form.source), categoryId: form.categoryId, tagIds: form.tagIds,
+      ...(learningNotes.length || hadNotes ? { learningNotes } : {}) };
     const action: AssetAction = form.id ? { type: 'updateKnowledge', id: form.id, ...payload } : { type: 'createKnowledge', ...payload };
     if (await operate(() => props.onAction(action))) closeForm();
   }
@@ -165,7 +169,7 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
       </nav>}
       <div className="knowledge-content"><div className="knowledge-toolbar"><div className="knowledge-search">
         {collapsed && <button className="secondary" aria-expanded="false" onClick={() => setCollapsed(false)}>展开分类</button>}
-        <input type="search" aria-label="模糊搜索知识与正文" placeholder="搜索内容、出处、标签" value={text} onChange={event => setText(event.target.value)} />
+        <input type="search" aria-label="模糊搜索知识与正文" placeholder="搜索内容、写法、场景、出处" value={text} onChange={event => setText(event.target.value)} />
         {text && <button className="secondary" aria-label="清空搜索" onClick={() => setText('')}>清空</button>}
         <button className="secondary knowledge-filter-toggle" aria-expanded={filtersExpanded} aria-controls="knowledge-filter-controls" onClick={() => setFiltersExpanded(value => !value)}>筛选范围</button></div><div id="knowledge-filter-controls" className={`knowledge-filter-controls ${filtersExpanded ? 'is-open' : ''}`}>
         <label>搜索范围<SelectField aria-label="搜索范围" value={mode} onChange={event => { setMode(event.target.value as AssetQuery['mode']); setRetrievalMode('keyword'); }}><option value="knowledge">知识内容</option>{canEdit && <option value="all">正文与知识</option>}</SelectField></label>
@@ -180,6 +184,7 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
       {form && <form className="knowledge-form" aria-label={form.id ? '编辑知识' : '新添知识'} onSubmit={event => { event.preventDefault(); void save(); }}>
         <h2>{form.id ? '编辑知识' : '新添知识'}</h2><label>知识内容<textarea ref={editor} value={form.body} disabled={disabled} onChange={event => setForm({ ...form, body: event.target.value })} required /></label>
         <label>出处<input value={form.source} disabled={disabled} onChange={event => setForm({ ...form, source: event.target.value })} /></label>
+        <KnowledgeLearningEditor notes={form.learningNotes} disabled={disabled} onChange={learningNotes => setForm({ ...form, learningNotes })} />
         <label>主分类<SelectField value={form.categoryId} disabled={disabled} onChange={event => setForm({ ...form, categoryId: event.target.value })}>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</SelectField></label>
         <fieldset disabled={disabled}><legend>已维护标签</legend>{tags.map(tag => <label key={tag.id}><input type="checkbox" checked={form.tagIds.includes(tag.id)} onChange={() => setForm({ ...form, tagIds: form.tagIds.includes(tag.id) ? form.tagIds.filter(id => id !== tag.id) : [...form.tagIds, tag.id] })} />{tag.name}</label>)}</fieldset>
         <div className="knowledge-form-actions"><button type="button" className="secondary" disabled={disabled} onClick={closeForm}>取消编辑</button><button className="primary" disabled={disabled || !form.body.trim() || !form.categoryId}>{sending ? '正在保存…' : '保存知识'}</button></div>
@@ -196,8 +201,8 @@ export function KnowledgeWorkspace(props: KnowledgeWorkspaceProps) {
             <summary aria-label={`知识操作：${entry.body.slice(0, 20)}`} title="知识操作">···</summary>
             <div className="knowledge-entry-menu-items" role="group" aria-label="知识操作"><button disabled={disabled || !!form} onClick={event => { const menu = event.currentTarget.closest('details'); menu?.removeAttribute('open'); menu?.querySelector('summary')?.focus(); openForm(entry); }}>编辑知识</button><button disabled={disabled || !!form} onClick={event => { const menu = event.currentTarget.closest('details'); menu?.removeAttribute('open'); menu?.querySelector('summary')?.focus(); setDialog({ heading: '删除知识', description: '将删除这条知识。历史内容与引用追溯仍保留，不会删除正文。', submitLabel: '确认删除', onSubmit: () => operate(() => props.onAction({ type: 'deleteKnowledge', id: entry.id })) }); }}>删除知识</button></div>
           </details> : props.scopeProps?.entryOwners?.[entry.id]?.workId === props.work.id ? <span>已在当前作品</span> : props.scopeProps?.onCopy && <button disabled={disabled} onClick={() => { void operate(() => props.scopeProps!.onCopy!(entry.id)); }}>复制到当前作品</button>}
-        </div><div className="knowledge-source"><span>{source.readable || '未注明出处'}</span>{expanded.has(entry.id) && <>{props.scopeProps?.entryOwners?.[entry.id] && <span>作品：{props.scopeProps.entryOwners[entry.id].workTitle}</span>}{entry.origin && <small>来源作品：{entry.origin.workTitle}</small>}</>}</div></div>
-        {expanded.has(entry.id) && <>{reply && <small className="knowledge-match">{reply.hits.find(hit => hit.entryId === (props.scopeProps?.entryOwners?.[entry.id]?.sourceEntryId ?? entry.id) && hit.workId === (props.scopeProps?.entryOwners?.[entry.id]?.workId ?? props.work.id))?.matchedBy.map(value => value === 'keyword' ? '关键词命中' : '语义相关').join(' · ')}</small>}<KnowledgeSourceAudit records={source.records} /></>}
+        </div><div className="knowledge-source"><span>{conciseKnowledgeSource(entry.source) || '未注明出处'}</span>{expanded.has(entry.id) && <>{props.scopeProps?.entryOwners?.[entry.id] && <span>作品：{props.scopeProps.entryOwners[entry.id].workTitle}</span>}{entry.origin && <small>来源作品：{entry.origin.workTitle}</small>}</>}</div></div>
+        {expanded.has(entry.id) && <><KnowledgeLearningNotes notes={entry.learningNotes ?? []} referenceAvailable={canEdit && !!props.onToggleReference} /><KnowledgeSourceVerification source={entry.source} />{reply && <small className="knowledge-match">{reply.hits.find(hit => hit.entryId === (props.scopeProps?.entryOwners?.[entry.id]?.sourceEntryId ?? entry.id) && hit.workId === (props.scopeProps?.entryOwners?.[entry.id]?.workId ?? props.work.id))?.matchedBy.map(value => value === 'keyword' ? '关键词命中' : '语义相关').join(' · ')}</small>}<KnowledgeSourceAudit records={source.records} /></>}
       </article>; })}</div>
       {paragraphs.map(row => <article className="knowledge-paragraph-result" key={row.id}><small>正文 · {row.source}</small><p>{row.snippet}</p><button className="secondary" disabled={!row.chapterId || disabled} aria-label={`定位正文：${row.title}`} onClick={() => { if (row.chapterId) props.onLocate(row.chapterId, row.paragraphId ?? undefined); }}>{row.title}</button></article>)}
       {!searching && !searchError && !visible.length && !paragraphs.length && <div role="status">{!entries.length ? <><p>还没有知识储备</p>{props.onBookExtraction && <button className="secondary" disabled={disabled} onClick={props.onBookExtraction}>导入参考素材</button>}</> : !text.trim() && (categoryId || tagIds.length) ? <><p>当前分类或标签没有匹配内容</p><button className="secondary" onClick={() => { setCategory(null); setTags([]); }}>清除筛选</button></> : <><p>没有匹配的知识或正文内容</p><button className="secondary" onClick={() => document.querySelector<HTMLInputElement>('input[aria-label="模糊搜索知识与正文"]')?.focus()}>改写查询</button></>}</div>}

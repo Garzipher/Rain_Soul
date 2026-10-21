@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KnowledgeEntry } from '../../shared/assets';
 import type { RetrievalQuery, RetrievalReply } from '../../shared/retrieval';
-import { readableKnowledgeSource } from '../../shared/knowledge-source';
+import { conciseKnowledgeSource } from '../../shared/knowledge-source';
 import type { GlobalEntryRef } from '../../shared/global-knowledge';
 import { SelectField } from './select-field';
+import { KnowledgeLearningNotes } from './knowledge-learning-notes';
+import { KnowledgeSourceVerification } from './knowledge-source-audit';
 interface ReferenceChoice { key: string; library: 'work' | 'global'; id: string; revision: number; body: string; source: string }
 export function LocalReferencePanel(props: {
   workId: string; revision: number; entries: KnowledgeEntry[]; busy: boolean;
@@ -49,7 +51,9 @@ export function LocalReferencePanel(props: {
         const ids = event.target.checked ? [...selected, entry.key] : selected.filter(id => id !== entry.key); setSelected(ids);
         select.current(results.filter(item => item.library === 'work' && ids.includes(item.key)).map(item => item.id));
         globalSelect.current?.(results.filter(item => item.library === 'global' && ids.includes(item.key)).map(item => ({ entryId: item.id, revision: item.revision })));
-      }} /><span>{entry.body}</span></label><small>{entry.library === 'global' ? `全局库 v${entry.revision} · ` : '当前作品 · '}{readableKnowledgeSource(entry.source) || '未注明出处'}</small>
+      }} /><span>{entry.body}</span></label><small>{entry.library === 'global' ? `全局库 v${entry.revision} · ` : '当前作品 · '}{conciseKnowledgeSource(entry.source) || '未注明出处'}</small>
+      {entry.library === 'work' && <KnowledgeLearningNotes notes={props.entries.find(item => item.id === entry.id)?.learningNotes ?? []} referenceAvailable={true} />}
+      <KnowledgeSourceVerification source={entry.source} />
     </div>)}</fieldset>
   </div>;
 }

@@ -3,7 +3,23 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { LocalReferencePanel } from '../../src/renderer/components/local-reference-panel';
+import type { KnowledgeEntry } from '../../src/shared/assets';
 afterEach(cleanup);
+it('本作品参考明确附带学习注释，来源技术字段折叠后仍可追溯', async () => {
+  const hash = 'b'.repeat(64), entry = { id: 'entry', body: '她把信折了两遍。', source: '《原创练习》；文件 SHA-256：' + hash, deletedAt: null,
+    learningNotes: [{ technique: '重复动作呈现克制', usage: '重逢前', exercise: '改写折纸场景' }] } as KnowledgeEntry;
+  const onRetrieve = vi.fn(async (request: { queryId: string }) => ({ queryId: request.queryId, hits: [{ workId: 'work', entryId: 'entry', reliable: true }], total: 1 }));
+  render(<LocalReferencePanel workId="work" revision={1} entries={[entry]} busy={false} onRetrieve={onRetrieve as never} onSelect={vi.fn()} />);
+  fireEvent.change(screen.getByLabelText('本机参考查询'), { target: { value: '克制的情绪' } });
+  fireEvent.click(screen.getByRole('button', { name: '查找写作参考' }));
+  await screen.findByRole('checkbox');
+  expect(screen.getByText(/选作参考时附带学习注释/)).toBeVisible();
+  expect(screen.getByText('重复动作呈现克制')).toBeVisible();
+  expect(screen.getByText('《原创练习》', { exact: false })).toBeVisible();
+  expect(screen.queryByText(new RegExp(hash))).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText('来源校验详情'));
+  await waitFor(() => expect(screen.getByText(new RegExp(hash))).toBeVisible());
+});
 it('作者主动本机检索并勾选才采用参考，回退信息可见，修订后清除选择', async () => {
   const entry = { id: 'entry', body: '雨夜的原文描写', source: '例文', deletedAt: null };
   const onRetrieve = vi.fn(async (request: { queryId: string }) => ({ queryId: request.queryId, hits: [{ workId: 'work', entryId: 'entry', bodyHash: '', excerpt: entry.body, source: entry.source, matchedBy: ['keyword'], reliable: true }], total: 1, sourceRevisions: { work: 1 }, status: 'fallback', modelFingerprint: null, message: '模型未就绪，使用关键词' }));
