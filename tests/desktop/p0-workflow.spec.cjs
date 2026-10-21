@@ -205,11 +205,11 @@ test('手稿预览、TXT与DOCX导出和归档导入为新作品在离线重启�
     await expect(page.locator('dialog[aria-label="导入预览"]')).toHaveCount(0);
     await setDialogFile(application, txtExport, true);
     await openWorkActions(page);
-    await activate(page.getByRole('button', { name: '导出 TXT', exact: true }));
+    await activate(page.getByRole('button', { name: '导出含创作资料 TXT', exact: true }));
     await expect.poll(async () => readFile(txtExport, 'utf8').catch(() => '')).toContain(prose);
     await setDialogFile(application, docxExport, true);
     await openWorkActions(page);
-    await activate(page.getByRole('button', { name: '导出 DOCX', exact: true }));
+    await activate(page.getByRole('button', { name: '导出含创作资料 DOCX', exact: true }));
     await expect.poll(async () => (await readFile(docxExport).catch(() => Buffer.alloc(0))).subarray(0, 2).toString()).toBe('PK');
     const original = await currentWork(page, '雨落之后');
     await setDialogFile(application, archive, true);
@@ -331,7 +331,7 @@ test('最小窗口的写作入口和AI面板可在侧栏展开与收起时触达
       await page.evaluate(() => { document.scrollingElement.scrollTop = 0; document.querySelector('dialog[aria-label="AI工具"]').scrollTop = 0; });
       await page.screenshot({ path: test.info().outputPath(`small-window-${expanded ? 'expanded' : 'collapsed'}.png`), fullPage: true });
       const geometry = await page.evaluate(() => {
-        const items = [...document.querySelectorAll('button')].filter(item => ['备份项目', '导出 TXT', '导出 DOCX', '预览 AI 请求'].includes(item.textContent.trim()));
+        const items = [...document.querySelectorAll('button')].filter(item => ['备份项目', '导出正文净稿 TXT', '导出正文净稿 DOCX', '导出含创作资料 TXT', '导出含创作资料 DOCX', '预览 AI 请求'].includes(item.textContent.trim()));
         const tabs = [...document.querySelectorAll('[role="tab"]')];
         const main = document.querySelector('main').getBoundingClientRect();
         return { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, main: { left: main.left, width: main.width }, controls: [...items, ...tabs].map(item => {

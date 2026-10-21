@@ -1,5 +1,5 @@
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
-import type { ExportManuscript } from '../shared/manuscript';
+import type { ExportManuscript, ManuscriptExportMode } from '../shared/manuscript';
 import { readableKnowledgeSource } from '../shared/knowledge-source';
 
 interface OutputBlock { text: string; heading: boolean }
@@ -13,7 +13,7 @@ function assertText(value: string): void {
 }
 
 /** 冻结数据必须保持关联完整；不为悬空书签编造内容。 */
-function prepare(work: ExportManuscript): OutputBlock[] {
+function prepare(work: ExportManuscript, mode: ManuscriptExportMode): OutputBlock[] {
   if (!Number.isSafeInteger(work.revision) || work.revision < 0) throw new Error('导出版本无效。');
   const validateStrings = (value: unknown): void => {
     if (typeof value === 'string') assertText(value);
@@ -54,12 +54,12 @@ function prepare(work: ExportManuscript): OutputBlock[] {
           if (kind === 'knowledge') {
             if (!knowledge.has(targetId)) throw new Error('知识引用目标缺失。');
             if (!references.has(targetId)) references.set(targetId, references.size + 1);
-            text += `[${references.get(targetId)}]`;
+            if (mode === 'full') text += `[${references.get(targetId)}]`;
           } else if (kind === 'foreshadow') {
             const target = foreshadows.get(targetId);
             if (!target) throw new Error('伏笔引用目标缺失。');
             usedForeshadows.add(targetId);
-            text += `[伏笔：${target.deletedAt ? '已删除伏笔：' : ''}${target.name}]`;
+            if (mode === 'full') text += `[伏笔：${target.deletedAt ? '已删除伏笔：' : ''}${target.name}]`;
           } else throw new Error('导出书签类型无效。');
         } else throw new Error('导出正文包含不支持的节点。');
       }
@@ -68,14 +68,14 @@ function prepare(work: ExportManuscript): OutputBlock[] {
   };
   work.unvolumedChapters.forEach(addChapter);
   for (const volume of work.volumes) { add(volume.title, true); volume.chapters.forEach(addChapter); }
-  if (references.size) {
+  if (mode === 'full' && references.size) {
     add('引用清单', true);
     for (const [id, number] of references) {
       const entry = knowledge.get(id)!;
       add(`[${number}] ${entry.deletedAt ? '已删除条目（保留历史内容）\n' : ''}${entry.body}\n出处：${readableKnowledgeSource(entry.source) || '未注明'}`);
     }
   }
-  const listed = work.foreshadows.filter(item => !item.deletedAt || usedForeshadows.has(item.id));
+  const listed = mode === 'full' ? work.foreshadows.filter(item => !item.deletedAt || usedForeshadows.has(item.id)) : [];
   if (listed.length) {
     add('伏笔清单', true);
     for (const item of listed) {
@@ -90,13 +90,13 @@ function prepare(work: ExportManuscript): OutputBlock[] {
   return blocks;
 }
 
-export function exportTxtManuscript(work: ExportManuscript): Buffer {
-  const blocks = prepare(work);
+export function exportTxtManuscript(work: ExportManuscript, mode: ManuscriptExportMode = 'full'): Buffer {
+  const blocks = prepare(work, mode);
   return Buffer.from(`${blocks.map(block => block.text).join('\n\n')}\n`.replace(/\n/g, '\r\n'), 'utf8');
 }
 
-export async function exportDocxManuscript(work: ExportManuscript): Promise<Buffer> {
-  const blocks = prepare(work);
+export async function exportDocxManuscript(work: ExportManuscript, mode: ManuscriptExportMode = 'full'): Promise<Buffer> {
+  const blocks = prepare(work, mode);
   const children = blocks.map(block => new Paragraph({
     heading: block.heading ? HeadingLevel.HEADING_1 : undefined,
     spacing: { line: 360, after: block.heading ? 160 : 80 },

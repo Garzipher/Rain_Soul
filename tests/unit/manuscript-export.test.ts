@@ -96,6 +96,30 @@ describe('固定版本手稿导出', () => {
     expect(exportTxtManuscript(historic).toString('utf8')).toContain('历史当时的内容');
     expect(exportTxtManuscript(historic).toString('utf8')).not.toContain('雨像琴弦。');
   });
+  it('正文净稿移除行内管理书签并隐藏知识/伏笔清单，正文和卷章标题保持不变', async () => {
+    const work = example();
+    const txt = exportTxtManuscript(work, 'clean').toString('utf8').replace(/\r\n/g, '\n');
+    const files = await readDocxPackage(await exportDocxManuscript(work, 'clean'), { title: '书' });
+    const docx = parseWordXml(files.get('word/document.xml')!.toString('utf8'), files.get('word/styles.xml')!.toString('utf8'));
+    for (const text of [txt, docx.blocks.map(block => block.text).join('\n')]) {
+      expect(text).toContain('雨🌧️\n之后');
+      expect(text).toContain('第一卷 雨');
+      expect(text).toContain('第一章 雨夜');
+      expect(text).not.toContain('[1]');
+      expect(text).not.toContain('[伏笔：');
+      expect(text).not.toContain('引用清单');
+      expect(text).not.toContain('伏笔清单');
+      expect(text).not.toContain('雨像琴弦。');
+      expect(text).not.toContain('来源版本');
+    }
+  });
+  it('未指定导出模式仍兼容含创作资料的原有格式', () => {
+    const text = exportTxtManuscript(example()).toString('utf8');
+    expect(text).toContain('[1]');
+    expect(text).toContain('[伏笔：旧钥匙]');
+    expect(text).toContain('引用清单');
+    expect(text).toContain('伏笔清单');
+  });
   it('知识/伏笔悬空关联、重复ID、非法XML字符与无效版本拒绝，不生成误导文件', async () => {
     const missing = example(); missing.knowledge = [];
     expect(() => exportTxtManuscript(missing)).toThrow(/引用/);

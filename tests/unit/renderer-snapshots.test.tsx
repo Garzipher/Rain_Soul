@@ -28,12 +28,12 @@ it('历史快照导出按钮传递快照身份且不创建或恢复版本', asyn
     const button = screen.getByRole('button', { name: '导出快照 TXT：导出旧稿' });
     expect(button).toBeEnabled(); fireEvent.click(button);
   });
-  await waitFor(() => expect(adapter.api.exportManuscript).toHaveBeenCalledExactlyOnceWith(work.id, 'txt', snapshots[0].id));
+  await waitFor(() => expect(adapter.api.exportManuscript).toHaveBeenCalledExactlyOnceWith(work.id, 'txt', snapshots[0].id, 'full'));
   await waitFor(() => {
     const button = screen.getByRole('button', { name: '导出快照 DOCX：导出旧稿' });
     expect(button).toBeEnabled(); fireEvent.click(button);
   });
-  await waitFor(() => expect(adapter.api.exportManuscript).toHaveBeenLastCalledWith(work.id, 'docx', snapshots[0].id));
+  await waitFor(() => expect(adapter.api.exportManuscript).toHaveBeenLastCalledWith(work.id, 'docx', snapshots[0].id, 'full'));
   expect(await adapter.api.openWork(work.id)).toEqual(before);
   expect(await adapter.api.listSnapshots(work.id)).toEqual(snapshots);
 });

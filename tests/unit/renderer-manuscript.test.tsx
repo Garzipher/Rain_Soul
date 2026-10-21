@@ -10,7 +10,7 @@ it('手稿预览取消不新建，确认完整卷章导入，TXT/DOCX导出先�
   const adapter = createStructureAdapter(); adapters.push(adapter);
   adapter.api.chooseManuscript = async () => ({ token: crypto.randomUUID(), draft: { title: '手稿', format: 'txt', encoding: 'utf-8', warnings: [], chapters: [{ title: '第一章', volumeTitle: '第一卷', paragraphs: ['雨落下来。'] }] } });
   const exports: string[] = [];
-  adapter.api.exportManuscript = async (id, format) => { exports.push(format); expect((await adapter.api.openWork(id)).chapters[0].title).toBe('修改后标题'); return true; };
+  adapter.api.exportManuscript = async (id, format, snapshotId, mode) => { exports.push(`${format}:${mode}`); expect(snapshotId).toBeUndefined(); expect((await adapter.api.openWork(id)).chapters[0].title).toBe('修改后标题'); return true; };
   render(<App api={adapter.api} />);
   fireEvent.click(await screen.findByRole('button', { name: '导入手稿' }));
   fireEvent.click(await screen.findByRole('button', { name: '取消' }));
@@ -19,10 +19,10 @@ it('手稿预览取消不新建，确认完整卷章导入，TXT/DOCX导出先�
   fireEvent.click(await screen.findByRole('button', { name: '创建新作品' }));
   expect(await screen.findByLabelText('章节正文')).toHaveTextContent('雨落下来。');
   fireEvent.change(screen.getByLabelText('章节标题'), { target: { value: '修改后标题' } });
-  fireEvent.click(screen.getByRole('button', { name: '导出 DOCX' }));
-  await waitFor(() => expect(exports).toEqual(['docx']));
-  await waitFor(() => expect(screen.getByRole('button', { name: '导出 TXT' })).toBeEnabled());
-  fireEvent.click(screen.getByRole('button', { name: '导出 TXT' }));
-  await waitFor(() => expect(exports).toEqual(['docx', 'txt']));
+  fireEvent.click(screen.getByRole('button', { name: '导出正文净稿 DOCX' }));
+  await waitFor(() => expect(exports).toEqual(['docx:clean']));
+  await waitFor(() => expect(screen.getByRole('button', { name: '导出含创作资料 TXT' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: '导出含创作资料 TXT' }));
+  await waitFor(() => expect(exports).toEqual(['docx:clean', 'txt:full']));
   expect(screen.getByRole('group', { name: '分卷：第一卷' })).toBeInTheDocument();
 });

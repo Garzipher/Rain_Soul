@@ -11,7 +11,7 @@ import { exportDocxManuscript, exportTxtManuscript } from './manuscript-export';
 const schemas = {
   chooseManuscript: z.object({ encoding: z.enum(['utf-8', 'gb18030']) }).strict(),
   confirmManuscript: z.object({ token: z.uuid(), operationId: z.uuid(), draft: manuscriptDraftSchema }).strict(),
-  exportManuscript: z.object({ workId: z.uuid(), format: z.enum(['txt', 'docx']), snapshotId: z.uuid().optional() }).strict(),
+  exportManuscript: z.object({ workId: z.uuid(), format: z.enum(['txt', 'docx']), snapshotId: z.uuid().optional(), mode: z.enum(['clean', 'full']).optional() }).strict(),
 };
 interface FileAccess { choose: () => Promise<{ name: string; bytes: Buffer } | null>; save: (name: string, bytes: Buffer) => Promise<boolean> }
 interface StoreAccess { execute: (command: string, payload: unknown) => Promise<unknown> }
@@ -53,8 +53,9 @@ export class ManuscriptCommands {
       const frozen = request.snapshotId
         ? await this.store.execute('freezeSnapshot', { workId: request.workId, snapshotId: request.snapshotId }) as ExportManuscript
         : freezeExport(await this.store.execute('freezeWork', { workId: request.workId }) as WorkDetail);
-      const bytes = request.format === 'txt' ? exportTxtManuscript(frozen) : await exportDocxManuscript(frozen);
-      const name = `${frozen.title}${request.snapshotId ? `—快照版本${frozen.revision}` : ''}`;
+      const mode = request.mode ?? 'full';
+      const bytes = request.format === 'txt' ? exportTxtManuscript(frozen, mode) : await exportDocxManuscript(frozen, mode);
+      const name = `${frozen.title}${request.snapshotId ? `—快照版本${frozen.revision}` : ''}${mode === 'clean' ? '—正文净稿' : ''}`;
       return this.files.save(`${name.replace(/[<>:"/\\|?*]/g, '_')}.${request.format}`, bytes);
     });
     this.queue = operation.catch(() => {}); return operation;

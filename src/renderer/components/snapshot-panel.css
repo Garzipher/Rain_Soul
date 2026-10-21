@@ -5,6 +5,10 @@
 .snapshot-create input { flex: 1; min-height: var(--control-height); border: 1px solid var(--line); border-radius: var(--radius-control); padding: 7px 11px; }
 .snapshot-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
 .snapshot-row p { margin: 5px 0 0; }
+.snapshot-export-mode { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; margin: 0 0 12px; padding: 12px 0; border: 0; }
+.snapshot-export-mode legend { font-size: 13px; color: var(--text-secondary); }
+.snapshot-export-mode label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.snapshot-export-mode p { flex-basis: 100%; margin: 0; }
 .snapshot-preview { margin-top: 24px; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface-muted); }
 .snapshot-preview li { line-height: 1.9; }
 @media (max-width: 800px) { .snapshot-panel { padding: 20px; } .snapshot-create { flex-wrap: wrap; } .snapshot-create label { width: 100%; } .snapshot-row { align-items: flex-start; } }

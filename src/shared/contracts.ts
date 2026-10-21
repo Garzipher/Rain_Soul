@@ -76,7 +76,7 @@ export interface DesktopApi extends BookExtractionAiApi, RetrievalApi, Partial<G
   exportProjectArchive(workId: string): Promise<boolean>;
   chooseManuscript(encoding: 'utf-8' | 'gb18030'): Promise<{ token: string; draft: ManuscriptDraft } | null>;
   confirmManuscript(request: { token: string; operationId: string; draft: ManuscriptDraft }): Promise<WorkDetail>;
-  exportManuscript(workId: string, format: 'txt' | 'docx', snapshotId?: string): Promise<boolean>;
+  exportManuscript(workId: string, format: 'txt' | 'docx', snapshotId?: string, mode?: 'clean' | 'full'): Promise<boolean>;
   getAuthorProfile(): Promise<AuthorProfile>;
   setPenName(penName: string): Promise<AuthorProfile>;
   chooseAvatar(): Promise<AuthorProfile>;

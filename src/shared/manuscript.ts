@@ -29,3 +29,5 @@ export interface ExportManuscript {
   foreshadows: Foreshadow[];
   evidence: Evidence[];
 }
+
+export type ManuscriptExportMode = 'clean' | 'full';

@@ -29,7 +29,7 @@ export interface WritingWorkspaceProps {
   savedSelection?: SavedWritingRequest;
   onSelectionChange?: (value: SavedWritingRequest | undefined) => void;
   ai: Omit<AiWorkspaceProps, 'work' | 'chapterId' | 'busy'>;
-  onExport: (format: 'txt' | 'docx') => void;
+  onExport: (format: 'txt' | 'docx', mode: 'clean' | 'full') => void;
   onBackup: () => void;
   snapshots: Omit<SnapshotPanelProps, 'busy' | 'revision'>;
   assetRecovery: number;
@@ -128,7 +128,9 @@ export function WritingWorkspace(props: WritingWorkspaceProps) {
     <header className="topbar work-topbar"><h1 title={props.work.title}>{props.work.title}</h1><div className="header-actions"><button className="secondary" disabled={props.busy || !props.draft} onClick={() => showTool('ai')}>AI 工具</button>
       <details className="work-more" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
         <summary>更多</summary><div className="work-more-items" role="group" aria-label="作品操作" onClick={event => { if ((event.target as HTMLElement).closest('button:not(:disabled)')) { const menu = event.currentTarget.closest('details'); menu?.removeAttribute('open'); menu?.querySelector('summary')?.focus(); } }}>
-          <button disabled={props.busy} onClick={() => showTool('snapshots')}>版本历史</button><button disabled={props.busy} onClick={props.onBackup}>备份项目</button><button disabled={props.busy} onClick={() => props.onExport('txt')}>导出 TXT</button><button disabled={props.busy} onClick={() => props.onExport('docx')}>导出 DOCX</button>
+          <button disabled={props.busy} onClick={() => showTool('snapshots')}>版本历史</button><button disabled={props.busy} onClick={props.onBackup}>备份项目</button>
+          <button disabled={props.busy} onClick={() => props.onExport('txt', 'clean')}>导出正文净稿 TXT</button><button disabled={props.busy} onClick={() => props.onExport('docx', 'clean')}>导出正文净稿 DOCX</button>
+          <button disabled={props.busy} onClick={() => props.onExport('txt', 'full')}>导出含创作资料 TXT</button><button disabled={props.busy} onClick={() => props.onExport('docx', 'full')}>导出含创作资料 DOCX</button>
         </div>
       </details><span role="status" className={`save-status ${props.status.phase}`}>{props.closing ? '正在保存并关闭…' : statusText}</span></div></header>
     <div className="work-tabs">

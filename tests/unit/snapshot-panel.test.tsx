@@ -20,8 +20,16 @@ describe('快照面板', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('磁盘不可写');
     await user.click(screen.getByRole('button', { name: '导出快照 TXT：第一稿' }));
     await user.click(screen.getByRole('button', { name: '导出快照 DOCX：第一稿' }));
-    expect(onExport.mock.calls).toEqual([['old', 'txt'], ['old', 'txt'], ['old', 'docx']]);
+    expect(onExport.mock.calls).toEqual([['old', 'txt', 'full'], ['old', 'txt', 'full'], ['old', 'docx', 'full']]);
     expect(props.onRestore).not.toHaveBeenCalled(); expect(props.onPreview).not.toHaveBeenCalled();
+  });
+  it('历史导出可切换正文净稿且保持原快照身份', async () => {
+    const user = userEvent.setup(), onExport = vi.fn(async () => true);
+    const props = setup({ onExport });
+    await user.click(await screen.findByRole('radio', { name: '正文净稿' }));
+    await user.click(screen.getByRole('button', { name: '导出快照 DOCX：第一稿' }));
+    expect(onExport).toHaveBeenCalledWith('old', 'docx', 'clean');
+    expect(props.onRestore).not.toHaveBeenCalled();
   });
   it('创建手动快照后刷新列表，空名称不能提交', async () => {
     const user = userEvent.setup(), props = setup();

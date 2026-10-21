@@ -26,6 +26,12 @@ it('取消选择、导出取消不写入作品；导出冻结当前卷章一次�
   expect(files.save).toHaveBeenCalledWith('雨夜.txt', expect.any(Buffer));
   expect(files.save.mock.calls[0][1].toString()).toContain('开篇');
 });
+it('正文净稿通过受限命令导出且文件名明确标注净稿模式', async () => {
+  const { service, files } = setup();
+  expect(await service.execute('exportManuscript', { workId: work.id, format: 'txt', mode: 'clean' })).toBe(true);
+  expect(files.save).toHaveBeenCalledWith('雨夜—正文净稿.txt', expect.any(Buffer));
+  await expect(service.execute('exportManuscript', { workId: work.id, format: 'txt', mode: 'sidecar' })).rejects.toThrow();
+});
 it('拒绝任意文件路径/格式和过期预览，保存失败保持可重试', async () => {
   const { service, files } = setup();
   await expect(service.execute('chooseManuscript', { path: 'C:/secret', encoding: 'utf-8' })).rejects.toThrow();

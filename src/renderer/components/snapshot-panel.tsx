@@ -10,7 +10,7 @@ export interface SnapshotPanelProps {
   onPreview: (id: string) => Promise<SnapshotPreview>;
   onCreate: (title: string) => Promise<boolean>;
   onRestore: (id: string) => Promise<boolean>;
-  onExport?: (id: string, format: 'txt' | 'docx') => Promise<boolean>;
+  onExport?: (id: string, format: 'txt' | 'docx', mode: 'clean' | 'full') => Promise<boolean>;
 }
 
 export function SnapshotPanel({ busy, revision, onList, onPreview, onCreate, onRestore, onExport }: SnapshotPanelProps) {
@@ -21,6 +21,7 @@ export function SnapshotPanel({ busy, revision, onList, onPreview, onCreate, onR
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exportMode, setExportMode] = useState<'clean' | 'full'>('full');
   const locked = busy || working;
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -46,7 +47,7 @@ export function SnapshotPanel({ busy, revision, onList, onPreview, onCreate, onR
   async function exportHistory(id: string, format: 'txt' | 'docx') {
     if (locked || !onExport) return;
     setWorking(true); setError(null);
-    try { await onExport(id, format); }
+    try { await onExport(id, format, exportMode); }
     catch (reason) { setError(reason instanceof Error ? reason.message : '历史快照导出失败，请选择新位置或重试。'); }
     finally { setWorking(false); }
   }
@@ -57,6 +58,11 @@ export function SnapshotPanel({ busy, revision, onList, onPreview, onCreate, onR
       <label htmlFor="snapshot-title">快照名称</label><input id="snapshot-title" value={title} maxLength={200} disabled={locked} onChange={event => setTitle(event.target.value)} placeholder="例如：修改之前" />
       <button className="primary" disabled={locked || !title.trim()}>创建快照</button>
     </form>
+    {onExport && <fieldset className="snapshot-export-mode" disabled={locked}><legend>导出内容</legend>
+      <label><input type="radio" name="snapshot-export-mode" checked={exportMode === 'clean'} onChange={() => setExportMode('clean')} />正文净稿</label>
+      <label><input type="radio" name="snapshot-export-mode" checked={exportMode === 'full'} onChange={() => setExportMode('full')} />含创作资料</label>
+      <p>{exportMode === 'clean' ? '仅导出卷章与正文，隐藏书签标记和资料清单。' : '保留正文书签、引用清单及伏笔证据。'}</p>
+    </fieldset>}
     {loading ? <p role="status">正在读取快照…</p> : <div className="snapshot-list">{items.length === 0 ? <p>还没有快照。可以在重要修改之前保存一份。</p> : items.map(item => <article key={item.id} className="snapshot-row">
       <div><strong>{item.title}</strong><p>{item.kind === 'manual' ? '手动快照' : '安全快照'} · 源版本 {item.sourceRevision} · <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString('zh-CN')}</time></p></div>
       <div className="asset-buttons">{onExport && <><button className="secondary" disabled={locked} aria-label={`导出快照 TXT：${item.title}`} onClick={() => void exportHistory(item.id, 'txt')}>导出 TXT</button><button className="secondary" disabled={locked} aria-label={`导出快照 DOCX：${item.title}`} onClick={() => void exportHistory(item.id, 'docx')}>导出 DOCX</button></>}<button className="secondary" disabled={locked} aria-label={`预览并恢复：${item.title}`} onClick={() => void inspect(item.id)}>预览并恢复</button></div>

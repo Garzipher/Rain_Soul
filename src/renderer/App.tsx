@@ -377,10 +377,10 @@ export default function App({ api, textbook }: AppProps) {
       catch (reason) { const operation: PendingOperation = { kind: 'importManuscript', request }; pendingRef.current = operation; setPending(operation); throw reason; }
     });
   }
-  function exportManuscript(format: 'txt' | 'docx') { void guarded(async () => { if (work) await api.exportManuscript(work.id, format); }); }
-  async function exportSnapshot(snapshotId: string, format: 'txt' | 'docx'): Promise<boolean> {
+  function exportManuscript(format: 'txt' | 'docx', mode: 'clean' | 'full') { void guarded(async () => { if (work) await api.exportManuscript(work.id, format, undefined, mode); }); }
+  async function exportSnapshot(snapshotId: string, format: 'txt' | 'docx', mode: 'clean' | 'full'): Promise<boolean> {
     let saved = false;
-    const completed = await guarded(async () => { if (work) saved = await api.exportManuscript(work.id, format, snapshotId); });
+    const completed = await guarded(async () => { if (work) saved = await api.exportManuscript(work.id, format, snapshotId, mode); });
     return completed && saved;
   }
   function exportArchive() { void guarded(async () => { if (work) await api.exportProjectArchive(work.id); }); }
