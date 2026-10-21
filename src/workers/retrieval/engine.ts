@@ -3,7 +3,8 @@ import { chunkKnowledgeText } from './chunking';
 import { rankKnowledge, type RankedEntry, type RankedHit, type CategoryNode } from './ranking';
 import { RetrievalCache } from './cache';
 
-export interface IndexEntry extends RankedEntry { body: string }
+export interface IndexEntry extends RankedEntry { body: string; searchText?: string; searchHash?: string }
+const cacheSource = (entry: IndexEntry) => ({ entryId: entry.entryId, bodyHash: entry.searchHash ?? entry.bodyHash });
 export interface EngineQuery {
   entries: IndexEntry[]; categories: CategoryNode[]; keywords: { workId: string; entryId: string }[];
   text: string; mode: 'keyword' | 'semantic' | 'hybrid'; filter: { workId: string | null; categoryId?: string; tagIds: string[] };
@@ -17,12 +18,12 @@ export class RetrievalEngine {
   async index(entries: IndexEntry[], workIds=[...new Set(entries.map(entry=>entry.workId))]): Promise<void> {
     if (this.closed) throw new Error('本机检索已关闭。');
     this.cache.beginGeneration(this.fingerprint);
-    const tokens=workIds.map(workId=>this.cache.stageWork(workId,entries.filter(entry=>entry.workId===workId).map(({entryId,bodyHash})=>({entryId,bodyHash}))));
+    const tokens=workIds.map(workId=>this.cache.stageWork(workId,entries.filter(entry=>entry.workId===workId).map(cacheSource)));
     for (const entry of entries) {
       if (this.closed) return;
       const token=tokens.find(item=>item.workId===entry.workId)!;
-      if (this.cache.readStaged(token, [{ entryId: entry.entryId, bodyHash: entry.bodyHash }]).length) continue;
-      const chunks = chunkKnowledgeText(entry.body, text => this.model.tokenize(text));
+      if (this.cache.readStaged(token, [cacheSource(entry)]).length) continue;
+      const chunks = chunkKnowledgeText(entry.searchText ?? entry.body, text => this.model.tokenize(text));
       if (!chunks.length) continue;
       const vectors: Float32Array[] = [];
       for (let offset = 0; offset < chunks.length; offset += 32) {
@@ -31,7 +32,7 @@ export class RetrievalEngine {
         // 每个推理批次让出事件循环，主进程的保存使用独立数据库Worker。
         await new Promise<void>(resolve => setImmediate(resolve));
       }
-      if (!this.closed) this.cache.writeStagedCAS(token, { entryId: entry.entryId, bodyHash: entry.bodyHash,
+      if (!this.closed) this.cache.writeStagedCAS(token, { ...cacheSource(entry),
         chunks: chunks.map((chunk, index) => ({ ...chunk, vector: vectors[index] })) });
     }
     if(!this.closed)for(const token of tokens)this.cache.activateStage(token);
@@ -41,10 +42,13 @@ export class RetrievalEngine {
     if (request.mode !== 'keyword' && this.model.tokenize(request.text).length > 400) throw Object.assign(new Error('查询超过400 token，请缩小范围。'), { code: 'RETRIEVAL_QUERY_TOO_LONG' });
     const queryVector = request.mode === 'keyword' ? [] : (await this.model.embed([request.text], 'query'))[0];
     const workIds = [...new Set(request.entries.map(entry => entry.workId))];
-    const chunks = workIds.flatMap(workId => this.cache.readWork(workId, request.entries.filter(entry => entry.workId === workId).map(({ entryId, bodyHash }) => ({ entryId, bodyHash })))
+    const chunks = workIds.flatMap(workId => this.cache.readWork(workId, request.entries.filter(entry => entry.workId === workId).map(cacheSource))
       .filter(chunk => request.entries.some(entry => entry.workId === chunk.workId && entry.entryId === chunk.entryId
-        && entry.bodyHash === chunk.bodyHash && entry.body.slice(chunk.start, chunk.end) === chunk.text))
-      .map(chunk => ({ ...chunk, chunkIndex: chunk.index, excerpt: chunk.text })));
+        && (entry.searchHash ?? entry.bodyHash) === chunk.bodyHash && (entry.searchText ?? entry.body).slice(chunk.start, chunk.end) === chunk.text))
+      .map(chunk => {
+        const entry = request.entries.find(entry => entry.workId === chunk.workId && entry.entryId === chunk.entryId)!;
+        return { ...chunk, chunkIndex: chunk.index, excerpt: entry.searchText ? entry.body : chunk.text };
+      }));
     return rankKnowledge({ ...request, queryVector, chunks, threshold: this.threshold });
   }
   async close() { if (!this.closed) { this.closed = true; await this.model.dispose(); this.cache.close(); } }

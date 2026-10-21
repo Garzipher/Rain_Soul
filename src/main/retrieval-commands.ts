@@ -8,6 +8,7 @@ import type { EngineQuery, IndexEntry } from '../workers/retrieval/engine';
 import { rankKnowledge } from '../workers/retrieval/ranking';
 import type { GlobalKnowledgeTransport } from './global-knowledge-commands';
 import { exposeRetrievalIdentity, readGlobalRetrieval } from './global-knowledge-retrieval';
+import { knowledgeSearchText } from '../shared/knowledge-learning';
 
 interface Store { execute(command: string, payload: unknown): Promise<unknown> }
 interface Models {
@@ -96,7 +97,9 @@ export class RetrievalCommands {
     const scope = await this.store.execute('readKnowledgeScope', { scopeId: workId }) as KnowledgeScope;
     const entries: IndexEntry[] = scope.knowledge.filter(entry => !entry.deletedAt).map(entry => {
       const owner = scope.entryOwners[entry.id]; if (!owner) throw new Error('知识来源身份无效。');
+      const searchText = knowledgeSearchText(entry);
       return { workId: owner.workId, entryId: owner.sourceEntryId, body: entry.body, bodyHash: createHash('sha256').update(entry.body).digest('hex'),
+        ...(searchText !== entry.body ? { searchText, searchHash: createHash('sha256').update(searchText).digest('hex') } : {}),
         excerpt: entry.body, source: entry.source, categoryId: entry.categoryId, tagIds: entry.tagIds };
     });
     const works = await this.store.execute('listWorks', {}) as WorkSummary[];
@@ -153,7 +156,7 @@ export class RetrievalCommands {
         else try {
           for (const workId of frozen.workIds) {
             const entries=frozen.entries.filter(entry=>entry.workId===workId);
-            const key = `${modelGeneration}/${model.source ?? ''}/${model.fingerprint}/${JSON.stringify(entries.map(({entryId,bodyHash})=>[entryId,bodyHash]).sort((a,b)=>a[0].localeCompare(b[0])))}`;
+            const key = `${modelGeneration}/${model.source ?? ''}/${model.fingerprint}/${JSON.stringify(entries.map(({entryId,bodyHash,searchHash})=>[entryId,searchHash ?? bodyHash]).sort((a,b)=>a[0].localeCompare(b[0])))}`;
             if (this.indexed.get(workId) !== key) {
               this.indexed.set(workId, key);
               void this.client.index(entries, directory,[workId]).catch(() => {if(this.indexed.get(workId)===key)this.indexed.delete(workId);});

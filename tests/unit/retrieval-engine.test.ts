@@ -95,3 +95,19 @@ it('缓存hash相同但原文offset不符不能进入语义结果，空文本不
   expect(await engine.search(request)).toEqual([]);model.embed.mockClear();
   await engine.index([{...entry,body:'',bodyHash:createHash('sha256').update('').digest('hex')}]);expect(model.embed).not.toHaveBeenCalled();
 });
+it('学习注释参与本机嵌入和缓存失效，语义命中仍呈现原句与原文哈希', async () => {
+  const { engine, model, entry, workId } = setup();
+  const searchText = `${entry.body}\n写作手法：重复动作表现克制情绪`;
+  const annotated = { ...entry, searchText, searchHash: createHash('sha256').update(searchText).digest('hex') };
+  await engine.index([annotated]);
+  expect(model.embed).toHaveBeenCalledWith([searchText], 'document');
+  const request = { entries: [annotated], categories: [], keywords: [], text: '用动作表达情绪', mode: 'semantic' as const, filter: { workId, tagIds: [] } };
+  expect(await engine.search(request)).toEqual([expect.objectContaining({ excerpt: entry.body, bodyHash: entry.bodyHash, source: entry.source })]);
+  const changedText = `${entry.body}\n写作手法：光影映衬人物`;
+  const changed = { ...annotated, searchText: changedText, searchHash: createHash('sha256').update(changedText).digest('hex') };
+  expect(await engine.search({ ...request, entries: [changed] })).toEqual([]);
+  await engine.index([changed]);
+  expect(model.embed).toHaveBeenCalledWith([changedText], 'document');
+  expect(await engine.search({ ...request, entries: [changed] })).toEqual([expect.objectContaining({ excerpt: entry.body, bodyHash: entry.bodyHash })]);
+  expect(await engine.search({ ...request, entries: [{ ...changed, searchText: '篡改说明' }] })).toEqual([]);
+});

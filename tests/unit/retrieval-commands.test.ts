@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { expect, it, vi } from 'vitest';
 import { RetrievalCommands } from '../../src/main/retrieval-commands';
 import type { RetrievalModelStatus } from '../../src/shared/retrieval-model';
+import type { IndexEntry } from '../../src/workers/retrieval/engine';
 const hash = (body: string) => createHash('sha256').update(body).digest('hex');
 function setup(qualified = false) {
   const workId = randomUUID(), entryId = randomUUID(), categoryId = randomUUID();
@@ -13,7 +14,7 @@ function setup(qualified = false) {
   } : command === 'listWorks' ? [{ id: workId, revision, title: '作品' }] : [{ id: entryId, workId }]) };
   const status: RetrievalModelStatus = { state: 'ready', modelId: 'fixed', fingerprint: 'fingerprint', installed: true, qualified, bytes: 123, source: 'bundled', enabled: true };
   const models = { getStatus: vi.fn(async () => ({ ...status })), getActiveDirectory: vi.fn(async () => 'trusted'), setEnabled: vi.fn(async () => {}), install: vi.fn(async () => {}), selectSource: vi.fn(async (source: 'bundled' | 'user') => { status.source = source; }) };
-  const client = { search: vi.fn(async () => [{ workId, entryId, bodyHash: hash(knowledge.body), excerpt: knowledge.body, source: knowledge.source, matchedBy: ['semantic' as const], reliable: true }]), index: vi.fn(async () => {}), close: vi.fn(), invalidateWork: vi.fn(), isIndexing: () => false, cancel: vi.fn() };
+  const client = { search: vi.fn(async () => [{ workId, entryId, bodyHash: hash(knowledge.body), excerpt: knowledge.body, source: knowledge.source, matchedBy: ['semantic' as const], reliable: true }]), index: vi.fn(async (_entries: IndexEntry[], _directory: string, _workIds?: string[]) => {}), close: vi.fn(), invalidateWork: vi.fn(), isIndexing: () => false, cancel: vi.fn() };
   const commands = new RetrievalCommands(store, models, client, async () => null);
   const query = { workId, queryId: randomUUID(), query: '雨', mode: 'hybrid' as const, tagIds: [], page: 1, pageSize: 20 };
   return { commands, models, client, store, query, knowledge, status, change: () => { revision++; } };
@@ -84,6 +85,19 @@ it('正文revision变化不重算知识向量，条目hash变化只调度增量�
   await commands.execute('queryKnowledge',{...query,queryId:randomUUID()});expect(client.index).toHaveBeenCalledTimes(1);
   knowledge.body='风吹过窗台';await commands.execute('queryKnowledge',{...query,queryId:randomUUID()});
   expect(client.index).toHaveBeenCalledTimes(2);expect(client.invalidateWork).not.toHaveBeenCalled();
+});
+it('作品学习注释进入独立嵌入文本，编辑注释会重建索引但不改原文哈希', async () => {
+  const { commands, client, query, knowledge } = setup(true);
+  const annotated = knowledge as typeof knowledge & { learningNotes: { technique: string; usage: string; exercise: string }[] };
+  annotated.learningNotes = [{ technique: '借景写情', usage: '离别', exercise: '写一段风声' }];
+  await commands.execute('queryKnowledge', query);
+  expect(client.index).toHaveBeenLastCalledWith([expect.objectContaining({ body: knowledge.body, bodyHash: hash(knowledge.body), searchText: expect.stringContaining('借景写情') })], 'trusted', [query.workId]);
+  const before = client.index.mock.calls[0]![0][0]!;
+  annotated.learningNotes[0].usage = '重逢';
+  await commands.execute('queryKnowledge', { ...query, queryId: randomUUID() });
+  expect(client.index).toHaveBeenCalledTimes(2);
+  const after = client.index.mock.calls[1]![0][0]!;
+  expect(after.searchHash).not.toBe(before.searchHash);
 });
 it('作者主动重建不先删除旧完整索引，重启首次查询交给Worker复用持久hash块',async()=>{
   const {commands,client,query}=setup(true);
