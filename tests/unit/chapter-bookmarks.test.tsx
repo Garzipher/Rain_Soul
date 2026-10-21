@@ -94,3 +94,23 @@ it('伏笔书签详情与一致性规则同步提示正文摘录失配，不更�
   expect(screen.getByRole('dialog')).toHaveTextContent('证据摘录已不在当前正文中');
   expect(screen.getByRole('dialog')).toHaveTextContent('已埋设');
 });
+
+it('正文书签跟随当前草稿显示复核标记，打开详情仍保留原证据', async () => {
+  const state = assets(), doc = emptyDocument();
+  const hintId = state.foreshadows[0].id, paragraphId = doc.content[0].attrs.id;
+  state.foreshadows[0].status = '已埋设';
+  doc.content[0].content = [{ type: 'text', text: '半张蓝船票' }, { type: 'bookmark', attrs: { id: crypto.randomUUID(), kind: 'foreshadow', targetId: hintId } }];
+  state.evidence.push({ id: 'evidence', foreshadowId: hintId, kind: '埋设', chapterId: 'chapter', paragraphId, excerpt: '半张蓝船票', sourceRevision: 1, originalSource: { chapterId: 'chapter', chapterTitle: '第一章', paragraphId, excerpt: '半张蓝船票', revision: 1 }, valid: true, invalidReason: null, deletedAt: null, supersedesId: null, supersededBy: null });
+  const chapter = { id: 'chapter', title: '第一章', document: doc, wordCount: 6, volumeId: null };
+  const props = { document: doc, chapters: [chapter], assets: state, locked: false, onChange: vi.fn(), onError: vi.fn(), onCompositionChange: vi.fn() };
+  const view = render(<ChapterEditor {...props} />);
+  expect(await screen.findByRole('button', { name: '伏笔书签：未寄出的信' })).not.toHaveTextContent('需复核');
+  const revised = structuredClone(doc); revised.content[0].content![0] = { type: 'text', text: '半张红船票' };
+  view.rerender(<ChapterEditor {...props} document={revised} chapters={[{ ...chapter, document: revised }]} />);
+  const marker = await screen.findByRole('button', { name: '伏笔书签：未寄出的信 · 证据需复核' });
+  expect(marker).toHaveTextContent('需复核');
+  fireEvent.click(marker);
+  expect(screen.getByRole('dialog')).toHaveTextContent('证据摘录已不在当前正文中');
+  expect(state.evidence[0].excerpt).toBe('半张蓝船票');
+  expect(state.foreshadows[0].status).toBe('已埋设');
+});

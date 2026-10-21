@@ -9,7 +9,7 @@ import { closeHistory } from '@tiptap/pm/history';
 import { TextSelection } from '@tiptap/pm/state';
 import { EditorContent, useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
-import type { BookmarkNode, WritingDocument } from '../../shared/contracts';
+import type { BookmarkNode, Chapter, WritingDocument } from '../../shared/contracts';
 import type { AssetState, KnowledgeEntry } from '../../shared/assets';
 import { validateDocument } from '../../shared/document';
 import { stableParagraphIds } from '../lib/paragraph-ids';
@@ -20,10 +20,10 @@ import { createKnowledgeGhost, refreshKnowledgeGhost } from '../lib/knowledge-gh
 
 import type { KnowledgeCompletion } from '../lib/knowledge-completion';
 
-export interface ChapterEditorProps { globalEntries?: KnowledgeEntry[]; onAcceptGlobal?: (candidate: KnowledgeCompletion) => Promise<boolean>; document: WritingDocument; assets?: AssetState; locked: boolean; ghostPaused?: boolean; onChange: (document: WritingDocument) => void; onError: (error: string) => void; onCompositionChange: (value: boolean) => void; location?: { paragraphId: string; token: number } | null; onLocateAsset?: (kind: BookmarkNode['attrs']['kind'], id: string) => void; onAiRequest?: (request: WritingAiRequest) => void }
+export interface ChapterEditorProps { chapters?: Chapter[]; globalEntries?: KnowledgeEntry[]; onAcceptGlobal?: (candidate: KnowledgeCompletion) => Promise<boolean>; document: WritingDocument; assets?: AssetState; locked: boolean; ghostPaused?: boolean; onChange: (document: WritingDocument) => void; onError: (error: string) => void; onCompositionChange: (value: boolean) => void; location?: { paragraphId: string; token: number } | null; onLocateAsset?: (kind: BookmarkNode['attrs']['kind'], id: string) => void; onAiRequest?: (request: WritingAiRequest) => void }
 
 /** 固定样式正文保存段落、文本、换行与书签关联；不导入外部 HTML 样式。 */
-export function ChapterEditor({ document, assets, globalEntries, onAcceptGlobal, locked, ghostPaused = false, onChange, onError, onCompositionChange, location, onLocateAsset, onAiRequest }: ChapterEditorProps) {
+export function ChapterEditor({ document, chapters, assets, globalEntries, onAcceptGlobal, locked, ghostPaused = false, onChange, onError, onCompositionChange, location, onLocateAsset, onAiRequest }: ChapterEditorProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const aiEntry = useRef({ locked, onAiRequest });
   useEffect(() => { aiEntry.current = { locked, onAiRequest }; }, [locked, onAiRequest]);
@@ -119,13 +119,13 @@ export function ChapterEditor({ document, assets, globalEntries, onAcceptGlobal,
     const refresh = () => {
       editor.view.dom.querySelectorAll<HTMLElement>('[data-bookmark-id]').forEach(element => {
         const bookmark = { id: element.dataset.bookmarkId!, kind: element.dataset.bookmarkKind as BookmarkNode['attrs']['kind'], targetId: element.dataset.bookmarkTarget! };
-        const info = bookmarkInfo(bookmark, assets);
-        element.setAttribute('aria-label', info.label); element.textContent = bookmark.kind === 'knowledge' ? '〔知识〕' : `〔伏笔：${info.title}〕`;
+        const info = bookmarkInfo(bookmark, assets, chapters);
+        element.setAttribute('aria-label', info.label); element.textContent = bookmark.kind === 'knowledge' ? '〔知识〕' : `〔伏笔：${info.title}${info.needsReview ? ' · 需复核' : ''}〕`;
       });
     };
     refresh(); editor.on('update', refresh);
     return () => { editor.off('update', refresh); };
-  }, [editor, assets]);
+  }, [editor, assets, chapters]);
   useEffect(() => { editor?.setEditable(!locked, false); }, [editor, locked]);
   useEffect(() => {
     if (!editor || !location || locked) return;
@@ -151,6 +151,6 @@ export function ChapterEditor({ document, assets, globalEntries, onAcceptGlobal,
     <EditorContent editor={editor} />
     <div className="knowledge-completion-hint"><button type="button" className="knowledge-completion-toggle" aria-pressed={completionEnabled} onClick={() => setCompletionEnabled(value => !value)}>知识原句提示{completionEnabled ? '已开启' : '已关闭'}</button><span>{!completionEnabled ? '开启后从作品与全局知识库提示原句' : ghostPaused ? 'AI 操作期间暂停原句提示' : !assets?.knowledge.some(item => !item.deletedAt) && !globalEntries?.some(item => !item.deletedAt) ? '在知识库添加摘录后，输入原句前两个字即可提示' : '输入知识原句前两个字 · Tab 接受 · Esc 忽略'}</span></div>
     {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
-    {detail && <BookmarkDetails bookmark={detail} assets={assets} onClose={() => setDetail(null)} onLocateAsset={onLocateAsset} locked={locked} />}
+    {detail && <BookmarkDetails bookmark={detail} assets={assets} chapters={chapters} onClose={() => setDetail(null)} onLocateAsset={onLocateAsset} locked={locked} />}
   </>;
 }
