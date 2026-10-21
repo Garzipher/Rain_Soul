@@ -1,10 +1,12 @@
 import { SelectField } from './select-field';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Document from '@tiptap/extension-document';
 import HardBreak from '@tiptap/extension-hard-break';
 import Paragraph from '@tiptap/extension-paragraph';
 import Text from '@tiptap/extension-text';
 import { UndoRedo } from '@tiptap/extensions';
+import { closeHistory } from '@tiptap/pm/history';
+import { TextSelection } from '@tiptap/pm/state';
 import { EditorContent, useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import type { BookmarkNode, WritingDocument } from '../../shared/contracts';
@@ -98,6 +100,19 @@ export function ChapterEditor({ document, assets, globalEntries, onAcceptGlobal,
       catch (error) { onError(error instanceof Error ? error.message : '正文结构无法保存，请保留内容并联系开发者'); }
     },
   });
+  useLayoutEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    try {
+      const incoming = editor.schema.nodeFromJSON(document);
+      if (editor.state.doc.eq(incoming)) return;
+      // AI 写入和快照恢复由已确认草稿驱动；同步不生成新的保存事件或撤销步骤。
+      const { anchor, head } = editor.state.selection;
+      const transaction = closeHistory(editor.state.tr.replaceWith(0, editor.state.doc.content.size, incoming.content))
+        .setMeta('preventUpdate', true).setMeta('addToHistory', false);
+      transaction.setSelection(TextSelection.between(transaction.doc.resolve(Math.min(anchor, transaction.doc.content.size)), transaction.doc.resolve(Math.min(head, transaction.doc.content.size))));
+      editor.view.dispatch(transaction);
+    } catch (error) { onError(error instanceof Error ? error.message : '已保存正文同步失败，请暂勿继续编辑'); }
+  }, [editor, document, onError]);
   useEffect(() => { editorRef.current = editor; return () => { if (editorRef.current === editor) editorRef.current = null; }; }, [editor]);
   useEffect(() => {
     if (!editor) return;
