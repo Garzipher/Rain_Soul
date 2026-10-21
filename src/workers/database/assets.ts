@@ -8,6 +8,7 @@ import { applyStyleAsset } from './assets-style';
 import { RepositoryError } from './errors';
 import { recordAssetChanges } from './assets-history';
 import { globalKnowledgeOriginSchema } from '../../shared/global-work-copy';
+import { learningAnnotationPayloadSchema } from '../../shared/source-assets';
 
 export function applyAsset(db: Database.Database, input: AssetAction, revision: number): void {
   const parsed = assetActionSchema.safeParse(input);
@@ -22,6 +23,12 @@ export function readAssets(db: Database.Database): AssetState {
   const outlines = db.prepare('SELECT id,type,parent_id AS parentId,title,summary,chapter_id AS chapterId,sort_order AS sortOrder,deleted_at AS deletedAt FROM outline_node ORDER BY sort_order,rowid').all() as Omit<AssetState['outlines'][number], 'knowledgeIds'>[];
   const knowledge = db.prepare('SELECT id,body,source,category_id AS categoryId,origin_json AS origin,revision,deleted_at AS deletedAt FROM knowledge_entry ORDER BY rowid DESC').all() as (Omit<AssetState['knowledge'][number], 'tagIds' | 'origin'> & { origin: string | null })[];
   const profiles = db.prepare('SELECT id,version,payload_json AS payload,created_at AS createdAt FROM style_profile ORDER BY version').all() as (Omit<AssetState['styleProfiles'][number], 'payload'> & { payload: string })[];
+  const hasLearningAnnotations = !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='learning_annotation'").get();
+  const learningNotes = new Map<string, AssetState['knowledge'][number]['learningNotes']>();
+  if (hasLearningAnnotations) for (const row of db.prepare('SELECT entry_id AS entryId,payload_json AS payload FROM learning_annotation ORDER BY rowid').all() as { entryId: string; payload: string }[]) {
+    const note = learningAnnotationPayloadSchema.parse(JSON.parse(row.payload));
+    const notes = learningNotes.get(row.entryId) ?? []; notes.push(note); learningNotes.set(row.entryId, notes);
+  }
   return {
     outlines: outlines.map(node => ({ ...node, knowledgeIds: (db.prepare('SELECT knowledge_id AS id FROM outline_knowledge WHERE node_id=? ORDER BY rowid').all(node.id) as { id: string }[]).map(row => row.id) })),
     foreshadows: db.prepare('SELECT id,name,status,description,outline_id AS outlineId,deleted_at AS deletedAt FROM foreshadow ORDER BY rowid').all() as AssetState['foreshadows'],
@@ -33,7 +40,8 @@ export function readAssets(db: Database.Database): AssetState {
       const globalOrigin = stored?.kind === 'global' ? globalKnowledgeOriginSchema.parse(stored) : undefined;
       return ({ ...entry, origin: globalOrigin ? null : stored as AssetState['knowledge'][number]['origin'],
       ...(globalOrigin ? { globalOrigin } : {}),
-      tagIds: (db.prepare('SELECT tag_id AS id FROM knowledge_tag WHERE entry_id=? ORDER BY rowid').all(entry.id) as { id: string }[]).map(row => row.id) }); }),
+      tagIds: (db.prepare('SELECT tag_id AS id FROM knowledge_tag WHERE entry_id=? ORDER BY rowid').all(entry.id) as { id: string }[]).map(row => row.id),
+      ...(learningNotes.has(entry.id) ? { learningNotes: learningNotes.get(entry.id)! } : {}) }); }),
     styleProfiles: profiles.map(profile => ({ ...profile, payload: JSON.parse(profile.payload) as AssetState['styleProfiles'][number]['payload'] })),
     chapterStyles: db.prepare('SELECT chapter_id AS chapterId,profile_id AS profileId FROM chapter_style').all() as AssetState['chapterStyles'],
     defaultStyleId: (db.prepare('SELECT profile_id AS id FROM style_default WHERE singleton=1').get() as { id: string | null }).id,

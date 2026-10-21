@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AssetAction, AssetQuery, AssetRequest } from './assets';
+import { learningAnnotationPayloadSchema } from './source-assets';
 
 const id = z.uuid();
 const name = z.string().trim().min(1, '名称不能为空');
@@ -8,7 +9,8 @@ const ids = z.array(id).refine(value => new Set(value).size === value.length, '�
 const nullableId = id.nullable();
 const direction = z.enum(['up', 'down']);
 const style = z.object({ narrativePerson: text, pace: text, prohibited: z.array(text), referenceWorks: z.array(text) }).strict();
-const knowledge = { body: z.string().refine(value => !!value.trim(), '知识内容不能为空'), source: text, categoryId: id, tagIds: ids };
+const knowledge = { body: z.string().refine(value => !!value.trim(), '知识内容不能为空'), source: text, categoryId: id, tagIds: ids,
+  learningNotes: z.array(learningAnnotationPayloadSchema).max(100).optional() };
 const evidence = { chapterId: id, paragraphId: nullableId, excerpt: text };
 export const assetActionSchema: z.ZodType<AssetAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('createOutline'), kind: z.enum(['volume', 'chapter', 'detail']), parentId: nullableId, title: name }).strict(),

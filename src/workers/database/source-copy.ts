@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { sourceAssetsSchema, learningAnnotationPayloadSchema, type SourceAssets } from '../../shared/source-assets';
 import { commitSourceAssets } from './source-document';
 import { RepositoryError } from './errors';
+import { refreshKnowledgeSearch } from './assets-search';
 
 /** 仅复制该条知识的证据，冻结原文及哈希保留，目标身份全部重新分配。 */
 export function copyKnowledgeSources(db:Database.Database,value:SourceAssets,sourceEntryId:string,targetEntryId:string):void {
@@ -23,4 +24,5 @@ export function copyKnowledgeSources(db:Database.Database,value:SourceAssets,sou
   const insert=db.prepare('INSERT INTO learning_annotation VALUES(?,?,?)');
   for(const annotation of assets.annotations.filter(item=>item.entryId===sourceEntryId))
     insert.run(randomUUID(),targetEntryId,JSON.stringify(learningAnnotationPayloadSchema.parse({technique:annotation.technique,usage:annotation.usage,exercise:annotation.exercise})));
+  refreshKnowledgeSearch(db,targetEntryId);
 }

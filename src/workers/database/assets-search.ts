@@ -6,8 +6,11 @@ import { assetDescendants, assetRow } from './assets-common';
 import { RepositoryError } from './errors';
 import { recordAssetHistory } from './assets-history';
 import { readableKnowledgeSource } from '../../shared/knowledge-source';
+import { learningAnnotationPayloadSchema } from '../../shared/source-assets';
 
 const normalize = (text: string) => text.normalize('NFC').toLowerCase();
+const hasAnnotations = (db: Database.Database) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='learning_annotation'").get();
+const repairedLearningIndexes = new WeakSet<Database.Database>();
 const insertSearch = (db: Database.Database, id: string, kind: 'knowledge' | 'paragraph', chapterId: string | null, paragraphId: string | null, title: string, body: string, source: string, labels = '') =>
   db.prepare('INSERT INTO search_document VALUES(?,?,?,?,?,?,?,?)').run(id, kind, chapterId, paragraphId, title, body, source, normalize(`${body}\n${source}\n${labels}`));
 
@@ -32,7 +35,12 @@ export function refreshKnowledgeSearch(db: Database.Database, entryId?: string):
     .all(...(entryId ? [entryId] : [])) as { id: string; body: string; source: string }[];
   for (const entry of entries) {
     const labels = (db.prepare('SELECT t.name FROM tag t JOIN knowledge_tag kt ON kt.tag_id=t.id WHERE kt.entry_id=? AND t.deleted_at IS NULL ORDER BY t.id').all(entry.id) as { name: string }[]).map(tag => tag.name).join('\n');
-    insertSearch(db, `k:${entry.id}`, 'knowledge', null, null, '', entry.body, readableKnowledgeSource(entry.source), labels);
+    const notes = hasAnnotations(db) ? db.prepare('SELECT payload_json AS payload FROM learning_annotation WHERE entry_id=? ORDER BY rowid').all(entry.id) as { payload: string }[] : [];
+    const annotationText = notes.map(row => {
+      const note = learningAnnotationPayloadSchema.parse(JSON.parse(row.payload));
+      return [note.technique, note.usage, note.exercise].join('\n');
+    }).join('\n');
+    insertSearch(db, `k:${entry.id}`, 'knowledge', null, null, '', entry.body, readableKnowledgeSource(entry.source), `${labels}\n${annotationText}`);
   }
 }
 export function rebuildAssetSearch(db: Database.Database): void {
@@ -50,6 +58,17 @@ function repairKnowledgeSourceIndex(db: Database.Database): void {
     for (const row of stale) refreshKnowledgeSearch(db, row.id.slice(2));
   }).immediate();
 }
+/** 旧安装库的学习注释已保存但未索引；按内容检测，仅修复缺失条目。 */
+function repairLearningNoteIndex(db: Database.Database): void {
+  if (repairedLearningIndexes.has(db) || !hasAnnotations(db)) return;
+  const rows = db.prepare("SELECT a.entry_id AS id,a.payload_json AS payload,d.normalized_text AS text FROM learning_annotation a JOIN knowledge_entry k ON k.id=a.entry_id LEFT JOIN search_document d ON d.id='k:'||a.entry_id WHERE k.deleted_at IS NULL").all() as { id: string; payload: string; text: string | null }[];
+  const stale = new Set(rows.filter(row => {
+    const note = learningAnnotationPayloadSchema.parse(JSON.parse(row.payload));
+    return [note.technique, note.usage, note.exercise].some(value => value && !row.text?.includes(normalize(value)));
+  }).map(row => row.id));
+  if (stale.size) db.transaction(() => { for (const id of stale) refreshKnowledgeSearch(db, id); }).immediate();
+  repairedLearningIndexes.add(db);
+}
 export function searchAssets(db: Database.Database, input: AssetQuery): SearchResult[] {
   const parsed = assetQuerySchema.safeParse(input);
   if (!parsed.success) throw new RepositoryError('INVALID_INPUT', '搜索条件无效。');
@@ -58,6 +77,7 @@ export function searchAssets(db: Database.Database, input: AssetQuery): SearchRe
   for (const id of tags) assetRow(db, 'tag', id);
   const categoryIds = query.categoryId ? (assetRow(db, 'category', query.categoryId), assetDescendants(db, 'category', query.categoryId)) : [];
   repairKnowledgeSourceIndex(db);
+  repairLearningNoteIndex(db);
   const text = normalize(query.text.trim());
   const conditions: string[] = []; const values: (string | number)[] = [];
   if (query.mode === 'knowledge') conditions.push("d.kind='knowledge'");

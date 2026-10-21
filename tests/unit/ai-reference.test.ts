@@ -61,3 +61,15 @@ it('章节参考包含所属卷概要和未绑定正文的详细节点，包含�
   for (const text of ['调查与成长主线', '进入旧车站', '午夜交出钥匙', '钥匙暗线']) expect(result).toContain(text);
   for (const text of ['范围外反转', '另一章秘密', '明确属于另一章', '不能越过异章节点纳入', '已删除计划', '未关联计划', '异章伏笔']) expect(result).not.toContain(text);
 });
+
+it('作者选用知识时附带独立学习注释，未选与已删知识不得泄露注释', () => {
+  const work = { chapters: [], assets: { knowledge: [
+    { id: 'k', body: '她把信折了两遍。', source: '原创参考', deletedAt: null, learningNotes: [{ technique: '重复动作写情绪', usage: '克制的难过', exercise: '改用折纸动作' }] },
+    { id: 'gone', body: '雨夜', source: '已删', deletedAt: 'deleted', learningNotes: [{ technique: '删除秘密', usage: '', exercise: '' }] },
+  ], chapterStyles: [], styleProfiles: [], outlines: [], foreshadows: [], evidence: [] } } as unknown as WorkDetail;
+  const result = buildAiReferences(work, 'chapter', '雨夜', ['chapter'], ['k', 'gone']);
+  for (const text of ['她把信折了两遍。', '重复动作写情绪', '克制的难过', '改用折纸动作', '作者审核学习注释']) expect(result).toContain(text);
+  expect(result).not.toContain('删除秘密');
+  expect(buildAiReferences(work, 'chapter', '雨夜', ['chapter'], [])).not.toContain('重复动作写情绪');
+  expect(buildAiReferences(work, 'chapter', '人物克制的难过')).toContain('她把信折了两遍。');
+});

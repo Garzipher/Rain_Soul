@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
-import type { AssetAction, KnowledgeEntry, KnowledgeOrigin } from '../../shared/assets';
+import type { AssetAction, KnowledgeEntry, KnowledgeOrigin, LearningNote } from '../../shared/assets';
+import { learningAnnotationPayloadSchema } from '../../shared/source-assets';
 import { assetDescendants, assetRow, moveAsset, nextAssetOrder } from './assets-common';
 import { RepositoryError } from './errors';
 import { refreshKnowledgeSearch } from './assets-search';
@@ -15,7 +16,7 @@ function uniqueCategory(db: Database.Database, name: string, parentId: string | 
     throw new RepositoryError('INVALID_INPUT', '同一层级下的分类名称必须唯一。');
   }
 }
-export function writeKnowledge(db: Database.Database, id: string, body: string, source: string, categoryId: string, tagIds: string[], revision: number, origin: KnowledgeOrigin | null, create: boolean) {
+export function writeKnowledge(db: Database.Database, id: string, body: string, source: string, categoryId: string, tagIds: string[], revision: number, origin: KnowledgeOrigin | null, create: boolean, learningNotes?: LearningNote[]) {
   assetRow(db, 'category', categoryId); tags(db, tagIds);
   if (create) db.prepare('INSERT INTO knowledge_entry(id,body,source,category_id,origin_json,revision) VALUES(?,?,?,?,?,?)').run(id, body, source, categoryId, origin ? JSON.stringify(origin) : null, revision);
   else {
@@ -25,6 +26,19 @@ export function writeKnowledge(db: Database.Database, id: string, body: string, 
   }
   for (const tagId of tagIds) db.prepare('INSERT INTO knowledge_tag VALUES(?,?)').run(id, tagId);
   db.prepare('INSERT INTO knowledge_history VALUES(?,?,?,?)').run(id, revision, body, source);
+  if (learningNotes !== undefined && db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='learning_annotation'").get()) {
+    const existing = db.prepare('SELECT id FROM learning_annotation WHERE entry_id=? ORDER BY rowid').all(id) as { id: string }[];
+    const update = db.prepare('UPDATE learning_annotation SET payload_json=? WHERE id=?');
+    const insert = db.prepare('INSERT INTO learning_annotation(id,entry_id,payload_json) VALUES(?,?,?)');
+    learningNotes.forEach((note, index) => {
+      const payload = JSON.stringify(learningAnnotationPayloadSchema.parse(note));
+      if (existing[index]) update.run(payload, existing[index].id);
+      else insert.run(randomUUID(), id, payload);
+    });
+    for (const stale of existing.slice(learningNotes.length)) db.prepare('DELETE FROM learning_annotation WHERE id=?').run(stale.id);
+  } else if (learningNotes?.length) {
+    throw new RepositoryError('INVALID_INPUT', '当前作品数据库不支持学习注释，请先完成数据迁移。');
+  }
   refreshKnowledgeSearch(db, id);
 }
 export function applyKnowledgeAsset(db: Database.Database, action: AssetAction, revision: number): boolean {
@@ -66,8 +80,8 @@ export function applyKnowledgeAsset(db: Database.Database, action: AssetAction, 
       for (const entry of affected) refreshKnowledgeSearch(db, entry.id);
       return true;
     }
-    case 'createKnowledge': writeKnowledge(db, randomUUID(), action.body, action.source, action.categoryId, action.tagIds, revision, null, true); return true;
-    case 'updateKnowledge': writeKnowledge(db, action.id, action.body, action.source, action.categoryId, action.tagIds, revision, null, false); return true;
+    case 'createKnowledge': writeKnowledge(db, randomUUID(), action.body, action.source, action.categoryId, action.tagIds, revision, null, true, action.learningNotes); return true;
+    case 'updateKnowledge': writeKnowledge(db, action.id, action.body, action.source, action.categoryId, action.tagIds, revision, null, false, action.learningNotes); return true;
     case 'deleteKnowledge':
       assetRow(db, 'knowledge_entry', action.id); db.prepare('UPDATE knowledge_entry SET deleted_at=?,revision=? WHERE id=?').run(new Date().toISOString(), revision, action.id);
       refreshKnowledgeSearch(db, action.id); return true;

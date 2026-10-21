@@ -6,6 +6,7 @@ import { knowledgeSourceLinkSchema, learningAnnotationPayloadSchema, learningAnn
   sourceAssetsSchema, type KnowledgeSourceLink, type LearningAnnotation, type SourceAssets } from '../../shared/source-assets';
 import { RepositoryError } from './errors';
 import { sourceCaptureSchema } from '../../shared/source-capture';
+import { refreshKnowledgeSearch } from './assets-search';
 
 const sha = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
 function validateSource(value: FrozenSourceDocument): FrozenSourceDocument {
@@ -73,6 +74,7 @@ export function commitSourceAssets(db: Database.Database, value: FrozenSourceDoc
   const insertAnnotation = db.prepare('INSERT INTO learning_annotation VALUES(?,?,?)');
   for (const annotation of annotations) insertAnnotation.run(annotation.id, annotation.entryId,
     JSON.stringify(learningAnnotationPayloadSchema.parse({ technique: annotation.technique, usage: annotation.usage, exercise: annotation.exercise })));
+  for (const entryId of new Set(annotations.map(annotation => annotation.entryId))) refreshKnowledgeSearch(db, entryId);
 }
 
 /** 归档/快照消费者读取规范资产，损坏JSON或原文哈希不能静默放过。 */

@@ -1,6 +1,7 @@
 import type { WorkDetail } from './contracts';
 import type { OutlineNode } from './assets';
 import { readableKnowledgeSource } from './knowledge-source';
+import { knowledgeSearchText, learningNoteText } from './knowledge-learning';
 /** 补齐选定章节的父级计划和详细场景；祖先不参与向下扩张，防止带入同卷其他章节。 */
 function scopeOutlines(nodes: OutlineNode[], chapterIds: Set<string>): OutlineNode[] {
   const live = nodes.filter(node => !node.deletedAt), byId = new Map(live.map(node => [node.id, node]));
@@ -40,7 +41,7 @@ export function relatedAiKnowledge(work: WorkDetail, text: string) {
     if (/\p{Script=Han}/u.test(match[0])) for (let i = 0; i < match[0].length - 1; i++) terms.add(match[0].slice(i, i + 2));
     else terms.add(match[0]);
   }
-  return assets.knowledge.filter(entry => !entry.deletedAt).map(entry => ({ entry, score: [...terms].filter(term => entry.body.toLocaleLowerCase().includes(term)).length }))
+  return assets.knowledge.filter(entry => !entry.deletedAt).map(entry => ({ entry, score: [...terms].filter(term => knowledgeSearchText(entry).toLocaleLowerCase().includes(term)).length }))
     .filter(item => item.score > 0).sort((a, b) => b.score - a.score || a.entry.id.localeCompare(b.entry.id)).slice(0, 5);
 }
 export function buildAiReferences(work: WorkDetail, chapterId: string, text: string, chapterIds: string[] = [chapterId], knowledgeIds?: string[]): string {
@@ -59,6 +60,6 @@ export function buildAiReferences(work: WorkDetail, chapterId: string, text: str
     styles.join('\n'),
     outlines.length ? `范围内大纲（含所属父级计划与详细场景）：\n${outlines.map(item => `${item.chapterId ? `${work.chapters.find(chapter => chapter.id === item.chapterId)?.title ?? item.chapterId} / ` : ''}${item.title}：${item.summary}`).join('\n')}` : '',
     hints.length ? `范围内伏笔：\n${hints.map(item => `${item.name} / ${item.status}：${item.description}`).join('\n')}` : '',
-    related.length ? `本作品关键词知识参考（最多五条；借鉴写法，保留出处，不照搬未授权内容）：\n${related.map(({ entry }) => `[知识 ${entry.id}]\n${entry.body}\n出处：${readableKnowledgeSource(entry.source) || '未注明'}`).join('\n\n')}` : '',
+    related.length ? `本作品关键词知识参考（最多五条；借鉴写法，保留出处，不照搬未授权内容）：\n${related.map(({ entry }) => `[知识 ${entry.id}]\n知识原文：\n${entry.body}\n出处：${readableKnowledgeSource(entry.source) || '未注明'}${learningNoteText(entry.learningNotes) ? `\n作者审核学习注释（教学建议，与原文分开）：\n${learningNoteText(entry.learningNotes)}` : ''}`).join('\n\n')}` : '',
   ].filter(Boolean).join('\n\n');
 }
