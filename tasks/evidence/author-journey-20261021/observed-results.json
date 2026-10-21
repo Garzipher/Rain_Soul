@@ -1,0 +1,40 @@
+{
+  "version": "1.3.7",
+  "sourceCommit": "bb89691906d0bf0c7c315b5297df50eb26cc947d",
+  "appAsarSha256AtReportReview": "4ab2ba368c72adb323d8ff2b1e910a60a812ea14ea92ee79c00e4ad636a8d239",
+  "scope": "原创隔离作品；无真实作者文本或凭据",
+  "repeatApply": {
+    "original": "雨已经停了，候船室里先亮起了一点光。",
+    "candidate": "雨停了，候船室先亮起一点光。",
+    "visibleHasCandidate": false,
+    "databaseHasCandidate": true,
+    "observedCandidateUpperBoundMs": 22778
+  },
+  "afterTyping": {
+    "candidate": "雨停了，候船室先亮起一点光。",
+    "oldSentence": "雨已经停了，候船室里先亮起了一点光。",
+    "newTextPresent": true,
+    "candidateSurvives": false,
+    "oldSentenceReturned": true,
+    "revision": 39
+  },
+  "learningAnnotations": [
+    {
+      "id": "9ee88512-82a1-4220-ac3e-438c24fd8a3e",
+      "entry_id": "e1e902b6-7c84-47ff-9f70-59c25b982e08",
+      "payload": {
+        "technique": "以重复动作的细微失败承载情绪，不直接说伤心。",
+        "usage": "读完旧信后克制情绪、人物不愿直面新信息时。",
+        "exercise": "换成折协议纸，保留重复动作，避免直接照搬原句。"
+      }
+    }
+  ],
+  "archiveRoundtrip": {
+    "count": 2,
+    "relationshipsEqual": true,
+    "chapters": 3,
+    "knowledge": 3,
+    "evidence": 3
+  },
+  "cleanup": "进程停止；隔离目录物理清理命令被策略拒绝，未换工具绕过；运行目录已被gitignore排除"
+}
