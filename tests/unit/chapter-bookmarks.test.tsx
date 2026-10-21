@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { chooseSelect } from './select-field-helper';
 import { afterEach, expect, it, vi } from 'vitest';
+import { BookmarkDetails } from '../../src/renderer/components/inline-bookmark';
 import { ChapterEditor } from '../../src/renderer/components/chapter-editor';
 import { emptyDocument, countDocumentWords, validateDocument } from '../../src/shared/document';
 import type { AssetState } from '../../src/shared/assets';
@@ -80,4 +81,16 @@ it('伏笔书签只关联目标，不制造埋设或回收证据；锁定时禁�
   expect(validateDocument(onChange.mock.calls.at(-1)![0]).content[0].content).toMatchObject([{ type: 'bookmark', attrs: { kind: 'foreshadow', targetId: state.foreshadows[0].id } }]);
   view.rerender(<ChapterEditor {...props} locked />);
   expect(screen.getByRole('button', { name: '插入书签' })).toBeDisabled();
+});
+
+
+it('伏笔书签详情与一致性规则同步提示正文摘录失配，不更改伏笔状态', () => {
+  const state = assets(), doc = emptyDocument();
+  doc.content[0].content = [{ type: 'text', text: '半张红船票' }];
+  state.foreshadows[0].status = '已埋设';
+  state.evidence.push({ id: 'evidence', foreshadowId: state.foreshadows[0].id, kind: '埋设', chapterId: 'chapter', paragraphId: doc.content[0].attrs.id, excerpt: '半张蓝船票', sourceRevision: 1, originalSource: { chapterId: 'chapter', chapterTitle: '第一章', paragraphId: doc.content[0].attrs.id, excerpt: '半张蓝船票', revision: 1 }, valid: true, invalidReason: null, deletedAt: null, supersedesId: null, supersededBy: null });
+  render(<BookmarkDetails bookmark={{ id: 'bookmark', kind: 'foreshadow', targetId: state.foreshadows[0].id }} assets={state} chapters={[{ id: 'chapter', title: '第一章', document: doc, wordCount: 6, volumeId: null }]} onClose={vi.fn()} />);
+  expect(screen.getByRole('dialog')).toHaveTextContent('证据需复核');
+  expect(screen.getByRole('dialog')).toHaveTextContent('证据摘录已不在当前正文中');
+  expect(screen.getByRole('dialog')).toHaveTextContent('已埋设');
 });

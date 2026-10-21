@@ -211,3 +211,46 @@ it.each(['人称', '节奏', '禁用项', '参考作品'])('写作特点的%s草
   expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ type: 'publishStyle' }));
   await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
 });
+
+
+it('选段自动填入当前正文摘录，换章清空旧摘录且不提前落盘', async () => {
+  const original = structuredClone(work);
+  original.chapters[0].document.content[0].content = [{ type: 'text', text: '来信' }, { type: 'hardBreak' }, { type: 'text', text: '带着雨声。' }, { type: 'bookmark', attrs: { id: 'marker', kind: 'foreshadow', targetId: 'hint' } }];
+  original.chapters.push({ ...original.chapters[0], id: 'second-chapter', title: '归途', document: { type: 'doc', content: [{ type: 'paragraph', attrs: { id: 'empty' }, content: [] }] } });
+  const onAction = vi.fn(async () => true);
+  render(<ForeshadowWorkspace {...base} work={original} onAction={onAction} />);
+  await chooseSelect(screen.getByRole('combobox', { name: '证据章节' }), '雨夜来信');
+  await chooseSelect(screen.getByRole('combobox', { name: '证据段落' }), /第 1 段/);
+  expect(screen.getByRole('textbox', { name: '证据摘录' })).toHaveValue('来信\n带着雨声。');
+  expect(onAction).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByRole('textbox', { name: '证据摘录' }), { target: { value: '带着雨声' } });
+  fireEvent.click(screen.getByRole('button', { name: '添加证据' }));
+  await waitFor(() => expect(onAction).toHaveBeenCalledWith({ type: 'addEvidence', foreshadowId: 'hint', kind: '埋设', chapterId: 'chapter', paragraphId: 'paragraph', excerpt: '带着雨声' }));
+  await chooseSelect(screen.getByRole('combobox', { name: '证据章节' }), '雨夜来信');
+  await chooseSelect(screen.getByRole('combobox', { name: '证据段落' }), /第 1 段/);
+  await chooseSelect(screen.getByRole('combobox', { name: '证据章节' }), '归途');
+  expect(screen.getByRole('textbox', { name: '证据摘录' })).toHaveValue('');
+  await chooseSelect(screen.getByRole('combobox', { name: '证据段落' }), /第 1 段/);
+  expect(screen.getByRole('textbox', { name: '证据摘录' })).toHaveValue('');
+});
+
+it('伏笔列表和详情动态提示正文摘录失配，定位仍可用于复核且历史证据不被改写', () => {
+  const current = { ...assets, evidence: [{ ...assets.evidence[0], chapterId: 'chapter', paragraphId: 'paragraph', excerpt: '旧地址', valid: true, invalidReason: null }] };
+  const before = structuredClone(current);
+  const onLocate = vi.fn();
+  render(<ForeshadowWorkspace {...base} assets={current} onAction={vi.fn(async () => true)} onLocate={onLocate} />);
+  expect(screen.getByRole('button', { name: '选择伏笔：旧地址' })).toHaveTextContent('证据需复核');
+  expect(screen.getByText(/证据需复核：证据摘录已不在当前正文中/)).toBeVisible();
+  expect(screen.getByRole('combobox', { name: '伏笔状态' })).toHaveTextContent('已埋设');
+  fireEvent.click(screen.getByRole('button', { name: '定位证据：旧地址' }));
+  expect(onLocate).toHaveBeenCalledWith('chapter', 'paragraph');
+  expect(current).toEqual(before);
+});
+
+it('缺少状态要求的有效证据时提示人工复核，历史和删除证据不当作当前证据', () => {
+  const archived = { ...assets, evidence: [{ ...assets.evidence[0], deletedAt: '2026-10-21' }, { ...assets.evidence[0], id: 'old', supersededBy: 'next' }] };
+  render(<ForeshadowWorkspace {...base} assets={archived} onAction={vi.fn(async () => true)} />);
+  expect(screen.getByRole('button', { name: '选择伏笔：旧地址' })).toHaveTextContent('证据需复核');
+  expect(screen.getByText(/缺少有效埋设证据/)).toBeVisible();
+  expect(screen.getByText('尚无证据')).toBeVisible();
+});
