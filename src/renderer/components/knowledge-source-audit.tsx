@@ -1,6 +1,16 @@
 import { useState } from 'react';
-import type { KnowledgeSourceAuditRecord } from '../../shared/knowledge-source';
+import { conciseKnowledgeSource, readableKnowledgeSource, type KnowledgeSourceAuditRecord } from '../../shared/knowledge-source';
 import type { FrozenSourceDocument } from '../../shared/source-document';
+
+/** 校验信息按需读取，默认不占据作者的阅读区域。 */
+export function KnowledgeSourceVerification({ source, targetId }: { source: string; targetId?: string }) {
+  const [open, setOpen] = useState(false);
+  const full = readableKnowledgeSource(source);
+  if (!targetId && conciseKnowledgeSource(source) === full) return null;
+  return <details onToggle={event => setOpen(event.currentTarget.open)}><summary>来源校验详情</summary>{open && <>
+    <p className="bookmark-fulltext">{full || '未注明出处'}</p>{targetId && <p className="bookmark-target">关联 ID：{targetId}</p>}
+  </>}</details>;
+}
 
 /** 只展示冻结证据字段，不读取或执行网页 HTML。 */
 export function WebSourceAudit({ source }: { source: FrozenSourceDocument }) {

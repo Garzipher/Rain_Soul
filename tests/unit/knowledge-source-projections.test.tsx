@@ -3,13 +3,23 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { PlotWorkspace } from '../../src/renderer/components/plot-workspace';
-import { KnowledgeSourceAudit, WebSourceAudit } from '../../src/renderer/components/knowledge-source-audit';
+import { KnowledgeSourceAudit, KnowledgeSourceVerification, WebSourceAudit } from '../../src/renderer/components/knowledge-source-audit';
 import { freezeSource } from '../../src/main/freeze-source';
 import type { AssetState } from '../../src/shared/assets';
 import type { WorkDetail } from '../../src/shared/contracts';
 import { auditedKnowledgeSource } from './knowledge-source-helper';
 
 afterEach(cleanup);
+it('简洁出处的完整校验信息按需展开，不混入AI审核材料', async () => {
+  const hash = 'a'.repeat(64), original = `《雨夜》／听雨；第2段；文件 SHA-256：${hash}`;
+  const { container } = render(<KnowledgeSourceVerification source={auditedKnowledgeSource(original).source} targetId="entry-1" />);
+  expect(container).not.toHaveTextContent(hash);
+  const details = screen.getByText('来源校验详情').closest('details')!;
+  details.open = true; fireEvent(details, new Event('toggle'));
+  await waitFor(() => expect(container).toHaveTextContent(hash));
+  expect(container).toHaveTextContent('关联 ID：entry-1');
+  expect(container).not.toHaveTextContent('上下文独有秘词');
+});
 it.each(['static', 'restricted-browser', 'legacy'] as const)('网页%s证据详情只显示捕获记录，旧来源不补造时间', method => {
   const source = freezeSource({ kind: 'web', title: '网页', rawBytes: Buffer.from('<script>秘密HTML</script>'), originalUrl: 'https://example.com/start',
     finalUrl: 'https://example.com/end', fetchedAt: '2026-10-10T00:00:00Z', segments: [{ text: '原文' }],

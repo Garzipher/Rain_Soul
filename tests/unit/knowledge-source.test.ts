@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { readableKnowledgeSource, replaceKnowledgeSource, splitKnowledgeSource } from '../../src/shared/knowledge-source';
+import { conciseKnowledgeSource, readableKnowledgeSource, replaceKnowledgeSource, splitKnowledgeSource } from '../../src/shared/knowledge-source';
 import { auditedKnowledgeSource } from './knowledge-source-helper';
 
 it.each([false, true])('兼容新旧审计后缀（旧格式：%s），清空或修改可读出处仍保留逐字审计', legacy => {
@@ -29,4 +29,17 @@ it('普通出处包含标记、无效JSON、错误字段/身份或非末尾结�
     expect(readableKnowledgeSource(value)).toBe(value); expect(splitKnowledgeSource(value).records).toEqual([]);
     expect(replaceKnowledgeSource(value, '手工改写')).toBe('手工改写');
   }
+});
+
+it('系统拆书出处默认去掉完整校验字段，普通作者文字和不完整哈希原样保留', () => {
+  const fileHash = 'a'.repeat(64), paragraphHash = 'b'.repeat(64);
+  const source = `《旧信》／作者：听雨；原稿.txt；第1章 第2段；文件 SHA-256：${fileHash}；段落 SHA-256：${paragraphHash}`;
+  expect(conciseKnowledgeSource(source)).toBe('《旧信》／作者：听雨；原稿.txt；第1章 第2段');
+  expect(readableKnowledgeSource(source)).toBe(source);
+  expect(conciseKnowledgeSource(`《旧信》／听雨；第2段；原始 SHA-256：${fileHash}；https://example.com/book`)).toBe('《旧信》／听雨；第2段；https://example.com/book');
+  for (const ordinary of ['作者讨论 SHA-256：文字', `手写出处；文件 SHA-256：${fileHash}`, '《论哈希》；文件 SHA-256：不完整', '第一行\n第二行']) {
+    expect(conciseKnowledgeSource(ordinary)).toBe(ordinary);
+  }
+  const audit = auditedKnowledgeSource(source);
+  expect(conciseKnowledgeSource(audit.source)).toBe('《旧信》／作者：听雨；原稿.txt；第1章 第2段');
 });

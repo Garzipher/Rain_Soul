@@ -29,6 +29,13 @@ export function splitKnowledgeSource(source: string) {
 
 export const readableKnowledgeSource = (source: string): string => splitKnowledgeSource(source).readable;
 
+/** 只为界面缩短系统生成的完整哈希字段；原始出处与冻结审计数据保持不变。 */
+export function conciseKnowledgeSource(source: string): string {
+  const readable = readableKnowledgeSource(source);
+  if (!/^《[^》]+》[／；]/.test(readable)) return readable;
+  return readable.replace(/；(?:文件|原始|段落) SHA-256：[a-f0-9]{64}(?=；|$)/g, '');
+}
+
 /** 手工编辑只替换可读出处，保留已有审计后缀，不重写证据内容。 */
 export function replaceKnowledgeSource(original: string, readable: string): string {
   const { audit } = splitKnowledgeSource(original);
