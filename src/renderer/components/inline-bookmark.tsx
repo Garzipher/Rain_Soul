@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import { Node, type Editor } from '@tiptap/core';
 import type { AssetState } from '../../shared/assets';
 import type { BookmarkNode, Chapter } from '../../shared/contracts';
-import { readableKnowledgeSource } from '../../shared/knowledge-source';
+import { conciseKnowledgeSource } from '../../shared/knowledge-source';
+import { KnowledgeSourceVerification } from './knowledge-source-audit';
 import { getEvidenceStatus, summarizeForeshadowEvidence } from '../../shared/evidence-status';
 import './inline-bookmark.css';
 
@@ -28,7 +29,7 @@ export function bookmarkInfo(bookmark: BookmarkNode['attrs'], assets?: AssetStat
   if (bookmark.kind === 'knowledge') {
     const entry = assets?.knowledge.find(item => item.id === bookmark.targetId);
     return { label: entry && !entry.deletedAt ? `知识书签：${entry.body.slice(0, 20)}` : '知识书签：已删除条目',
-      title: entry && !entry.deletedAt ? '知识引用' : '已删除条目', body: entry?.body ?? '原条目已不存在，关联 ID 仍保留。', source: readableKnowledgeSource(entry?.source ?? '') || '未注明出处', status: entry?.deletedAt ? '已删除条目，保留历史内容供追溯。' : '', needsReview: false };
+      title: entry && !entry.deletedAt ? '知识引用' : '已删除条目', body: entry?.body ?? '原条目已不存在，关联 ID 仍保留。', source: conciseKnowledgeSource(entry?.source ?? '') || '未注明出处', status: entry?.deletedAt ? '已删除条目，保留历史内容供追溯。' : '', needsReview: false };
   }
   const item = assets?.foreshadows.find(value => value.id === bookmark.targetId);
   const work = { chapters: chapters ?? [], assets };
@@ -47,8 +48,22 @@ export function BookmarkDetails({ bookmark, assets, chapters, onClose, onLocateA
     close.current?.focus();
     return () => { element?.close?.(); if (previous?.isConnected) previous.focus(); };
   }, []);
-  return <dialog ref={dialog} className="create-dialog bookmark-details" aria-labelledby="bookmark-title" onCancel={event => { event.preventDefault(); onClose(); }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); onClose(); } if (event.key === 'Tab') { event.preventDefault(); const buttons = Array.from(dialog.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []); const index = buttons.indexOf(window.document.activeElement as HTMLButtonElement); buttons[(index + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length]?.focus(); } }}>
-    <h2 id="bookmark-title">{info.title}</h2><p className="bookmark-fulltext">{info.body}</p>{info.source && <p>出处：{info.source}</p>}{info.status && <p>{info.status}</p>}<p className="bookmark-target">关联 ID：{bookmark.targetId}</p>
+  return <dialog ref={dialog} className="create-dialog bookmark-details" aria-labelledby="bookmark-title" onCancel={event => { event.preventDefault(); onClose(); }} onKeyDown={event => {
+    if (event.key === 'Escape') { event.preventDefault(); onClose(); }
+    if (event.key !== 'Tab') return;
+    event.preventDefault();
+    const items = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), summary, a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]') ?? []).filter(element => {
+      if (element.matches(':disabled') || element.closest('[hidden], [inert], [aria-hidden="true"]') || element.hasAttribute('tabindex') && element.tabIndex < 0) return false;
+      for (let parent = element.parentElement; parent && parent !== dialog.current; parent = parent.parentElement) {
+        if (parent instanceof HTMLDetailsElement && !parent.open && !parent.querySelector(':scope > summary')?.contains(element)) return false;
+      }
+      return true;
+    });
+    const index = items.indexOf(window.document.activeElement as HTMLElement);
+    items[(index + (event.shiftKey ? -1 : 1) + items.length) % items.length]?.focus();
+  }}>
+    <h2 id="bookmark-title">{info.title}</h2><p className="bookmark-fulltext">{info.body}</p>{info.source && <p>出处：{info.source}</p>}{info.status && <p>{info.status}</p>}
+    <KnowledgeSourceVerification source={bookmark.kind === 'knowledge' ? assets?.knowledge.find(entry => entry.id === bookmark.targetId)?.source ?? '' : ''} targetId={bookmark.targetId} />
     <div className="dialog-actions">{onLocateAsset && <button className="secondary" disabled={locked || !target || !!target.deletedAt} onClick={() => { if (target && !target.deletedAt && !locked) { onClose(); onLocateAsset(bookmark.kind, bookmark.targetId); } }}>{bookmark.kind === 'knowledge' ? '定位知识条目' : '定位伏笔架构'}</button>}<button ref={close} className="secondary" onClick={onClose}>关闭书签详情</button></div>
   </dialog>;
 }

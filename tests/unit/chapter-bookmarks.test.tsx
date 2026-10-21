@@ -9,6 +9,34 @@ import { emptyDocument, countDocumentWords, validateDocument } from '../../src/s
 import type { AssetState } from '../../src/shared/assets';
 import { auditedKnowledgeSource } from './knowledge-source-helper';
 afterEach(cleanup);
+it('书签详情的键盘焦点循环包含来源校验折叠标题', () => {
+  const state = assets();
+  render(<BookmarkDetails bookmark={{ id: 'bookmark', kind: 'knowledge', targetId: state.knowledge[0].id }} assets={state} onClose={vi.fn()} onLocateAsset={vi.fn()} />);
+  const close = screen.getByRole('button', { name: '关闭书签详情' });
+  const summary = screen.getByText('来源校验详情');
+  const locate = screen.getByRole('button', { name: '定位知识条目' });
+  expect(close).toHaveFocus();
+  fireEvent.keyDown(close, { key: 'Tab' });
+  expect(summary).toHaveFocus();
+  fireEvent.keyDown(summary, { key: 'Tab' });
+  expect(locate).toHaveFocus();
+  fireEvent.keyDown(locate, { key: 'Tab', shiftKey: true });
+  expect(summary).toHaveFocus();
+  fireEvent.keyDown(summary, { key: 'Tab', shiftKey: true });
+  expect(close).toHaveFocus();
+});
+it('相同原句的书签目标以简洁出处区分，不显示完整校验哈希', async () => {
+  const state = assets();
+  state.knowledge[0].source = `《旧站》；第1段；文件 SHA-256：${'a'.repeat(64)}`;
+  state.knowledge.push({ ...state.knowledge[0], id: crypto.randomUUID(), source: '《归程》；第2段' });
+  render(<ChapterEditor document={emptyDocument()} assets={state} locked={false} onChange={vi.fn()} onError={vi.fn()} onCompositionChange={vi.fn()} />);
+  fireEvent.click(screen.getByText('引用与伏笔书签'));
+  await chooseSelect(screen.getByRole('combobox', { name: '书签目标' }), '雨打旧站台。 · 《归程》；第2段');
+  expect(screen.getByRole('combobox', { name: '书签目标' })).toHaveTextContent('《归程》；第2段');
+  await chooseSelect(screen.getByRole('combobox', { name: '书签目标' }), '雨打旧站台。 · 《旧站》；第1段');
+  expect(screen.getByRole('combobox', { name: '书签目标' })).not.toHaveTextContent('SHA-256');
+  expect(screen.queryByRole('option', { name: /SHA-256/ })).not.toBeInTheDocument();
+});
 it('知识书签详情仅展示可读出处，不向正文读者展开审计材料', async () => {
   const state = assets(), doc = emptyDocument(); state.knowledge[0].source = auditedKnowledgeSource('写作练习').source;
   doc.content[0].content = [{ type: 'bookmark', attrs: { id: crypto.randomUUID(), kind: 'knowledge', targetId: state.knowledge[0].id } }];
@@ -63,6 +91,9 @@ it('光标处插入可点击知识书签，持久化关联不计字数；详情�
   updated.knowledge[0].deletedAt = new Date().toISOString();
   view.rerender(<ChapterEditor {...props} assets={structuredClone(updated)} />);
   expect(screen.getByRole('dialog')).toHaveTextContent('已删除条目');
+  const verification = screen.getByText('来源校验详情').closest('details')!;
+  verification.open = true; fireEvent(verification, new Event('toggle'));
+  await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent(state.knowledge[0].id));
   expect(screen.getByRole('dialog')).toHaveTextContent(state.knowledge[0].id);
   fireEvent.click(screen.getByRole('button', { name: '关闭书签详情' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

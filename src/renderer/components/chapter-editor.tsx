@@ -12,6 +12,7 @@ import type { Editor } from '@tiptap/core';
 import type { BookmarkNode, Chapter, WritingDocument } from '../../shared/contracts';
 import type { AssetState, KnowledgeEntry } from '../../shared/assets';
 import { validateDocument } from '../../shared/document';
+import { conciseKnowledgeSource } from '../../shared/knowledge-source';
 import { stableParagraphIds } from '../lib/paragraph-ids';
 import { BookmarkDetails, bookmarkInfo, inlineBookmark, insertBookmarkAtSelection } from './inline-bookmark';
 import { ContextMenu, type MenuState } from './context-menu';
@@ -37,7 +38,7 @@ export function ChapterEditor({ document, chapters, assets, globalEntries, onAcc
   const [kind, setKind] = useState<BookmarkNode['attrs']['kind']>('knowledge');
   const [target, setTarget] = useState('');
   const [detail, setDetail] = useState<BookmarkNode['attrs'] | null>(null);
-  const options = kind === 'knowledge' ? assets?.knowledge.filter(item => !item.deletedAt).map(item => ({ id: item.id, label: item.body.slice(0, 30) })) : assets?.foreshadows.filter(item => !item.deletedAt).map(item => ({ id: item.id, label: item.name }));
+  const options = kind === 'knowledge' ? assets?.knowledge.filter(item => !item.deletedAt).map(item => ({ id: item.id, label: `${item.body.slice(0, 30)} · ${conciseKnowledgeSource(item.source) || '未注明出处'}` })) : assets?.foreshadows.filter(item => !item.deletedAt).map(item => ({ id: item.id, label: item.name }));
   const targetId = options?.some(item => item.id === target) ? target : options?.[0]?.id ?? '';
   const editor = useEditor({
     extensions: [Document, Paragraph, Text, HardBreak, inlineBookmark, stableParagraphIds, UndoRedo, createKnowledgeGhost(() => ({ entries: knowledgeEntries.current, globalEntries: globalKnowledge.current, onAcceptGlobal: candidate => acceptGlobal.current?.(candidate) ?? Promise.resolve(false), onError, paused: ghostState.current.locked || ghostState.current.paused }))],
