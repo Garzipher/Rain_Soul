@@ -3,5 +3,5 @@
 .inline-bookmark { display: inline; min-height: 0; padding: 0 4px; margin: 0 3px; border: 0; border-radius: 4px; background: #edf8ff; color: #176a94; font: inherit; font-size: .82em; cursor: pointer; }
 .inline-bookmark:focus-visible { outline: 2px solid #2586b2; outline-offset: 2px; }
 .bookmark-details { max-width: 640px; }
-.bookmark-fulltext { white-space: pre-wrap; line-height: 1.8; }
+.bookmark-fulltext { white-space: pre-wrap; line-height: 1.8; overflow-wrap: anywhere; }
 .bookmark-target { color: #637580; font-size: 12px; overflow-wrap: anywhere; }
