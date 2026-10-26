@@ -26,7 +26,7 @@ function setup() {
 }
 it('正文书签经过保存门禁定位具体伏笔，伏笔可再定位所属剧情', async () => {
   const { props } = setup(); render(<WritingWorkspace {...props} />);
-  fireEvent.click(await screen.findByRole('button', { name: '伏笔书签：目标伏笔' }));
+  fireEvent.click(await screen.findByRole('button', { name: '伏笔书签：目标伏笔 · 证据需复核' }));
   fireEvent.click(screen.getByRole('button', { name: '定位伏笔架构' }));
   expect(await screen.findByLabelText('伏笔名称')).toHaveValue('目标伏笔');
   fireEvent.click(screen.getByRole('button', { name: '定位剧情节点' }));
@@ -41,7 +41,7 @@ it('剧情关联列表定位目标伏笔，不切到首条伏笔', async () => {
 it('定位保存门禁失败不切换正文、不丢失当前内容', async () => {
   const { props } = setup(); props.changeTab = async () => false;
   render(<WritingWorkspace {...props} />);
-  fireEvent.click(await screen.findByRole('button', { name: '伏笔书签：目标伏笔' }));
+  fireEvent.click(await screen.findByRole('button', { name: '伏笔书签：目标伏笔 · 证据需复核' }));
   fireEvent.click(screen.getByRole('button', { name: '定位伏笔架构' }));
   expect(screen.getByRole('tab', { name: '正文' })).toHaveAttribute('aria-selected', 'true');
   expect(screen.getByLabelText('章节正文')).toHaveTextContent('旧信');

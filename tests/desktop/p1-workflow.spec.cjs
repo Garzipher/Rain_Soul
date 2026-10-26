@@ -133,7 +133,12 @@ test('P1本地拆书默认零选择，取消不写库，两段审核真实入库
     const first = page.getByRole('article', { name: /^知识：细雨落在窗上/ });
     await activate(first.getByRole('button', { name: /^展开知识：/ }));
     await expect(first).toContainText('合成测试作者'); await expect(first).toContainText('优秀作品.txt');
-    await expect(first).toContainText('第1段'); await expect(first).toContainText('SHA-256');
+    await expect(first).toContainText('第1段'); await expect(first).not.toContainText('SHA-256');
+    const verification = first.getByText('来源校验详情', { exact: true });
+    await verification.press('Enter');
+    await expect(first).toContainText('文件 SHA-256：'); await expect(first).toContainText('段落 SHA-256：');
+    await capture(page, 'p1-book-source-verification');
+    await verification.press('Enter'); await expect(first).not.toContainText('SHA-256');
     const state = await page.evaluate(id => window.rainSoul.openWork(id), id);
     expect(state.assets.knowledge).toHaveLength(2); expect(state.assets.knowledge.some(entry => entry.body.includes('未选内容'))).toBe(false);
     expect(await page.evaluate(id => window.rainSoul.listSnapshots(id), id)).toEqual(expect.arrayContaining([expect.objectContaining({ title: '拆书入库前安全快照' })]));
